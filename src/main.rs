@@ -324,47 +324,6 @@ impl IncidenceDensitySampler {
         Ok(case_control_pairs)
     }
 
-    pub fn verify_sampling_distribution(
-        &self,
-        case_control_pairs: &[(usize, SmallVec<[usize; 8]>)],
-    ) -> String {
-        let total_cases = case_control_pairs.len();
-        let total_controls: usize = case_control_pairs
-            .iter()
-            .map(|(_, controls)| controls.len())
-            .sum();
-
-        let avg_controls_per_case = total_controls as f64 / total_cases as f64;
-        let control_counts = case_control_pairs
-            .iter()
-            .map(|(_, controls)| controls.len())
-            .collect::<Vec<_>>();
-
-        let min_controls = control_counts.iter().min().unwrap_or(&0);
-        let max_controls = control_counts.iter().max().unwrap_or(&0);
-
-        format!(
-            "{}\n\
-            │ {} {}\n\
-            │ {} {}\n\
-            │ {} {:.2}\n\
-            │ {} {}\n\
-            │ {} {}\n\
-            └────────────────────────────",
-            "Distribution Statistics:".bold().green(),
-            "Matched Cases:".bold(),
-            total_cases.to_string().yellow(),
-            "Total Controls:".bold(),
-            total_controls.to_string().yellow(),
-            "Controls per Case:".bold(),
-            avg_controls_per_case,
-            "Min Controls:".bold(),
-            min_controls.to_string().yellow(),
-            "Max Controls:".bold(),
-            max_controls.to_string().yellow()
-        )
-    }
-
     pub fn evaluate_matching_quality(
         &self,
         case_control_pairs: &[(usize, SmallVec<[usize; 8]>)],
@@ -662,7 +621,7 @@ impl MatchingQuality {
 
         chart.draw_series(vec![Text::new(
             format!("Mean: {:.1} days", mean),
-            (5, (max_count * 0.9) as f64),
+            (5, (max_count * 0.9)),
             ("sans-serif", 20).into_font(),
         )])?;
 
@@ -756,7 +715,7 @@ impl MatchingQuality {
         let mean = data.iter().sum::<i64>() as f64 / data.len() as f64;
         chart.draw_series(vec![Text::new(
             format!("Mean: {:.1} days", mean),
-            (5, (max_count * 0.9) as f64),
+            (5, (max_count * 0.9)),
             ("sans-serif", 20).into_font(),
         )])?;
 
