@@ -229,7 +229,7 @@ impl IncidenceDensitySampler {
 
         let start_time = std::time::Instant::now();
         let total_cases = self.cases.len();
-        let total_chunks = (total_cases + BATCH_SIZE - 1) / BATCH_SIZE;
+        let total_chunks = total_cases.div_ceil(BATCH_SIZE);
 
         println!(
             "{}",
@@ -449,7 +449,7 @@ impl IncidenceDensitySampler {
         let mut wtr = csv::Writer::from_path(filename)?;
 
         // Write header
-        wtr.write_record(&[
+        wtr.write_record([
             "case_id",
             "case_pnr",
             "case_birth_date",
@@ -516,7 +516,7 @@ impl IncidenceDensitySampler {
         let mut wtr = csv::Writer::from_path(filename)?;
 
         // Write header
-        wtr.write_record(&[
+        wtr.write_record([
             "case_id",
             "n_controls",
             "avg_birth_diff",
@@ -615,7 +615,7 @@ impl MatchingQuality {
         let bin_size = (max_diff as f64 / N_BINS as f64).ceil() as i64;
 
         // Create histogram data
-        let mut histogram_data = vec![0; N_BINS];
+        let mut histogram_data = [0; N_BINS];
         for &diff in &self.birth_date_differences {
             let bin = ((diff as f64 / bin_size as f64).floor() as usize).min(N_BINS - 1);
             histogram_data[bin] += 1;
@@ -719,7 +719,7 @@ impl MatchingQuality {
         let bin_size = (max_diff as f64 / N_BINS as f64).ceil() as i64;
 
         // Create histogram data
-        let mut histogram_data = vec![0; N_BINS];
+        let mut histogram_data = [0; N_BINS];
         for &value in data {
             let bin = ((value as f64 / bin_size as f64).floor() as usize).min(N_BINS - 1);
             histogram_data[bin] += 1;
