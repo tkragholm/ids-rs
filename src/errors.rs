@@ -13,3 +13,11 @@ pub enum SamplingError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
+
+#[derive(Error, Debug)]
+pub enum PlottingError {
+    #[error("Plotting error: {0}")]
+    PlotError(String),
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+}

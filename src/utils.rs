@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use log::LevelFilter;
 use log4rs::{
     append::file::FileAppender,
@@ -6,6 +7,8 @@ use log4rs::{
     filter::threshold::ThresholdFilter,
     init_config,
 };
+
+use crate::errors::SamplingError;
 
 use std::error::Error;
 
@@ -29,8 +32,29 @@ pub fn configure_logging() {
 
 pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(filename)?;
-    let records: Vec<crate::sampler::Record> = rdr.deserialize().collect::<Result<_, _>>()?;
-    Ok(records)
+    let records: Result<Vec<crate::sampler::Record>, Box<dyn Error>> = rdr
+        .deserialize()
+        .map(|result| {
+            let record: crate::sampler::Record = result?;
+
+            // Validate dates
+            validate_date(&record.bday.to_string())?;
+            validate_date(&record.mother_bday.to_string())?;
+            validate_date(&record.father_bday.to_string())?;
+
+            if let Some(treatment_date) = record.treatment_date {
+                validate_date(&treatment_date.to_string())?;
+            }
+
+            Ok(record)
+        })
+        .collect();
+
+    records
+}
+
+pub fn validate_date(date_str: &str) -> Result<NaiveDate, SamplingError> {
+    NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|_| SamplingError::InvalidDate)
 }
 
 pub mod date_format {

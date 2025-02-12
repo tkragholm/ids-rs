@@ -1,24 +1,41 @@
+mod cli;
 mod errors;
+mod generate_data;
 mod matching_quality;
+mod plotting;
 mod sampler;
 mod utils;
 
+use clap::Parser;
+use cli::Cli;
 use log::info;
 use sampler::IncidenceDensitySampler;
-use std::time::Instant;
-use utils::{configure_logging, load_records};
+use std::{fs, path::Path, time::Instant};
+use utils::{configure_logging, load_records, MatchingCriteria};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+
+    // Create output directory if it doesn't exist
+    fs::create_dir_all(&cli.output_dir)?;
+
+    // Configure logging
     configure_logging();
     let start = Instant::now();
 
-    info!("Reading data...");
-    let records = load_records("data.csv")?;
+    // Generate synthetic data if requested
+    if cli.generate {
+        info!("Generating synthetic data...");
+        generate_data::generate_pediatric_data(&cli.input, cli.num_records, cli.num_cases)?;
+    }
+
+    info!("Reading data from {}...", cli.input);
+    let records = load_records(&cli.input)?;
     info!("Data loaded in {:?}", start.elapsed());
 
-    let criteria = utils::MatchingCriteria {
-        birth_date_window: 30,
-        parent_date_window: 365,
+    let criteria = MatchingCriteria {
+        birth_date_window: cli.birth_window,
+        parent_date_window: cli.parent_window,
     };
 
     info!("Initializing sampler...");
@@ -29,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Sampling controls...");
     let sampling_start = Instant::now();
-    match sampler.sample_controls(4) {
+    match sampler.sample_controls(cli.controls) {
         Ok(case_control_pairs) => {
             info!(
                 "Sampling completed in {:?}. Found {} matches",
@@ -40,18 +57,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let quality = sampler.evaluate_matching_quality(&case_control_pairs);
             info!("{}", quality.format_report());
 
-            if let Err(e) = quality.plot_all_distributions("matching_distributions") {
-                log::error!("Error plotting distributions: {}", e);
+            // Generate all plots
+            let plots_dir = Path::new(&cli.output_dir).join("plots");
+            fs::create_dir_all(&plots_dir)?;
+
+            if let Err(e) = quality.generate_summary_plots(&plots_dir.to_string_lossy()) {
+                log::error!("Error generating plots: {}", e);
             }
 
-            info!("\nSaving results...");
-
-            if let Err(e) = sampler.save_matches_to_csv(&case_control_pairs, "matched_pairs.csv") {
+            let matches_path = Path::new(&cli.output_dir).join("matched_pairs.csv");
+            if let Err(e) =
+                sampler.save_matches_to_csv(&case_control_pairs, &matches_path.to_string_lossy())
+            {
                 log::error!("Error saving matches to CSV: {}", e);
             }
 
+            let stats_path = Path::new(&cli.output_dir).join("matching_stats.csv");
             if let Err(e) =
-                sampler.save_matching_statistics(&case_control_pairs, "matching_stats.csv")
+                sampler.save_matching_statistics(&case_control_pairs, &stats_path.to_string_lossy())
             {
                 log::error!("Error saving matching statistics: {}", e);
             }

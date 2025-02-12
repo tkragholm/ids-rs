@@ -305,21 +305,19 @@ impl IncidenceDensitySampler {
                 &percentiles,
             );
 
-        crate::matching_quality::MatchingQuality {
+        crate::matching_quality::MatchingQuality::new(
             total_cases,
             matched_cases,
             total_controls,
-            avg_controls_per_case: total_controls as f64 / matched_cases as f64,
             birth_date_differences,
             mother_age_differences,
             father_age_differences,
-            matching_rate: matched_cases as f64 / total_cases as f64,
             birth_date_balance,
             parent_age_balance,
             birth_date_percentiles,
             mother_age_percentiles,
             father_age_percentiles,
-        }
+        )
     }
 
     fn calculate_balance_metric(&self, diffs: &[i64]) -> f64 {
