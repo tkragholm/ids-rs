@@ -18,10 +18,10 @@ pub struct Record {
     pub bday: NaiveDate,
     #[serde(with = "crate::utils::optional_date_format")]
     pub treatment_date: Option<NaiveDate>,
-    #[serde(with = "crate::utils::date_format")]
-    pub mother_bday: NaiveDate,
-    #[serde(with = "crate::utils::date_format")]
-    pub father_bday: NaiveDate,
+    #[serde(with = "crate::utils::optional_date_format")]
+    pub mother_bday: Option<NaiveDate>,
+    #[serde(with = "crate::utils::optional_date_format")]
+    pub father_bday: Option<NaiveDate>,
 }
 
 pub struct IncidenceDensitySampler {
@@ -50,8 +50,8 @@ impl IncidenceDensitySampler {
             .enumerate()
             .map(|(idx, record)| {
                 let birth = (record.bday - epoch).num_days();
-                let mother = (record.mother_bday - epoch).num_days();
-                let father = (record.father_bday - epoch).num_days();
+                let mother = record.mother_bday.map(|d| (d - epoch).num_days());
+                let father = record.father_bday.map(|d| (d - epoch).num_days());
                 let treatment = record.treatment_date.map(|d| (d - epoch).num_days());
 
                 (
@@ -91,6 +91,14 @@ impl IncidenceDensitySampler {
             sorted_controls: controls,
             birth_date_index: Arc::new(birth_date_index),
         })
+    }
+
+    fn is_parent_match(case_parent: Option<i64>, control_parent: Option<i64>, window: i64) -> bool {
+        match (case_parent, control_parent) {
+            (None, None) => true, // Match if both are missing
+            (Some(case_date), Some(control_date)) => (case_date - control_date).abs() <= window,
+            _ => false, // Don't match if one is missing and the other isn't
+        }
     }
 
     fn select_random_controls(
@@ -203,14 +211,20 @@ impl IncidenceDensitySampler {
                             for &control_idx in controls {
                                 if self.sorted_controls.binary_search(&control_idx).is_ok() {
                                     let control_date = self.dates[control_idx];
-                                    let mother_diff =
-                                        (case_date.mother - control_date.mother).abs();
-                                    let father_diff =
-                                        (case_date.father - control_date.father).abs();
 
-                                    if mother_diff <= self.criteria.parent_date_window
-                                        && father_diff <= self.criteria.parent_date_window
-                                    {
+                                    // Check parent matches considering missing values
+                                    let mother_match = Self::is_parent_match(
+                                        case_date.mother,
+                                        control_date.mother,
+                                        self.criteria.parent_date_window,
+                                    );
+                                    let father_match = Self::is_parent_match(
+                                        case_date.father,
+                                        control_date.father,
+                                        self.criteria.parent_date_window,
+                                    );
+
+                                    if mother_match && father_match {
                                         eligible_buffer.push(control_idx);
                                     }
                                 }
@@ -278,8 +292,14 @@ impl IncidenceDensitySampler {
                 let control_dates = self.dates[control_idx];
 
                 birth_date_differences.push((case_dates.birth - control_dates.birth).abs());
-                mother_age_differences.push((case_dates.mother - control_dates.mother).abs());
-                father_age_differences.push((case_dates.father - control_dates.father).abs());
+
+                if let Some(diff) = calculate_date_diff(case_dates.mother, control_dates.mother) {
+                    mother_age_differences.push(diff);
+                }
+
+                if let Some(diff) = calculate_date_diff(case_dates.father, control_dates.father) {
+                    father_age_differences.push(diff);
+                }
             }
         }
 
@@ -363,9 +383,15 @@ impl IncidenceDensitySampler {
                 let control = &self.records[control_idx];
                 let control_dates = self.dates[control_idx];
 
-                let birth_diff = (case_dates.birth - control_dates.birth).abs();
-                let mother_diff = (case_dates.mother - control_dates.mother).abs();
-                let father_diff = (case_dates.father - control_dates.father).abs();
+                let mother_diff = match (case_dates.mother, control_dates.mother) {
+                    (Some(m1), Some(m2)) => (m1 - m2).abs().to_string(),
+                    _ => "NA".to_string(),
+                };
+
+                let father_diff = match (case_dates.father, control_dates.father) {
+                    (Some(f1), Some(f2)) => (f1 - f2).abs().to_string(),
+                    _ => "NA".to_string(),
+                };
 
                 wtr.write_record(&[
                     case_idx.to_string(),
@@ -376,9 +402,9 @@ impl IncidenceDensitySampler {
                     control_idx.to_string(),
                     control.pnr.clone(),
                     control.bday.to_string(),
-                    birth_diff.to_string(),
-                    mother_diff.to_string(),
-                    father_diff.to_string(),
+                    (case_dates.birth - control_dates.birth).abs().to_string(),
+                    mother_diff,
+                    father_diff,
                 ])?;
             }
         }
@@ -424,12 +450,17 @@ impl IncidenceDensitySampler {
                     let control_dates = self.dates[control_idx];
                     (
                         (case_dates.birth - control_dates.birth).abs(),
-                        (case_dates.mother - control_dates.mother).abs(),
-                        (case_dates.father - control_dates.father).abs(),
+                        calculate_date_diff(case_dates.mother, control_dates.mother),
+                        calculate_date_diff(case_dates.father, control_dates.father),
                     )
                 })
                 .fold((0, 0, 0, 0), |acc, (b, m, f)| {
-                    (acc.0 + b, acc.1.max(b), acc.2 + m, acc.3 + f)
+                    (
+                        acc.0 + b,
+                        acc.1.max(b),
+                        acc.2 + m.unwrap_or(0),
+                        acc.3 + f.unwrap_or(0),
+                    )
                 });
 
             let n_controls = controls.len() as f64;
@@ -445,5 +476,12 @@ impl IncidenceDensitySampler {
         }
 
         Ok(())
+    }
+}
+
+fn calculate_date_diff(date1: Option<i64>, date2: Option<i64>) -> Option<i64> {
+    match (date1, date2) {
+        (Some(d1), Some(d2)) => Some((d1 - d2).abs()),
+        _ => None,
     }
 }

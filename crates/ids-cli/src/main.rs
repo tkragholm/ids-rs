@@ -3,7 +3,7 @@ use ids_core::{
     cli::{Cli, Commands},
     generate_data,
     sampler::IncidenceDensitySampler,
-    utils::{configure_logging, load_records, MatchingCriteria},
+    utils::{configure_logging, load_records, validate_csv_format, MatchingCriteria},
 };
 use log::{error, info};
 use std::{fs, path::Path, time::Instant};
@@ -38,6 +38,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             parent_window,
         } => {
             let start = Instant::now();
+
+            info!("Validating input file format...");
+            if let Err(e) = validate_csv_format(input) {
+                error!("CSV validation failed: {}", e);
+                return Err(e.into());
+            }
 
             info!("Reading data from {}...", input);
             let records = load_records(input)?;

@@ -66,31 +66,103 @@ pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<dyn Error>> {
-    let mut rdr = csv::Reader::from_path(filename)?;
-    let records: Result<Vec<crate::sampler::Record>, Box<dyn Error>> = rdr
-        .deserialize()
-        .map(|result| {
-            let record: crate::sampler::Record = result?;
-
-            // Validate dates
-            validate_date(&record.bday.to_string())?;
-            validate_date(&record.mother_bday.to_string())?;
-            validate_date(&record.father_bday.to_string())?;
-
-            if let Some(treatment_date) = record.treatment_date {
-                validate_date(&treatment_date.to_string())?;
-            }
-
-            Ok(record)
-        })
-        .collect();
-
-    records
+pub fn validate_optional_date(date: &Option<NaiveDate>) -> Result<(), SamplingError> {
+    match date {
+        Some(d) => validate_date(&d.to_string()),
+        None => Ok(()),
+    }
 }
 
-pub fn validate_date(date_str: &str) -> Result<NaiveDate, SamplingError> {
-    NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|_| SamplingError::InvalidDate)
+pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<dyn Error>> {
+    let mut rdr = csv::Reader::from_path(filename)?;
+    let mut records = Vec::new();
+
+    for (idx, result) in rdr.deserialize().enumerate() {
+        match result {
+            Ok(record) => {
+                let record: crate::sampler::Record = record;
+
+                // Validate dates with detailed error messages
+                if let Err(e) = validate_date(&record.bday.to_string()) {
+                    log::error!("Invalid birth date at record {}: {}", idx + 1, e);
+                    return Err(Box::new(SamplingError::InvalidDate));
+                }
+
+                if let Err(e) = validate_optional_date(&record.mother_bday) {
+                    log::error!("Invalid mother birth date at record {}: {}", idx + 1, e);
+                    return Err(Box::new(SamplingError::InvalidDate));
+                }
+
+                if let Err(e) = validate_optional_date(&record.father_bday) {
+                    log::error!("Invalid father birth date at record {}: {}", idx + 1, e);
+                    return Err(Box::new(SamplingError::InvalidDate));
+                }
+
+                if let Some(treatment_date) = record.treatment_date {
+                    if let Err(e) = validate_date(&treatment_date.to_string()) {
+                        log::error!("Invalid treatment date at record {}: {}", idx + 1, e);
+                        return Err(Box::new(SamplingError::InvalidDate));
+                    }
+                }
+
+                records.push(record);
+            }
+            Err(e) => {
+                log::error!("Failed to parse record {} with error: {}", idx + 1, e);
+                return Err(Box::new(e));
+            }
+        }
+    }
+
+    Ok(records)
+}
+
+pub fn validate_csv_format(filename: &str) -> Result<(), Box<dyn Error>> {
+    let file = std::fs::File::open(filename)?;
+    let mut rdr = csv::Reader::from_reader(file);
+    let headers = rdr.headers()?;
+
+    // Check required headers
+    let required_headers = [
+        "pnr",
+        "bday",
+        "treatment_date",
+        "mother_bday",
+        "father_bday",
+    ];
+    for &header in required_headers.iter() {
+        if !headers.iter().any(|h| h == header) {
+            return Err(format!("Missing required header: {}", header).into());
+        }
+    }
+
+    // Validate each row
+    for (idx, result) in rdr.records().enumerate() {
+        match result {
+            Ok(record) => {
+                if record.len() != required_headers.len() {
+                    return Err(format!(
+                        "Invalid number of fields at line {}: expected {}, got {}",
+                        idx + 2, // +2 because idx starts at 0 and we need to account for header
+                        required_headers.len(),
+                        record.len()
+                    )
+                    .into());
+                }
+            }
+            Err(e) => {
+                return Err(format!("Error at line {}: {}", idx + 2, e).into());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_date(date_str: &str) -> Result<(), SamplingError> {
+    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .map(|_| ()) // Convert success to () instead of NaiveDate
+        .map_err(|_| SamplingError::InvalidDate)
 }
 
 pub mod date_format {
@@ -142,6 +214,6 @@ impl MatchingCriteria {
 #[derive(Copy, Clone)]
 pub struct DateData {
     pub birth: i64,
-    pub mother: i64,
-    pub father: i64,
+    pub mother: Option<i64>,
+    pub father: Option<i64>,
 }
