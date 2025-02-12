@@ -21,6 +21,22 @@ jobs:
         with:
           python-version: "3.13"
 
+      # Install Linux dependencies
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            fontconfig \
+            libfontconfig1-dev \
+            libfreetype6-dev
+
+      # Install macOS dependencies
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install fontconfig freetype
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
