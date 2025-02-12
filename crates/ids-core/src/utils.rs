@@ -1,33 +1,69 @@
 use chrono::NaiveDate;
 use log::LevelFilter;
+use std::{error::Error, sync::Once};
+
 use log4rs::{
-    append::file::FileAppender,
+    append::console::ConsoleAppender,
     config::{Appender, Config, Root},
     encode::pattern::PatternEncoder,
-    filter::threshold::ThresholdFilter,
-    init_config,
 };
 
 use crate::errors::SamplingError;
 
-use std::error::Error;
+static INIT: Once = Once::new();
 
-pub fn configure_logging() {
-    let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l} - {m}\n")))
-        .build("log/output.log")
-        .unwrap();
+pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
+    INIT.call_once(|| {
+        // Helper function to create a console appender
+        let create_console_appender = || {
+            ConsoleAppender::builder()
+                .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}{n}")))
+                .build()
+        };
 
-    let config = Config::builder()
-        .appender(
-            Appender::builder()
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Info)))
-                .build("logfile", Box::new(logfile)),
-        )
-        .build(Root::builder().appender("logfile").build(LevelFilter::Info))
-        .unwrap();
+        let mut config_builder = Config::builder();
 
-    init_config(config).unwrap();
+        // Add console appender
+        config_builder = config_builder
+            .appender(Appender::builder().build("console", Box::new(create_console_appender())));
+
+        // Add file appender if log file is specified
+        if let Some(file_path) = log_file {
+            if let Ok(file_appender) = log4rs::append::file::FileAppender::builder()
+                .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}{n}")))
+                .build(file_path)
+            {
+                config_builder = config_builder
+                    .appender(Appender::builder().build("file", Box::new(file_appender)));
+            }
+        }
+
+        // Build root logger
+        let mut root = Root::builder().appender("console");
+        if log_file.is_some() {
+            root = root.appender("file");
+        }
+
+        let config = config_builder
+            .build(root.build(LevelFilter::Debug))
+            .unwrap_or_else(|_| {
+                // Create a new console appender for the fallback configuration
+                Config::builder()
+                    .appender(
+                        Appender::builder().build("console", Box::new(create_console_appender())),
+                    )
+                    .build(
+                        Root::builder()
+                            .appender("console")
+                            .build(LevelFilter::Debug),
+                    )
+                    .unwrap()
+            });
+
+        let _ = log4rs::init_config(config);
+    });
+
+    Ok(())
 }
 
 pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<dyn Error>> {

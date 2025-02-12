@@ -1,0 +1,10 @@
+[package]
+name = "ids-cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ids-core = { path = "../ids-core" }
+clap = { version = "4.5", features = ["derive"] }
+log = "0.4"
+log4rs = { version = "1.2", features = ["console_appender"] }

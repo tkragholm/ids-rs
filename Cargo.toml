@@ -1,32 +1,25 @@
-[package]
-name = "ids-rs"
+[workspace]
+members = ["crates/ids-core", "crates/ids-cli", "crates/ids-py"]
+
+# Set the resolver to version 2 as recommended
+resolver = "2"
+
+# Set workspace-wide configuration
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["Tobias Kragholm <tkragholm@gmail.com>"]
+description = "Incidence Density Sampling implementation in Rust"
 
-[dependencies]
-bit-vec = "0.8.0"
-chrono = { version = "0.4.39", features = ["serde"] }
-clap = { version = "4.5.29", features = ["derive"] }
-colored = "3.0.0"
-csv = "1.3.1"
-dashmap = "6.1.0"
-fastrand = "2.3.0"
-hashbrown = "0.15.2"
-humantime = "2.1.0"
-indicatif = "0.17.11"
-log = "0.4.25"
-log4rs = "1.3.0"
-mimalloc = "0.1.43"
-ndarray = { version = "0.16.1", features = ["rayon"] }
-parking_lot = "0.12.3"
-plotters = "0.3.7"
-rand = "0.9.0"
-rand_distr = "0.5.0"
-rayon = "1.10.0"
-rustc-hash = "2.1.1"
-serde = { version = "1.0.217", features = ["derive"] }
-smallvec = "1.13.2"
-thiserror = "2.0.11"
+
+# Define shared development dependencies
+[workspace.dependencies]
+log = "0.4"
+env_logger = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+csv = "1.2"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
 
 [profile.release]
 lto = true
