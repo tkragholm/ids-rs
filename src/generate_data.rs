@@ -14,7 +14,7 @@ pub fn generate_pediatric_data(
     let mut writer = Writer::from_path(filename)?;
 
     // Write header
-    writer.write_record(&[
+    writer.write_record([
         "pnr",
         "bday",
         "treatment_date",
@@ -74,7 +74,7 @@ pub fn generate_pediatric_data(
             rng.random_range(0..10000)
         );
 
-        writer.write_record(&[
+        writer.write_record([
             &pnr,
             &birth_date.format("%Y-%m-%d").to_string(),
             &treatment_date,
