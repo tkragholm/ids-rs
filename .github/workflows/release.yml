@@ -1,175 +1,56 @@
+# .github/workflows/release.yml
 name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
-  pull_request:
 
 jobs:
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
-
-      # Build x86_64
-      - name: Build wheels - x86_64
-        uses: PyO3/maturin-action@v1
-        with:
-          command: build
-          target: x86_64-apple-darwin
-          args: --release --out dist -b bin
-          working-directory: ./crates/ids-py
-
-      # Build universal2 (both x86_64 and aarch64)
-      - name: Build wheels - universal2
-        uses: PyO3/maturin-action@v1
-        with:
-          command: build
-          target: universal2-apple-darwin
-          args: --release --out dist -b bin
-          working-directory: ./crates/ids-py
-
-      # Upload wheels
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: ./crates/ids-py/dist
-
-      # Create binary archive
-      - name: Archive binary
-        run: |
-          cd crates/ids-py/target/release
-          tar czvf ids-cli-macos.tar.gz ids-cli
-          cd -
-
-      # Upload binary to release
-      - name: Upload binary to GitHub Release
-        uses: svenstaro/upload-release-action@v2
-        if: "startsWith(github.ref, 'refs/tags/')"
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          asset_name: ids-cli-macos.tar.gz
-          file: crates/ids-py/target/release/ids-cli-macos.tar.gz
-          tag: ${{ github.ref }}
-
-  windows:
-    runs-on: windows-latest
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        platform:
-          [
-            { python-architecture: "x64", target: "x86_64-pc-windows-msvc" },
-            { python-architecture: "x86", target: "i686-pc-windows-msvc" },
-          ]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-          architecture: ${{ matrix.platform.python-architecture }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
 
-      # Build wheels
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           command: build
-          target: ${{ matrix.platform.target }}
           args: --release --out dist -b bin
           working-directory: ./crates/ids-py
 
-      # Upload wheels
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v3
         with:
-          name: wheels
+          name: wheels-${{ matrix.os }}
           path: ./crates/ids-py/dist
-
-  linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          [
-            { target: "x86_64-unknown-linux-musl", image_tag: "x86_64-musl" },
-            { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl" },
-            {
-              target: "armv7-unknown-linux-musleabihf",
-              image_tag: "armv7-musleabihf",
-            },
-          ]
-    container:
-      image: docker://messense/rust-musl-cross:${{ matrix.platform.image_tag }}
-    steps:
-      - uses: actions/checkout@v3
-
-      # Build wheels for different Linux platforms
-      - name: Build Wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          command: build
-          target: ${{ matrix.platform.target }}
-          manylinux: musllinux_1_1
-          container: off
-          args: --release --out dist -b bin
-          working-directory: ./crates/ids-py
-
-      # Upload wheels
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: ./crates/ids-py/dist
-
-      # Create binary archive
-      - name: Archive binary
-        run: |
-          cd crates/ids-py/target/${{ matrix.platform.target }}/release
-          tar czvf ids-cli-${{ matrix.platform.target }}.tar.gz ids-cli
-          cd -
-
-      # Upload binary to release
-      - name: Upload binary to GitHub Release
-        uses: svenstaro/upload-release-action@v2
-        if: "startsWith(github.ref, 'refs/tags/')"
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          asset_name: ids-cli-${{ matrix.platform.target }}.tar.gz
-          file: crates/ids-py/target/${{ matrix.platform.target }}/release/ids-cli-${{ matrix.platform.target }}.tar.gz
-          tag: ${{ github.ref }}
 
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [macos, windows, linux]
+    needs: build_wheels
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: wheels
-          path: dist
-
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # Publish to PyPI
+      - uses: actions/download-artifact@v3
+        with:
+          path: dist
+
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
           pip install --upgrade twine
-          twine upload --skip-existing dist/*
+          twine upload --skip-existing dist/**/*.whl
