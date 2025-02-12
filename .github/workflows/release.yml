@@ -28,7 +28,7 @@ jobs:
           args: --release --out dist -b bin
           working-directory: ./crates/ids-py
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
           path: ./crates/ids-py/dist
