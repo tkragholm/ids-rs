@@ -40,7 +40,7 @@ where
 }
 
 // Add missing functions
-fn is_case(id: &str) -> bool {
+pub fn is_case(id: &str) -> bool {
     // Implement based on your ID format
     id.starts_with("C")
 }

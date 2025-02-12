@@ -7,7 +7,9 @@ use ids_core::{
 };
 
 use ids_covariates::{
-    balance::BalanceChecker, loader::CovariateLoader, matched_pairs::load_matched_pairs,
+    balance::BalanceChecker,
+    loader::CovariateLoader,
+    matched_pairs::{is_case, load_matched_pairs},
     storage::CovariateStore,
 };
 use log::{error, info};
@@ -112,7 +114,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             covariate_dir,
         } => {
             info!("Loading matched pairs from {}...", matches_file);
-            let matched_pairs = load_matched_pairs(matches_file)?;
+            let matched_pairs = load_matched_pairs(Path::new(matches_file))?;
 
             info!("Loading covariate data from {}...", covariate_dir);
             let loader = CovariateLoader::new(
@@ -145,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Save balance results
             let output_path = Path::new(&cli.output_dir).join("covariate_balance.csv");
-            save_balance_results(&balance_results, &output_path)?;
+            BalanceChecker::save_balance_results(&balance_results, &output_path)?;
 
             info!("Balance results saved to {}", output_path.display());
         }

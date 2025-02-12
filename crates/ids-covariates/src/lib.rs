@@ -6,9 +6,9 @@ pub mod matched_pairs;
 pub mod models;
 pub mod storage;
 
-// Re-export commonly used types
 pub use balance::BalanceChecker;
 pub use error::CovariateError;
 pub use loader::CovariateLoader;
+pub use matched_pairs::{is_case, load_matched_pairs};
 pub use models::{CovariateSummary, Education, Income, Occupation};
 pub use storage::CovariateStore;
