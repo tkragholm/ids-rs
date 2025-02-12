@@ -51,4 +51,15 @@ pub enum Commands {
         #[arg(short = 'p', long, default_value_t = 365)]
         parent_window: i64,
     },
+
+    /// Check covariate balance between cases and controls
+    CheckBalance {
+        /// Path to the matched pairs CSV file
+        #[arg(short = 'm', long)]
+        matches_file: String,
+
+        /// Directory containing covariate data files
+        #[arg(short = 'c', long)]
+        covariate_dir: String,
+    },
 }

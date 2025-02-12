@@ -5,6 +5,11 @@ use ids_core::{
     sampler::IncidenceDensitySampler,
     utils::{configure_logging, load_records, validate_csv_format, MatchingCriteria},
 };
+
+use ids_covariates::{
+    balance::BalanceChecker, loader::CovariateLoader, matched_pairs::load_matched_pairs,
+    storage::CovariateStore,
+};
 use log::{error, info};
 use std::{fs, path::Path, time::Instant};
 
@@ -100,6 +105,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             info!("Total execution time: {:?}", start.elapsed());
+        }
+
+        Commands::CheckBalance {
+            matches_file,
+            covariate_dir,
+        } => {
+            info!("Loading matched pairs from {}...", matches_file);
+            let matched_pairs = load_matched_pairs(matches_file)?;
+
+            info!("Loading covariate data from {}...", covariate_dir);
+            let loader = CovariateLoader::new(
+                format!("{}/education.csv", covariate_dir),
+                format!("{}/income.csv", covariate_dir),
+                format!("{}/occupation.csv", covariate_dir),
+            );
+
+            let mut store = CovariateStore::new();
+            store.load_education(loader.load_education()?)?;
+            store.load_income(loader.load_income()?)?;
+            store.load_occupation(loader.load_occupation()?)?;
+
+            let checker = BalanceChecker::new(store);
+
+            // Extract cases and controls with their index dates
+            let (cases, controls): (Vec<_>, Vec<_>) = matched_pairs
+                .into_iter()
+                .flat_map(|(case_id, case_date, control_ids)| {
+                    std::iter::once((case_id, case_date)).chain(
+                        control_ids
+                            .into_iter()
+                            .map(move |control_id| (control_id, case_date)),
+                    )
+                })
+                .partition(|(id, _)| is_case(id));
+
+            info!("Calculating covariate balance...");
+            let balance_results = checker.calculate_balance(&cases, &controls)?;
+
+            // Save balance results
+            let output_path = Path::new(&cli.output_dir).join("covariate_balance.csv");
+            save_balance_results(&balance_results, &output_path)?;
+
+            info!("Balance results saved to {}", output_path.display());
         }
     }
 

@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/ids-core", "crates/ids-cli", "crates/ids-py"]
+members = [
+    "crates/ids-core",
+    "crates/ids-cli",
+    "crates/ids-py",
+    "crates/ids-covariates",
+]
 
 # Set the resolver to version 2 as recommended
 resolver = "2"
