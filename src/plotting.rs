@@ -23,8 +23,8 @@ pub trait Plottable: Debug {
 pub struct DefaultPlotter;
 
 impl DefaultPlotter {
-    pub fn new() -> Self {
-        DefaultPlotter
+    pub const fn new() -> Self {
+        Self
     }
 }
 
@@ -50,7 +50,7 @@ impl Plottable for DefaultPlotter {
             histogram_data[bin] += 1;
         }
 
-        let max_count = *histogram_data.iter().max().unwrap_or(&1) as f64;
+        let max_count = f64::from(*histogram_data.iter().max().unwrap_or(&1));
 
         let mut chart = ChartBuilder::on(&root)
             .caption(title, ("sans-serif", 30))
@@ -69,7 +69,7 @@ impl Plottable for DefaultPlotter {
 
         chart
             .draw_series(histogram_data.iter().enumerate().map(|(i, &count)| {
-                Rectangle::new([(i, 0.0), (i + 1, count as f64)], RED.mix(0.3).filled())
+                Rectangle::new([(i, 0.0), (i + 1, f64::from(count))], RED.mix(0.3).filled())
             }))
             .map_err(|e| PlottingError::PlotError(e.to_string()))?;
 
@@ -83,7 +83,7 @@ impl Plottable for DefaultPlotter {
         let mean = data.iter().sum::<i64>() as f64 / data.len() as f64;
         chart
             .draw_series(vec![Text::new(
-                format!("Mean: {:.1} days", mean),
+                format!("Mean: {mean:.1} days"),
                 (5, max_count * 0.9),
                 ("sans-serif", 20).into_font(),
             )])
@@ -125,7 +125,7 @@ impl Plottable for DefaultPlotter {
                     ("sans-serif", 20).into_font(),
                 ),
                 Text::new(
-                    format!("Average Reuse: {:.2}", average_reuse),
+                    format!("Average Reuse: {average_reuse:.2}"),
                     (0, 0.6),
                     ("sans-serif", 20).into_font(),
                 ),

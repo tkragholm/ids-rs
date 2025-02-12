@@ -40,14 +40,14 @@ pub fn generate_pediatric_data(
     for i in 0..total_records {
         // Generate birth date between 1995 and 2018
         let birth_days = rng.random_range(0..birth_range_days);
-        let birth_date = earliest_birth + Duration::days(birth_days as i64);
+        let birth_date = earliest_birth + Duration::days(i64::from(birth_days));
 
         // Generate parent ages at birth (typical reproductive age range: 20-45 years)
         let mother_age = rng.random_range(20..46); // 20-45 years
         let father_age = rng.random_range(20..50); // 20-49 years
 
-        let mother_birth_date = birth_date - Duration::days((mother_age * 365) as i64);
-        let father_birth_date = birth_date - Duration::days((father_age * 365) as i64);
+        let mother_birth_date = birth_date - Duration::days(i64::from(mother_age * 365));
+        let father_birth_date = birth_date - Duration::days(i64::from(father_age * 365));
 
         // Generate treatment date for cases
         let treatment_date = if treatment_indices.contains(&i) {

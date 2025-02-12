@@ -1,7 +1,7 @@
 use crate::errors::SamplingError;
 use crate::utils::{DateData, MatchingCriteria};
 use chrono::NaiveDate;
-use colored::*;
+use colored::Colorize;
 use fastrand::Rng;
 use humantime::format_duration;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -83,7 +83,7 @@ impl IncidenceDensitySampler {
 
         controls.sort_unstable();
 
-        Ok(IncidenceDensitySampler {
+        Ok(Self {
             dates,
             records: Arc::new(records),
             criteria,
@@ -200,7 +200,7 @@ impl IncidenceDensitySampler {
 
                     for birth_date in window_start..=window_end {
                         if let Some(controls) = self.birth_date_index.get(&birth_date) {
-                            for &control_idx in controls.iter() {
+                            for &control_idx in controls {
                                 if self.sorted_controls.binary_search(&control_idx).is_ok() {
                                     let control_date = self.dates[control_idx];
                                     let mother_diff =

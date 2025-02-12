@@ -95,7 +95,7 @@ pub struct MatchingCriteria {
 }
 
 impl MatchingCriteria {
-    pub fn validate(&self) -> Result<(), crate::errors::SamplingError> {
+    pub const fn validate(&self) -> Result<(), crate::errors::SamplingError> {
         if self.birth_date_window <= 0 || self.parent_date_window <= 0 {
             return Err(crate::errors::SamplingError::InvalidCriteria);
         }

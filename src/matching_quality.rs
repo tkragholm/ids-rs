@@ -76,7 +76,7 @@ impl MatchingQuality {
         // Create default plotting implementation
         let plotting = Box::new(DefaultPlotter::new());
 
-        MatchingQuality { stats, plotting }
+        Self { stats, plotting }
     }
 
     pub fn calculate_percentiles(values: &[i64], percentiles: &[f64]) -> Vec<i64> {
@@ -96,7 +96,7 @@ impl MatchingQuality {
         self.plotting
             .plot_distribution(
                 &self.stats.differences.birth_date,
-                &format!("{}_birth.png", base_filename),
+                &format!("{base_filename}_birth.png"),
                 "Birth Date Differences",
                 "Difference in Days",
             )
@@ -105,7 +105,7 @@ impl MatchingQuality {
         self.plotting
             .plot_distribution(
                 &self.stats.differences.mother_age,
-                &format!("{}_mother.png", base_filename),
+                &format!("{base_filename}_mother.png"),
                 "Mother Age Differences",
                 "Difference in Days",
             )
@@ -114,7 +114,7 @@ impl MatchingQuality {
         self.plotting
             .plot_distribution(
                 &self.stats.differences.father_age,
-                &format!("{}_father.png", base_filename),
+                &format!("{base_filename}_father.png"),
                 "Father Age Differences",
                 "Difference in Days",
             )
@@ -125,7 +125,7 @@ impl MatchingQuality {
 
     pub fn generate_summary_plots(&self, output_dir: &str) -> Result<(), Box<dyn Error>> {
         std::fs::create_dir_all(output_dir)?;
-        self.plot_all_distributions(&format!("{}/distributions", output_dir))?;
+        self.plot_all_distributions(&format!("{output_dir}/distributions"))?;
 
         let (utilization_rate, average_reuse) = {
             let total_matched_controls =
@@ -141,7 +141,7 @@ impl MatchingQuality {
 
         self.plotting
             .plot_utilization_summary(
-                &format!("{}/utilization.png", output_dir),
+                &format!("{output_dir}/utilization.png"),
                 utilization_rate,
                 average_reuse,
             )
@@ -150,7 +150,7 @@ impl MatchingQuality {
     }
 
     pub fn format_report(&self) -> String {
-        use colored::*;
+        use colored::Colorize;
 
         let mut report = String::new();
 
