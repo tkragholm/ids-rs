@@ -4,6 +4,7 @@ members = [
     "crates/ids-cli",
     "crates/ids-py",
     "crates/ids-covariates",
+    "crates/ids-arrow",
 ]
 
 # Set the resolver to version 2 as recommended
@@ -25,6 +26,7 @@ chrono = { version = "0.4", features = ["serde"] }
 csv = "1.2"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0.11"
+rayon = "1.10.0"
 
 [profile.release]
 lto = true

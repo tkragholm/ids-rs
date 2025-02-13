@@ -1,11 +1,11 @@
 use clap::Parser;
+use ids_arrow::{ArrowStore, RegisterReader};
 use ids_core::{
     cli::{Cli, Commands},
     generate_data,
     sampler::IncidenceDensitySampler,
     utils::{configure_logging, load_records, validate_csv_format, MatchingCriteria},
 };
-
 use ids_covariates::{
     balance::BalanceChecker,
     loader::CovariateLoader,
@@ -147,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Save balance results
             let output_path = Path::new(&cli.output_dir).join("covariate_balance.csv");
-            BalanceChecker::save_balance_results(&balance_results, &output_path)?;
+            BalanceChecker::save_balance_results(&balance_results.summaries, &output_path)?;
 
             info!("Balance results saved to {}", output_path.display());
         }

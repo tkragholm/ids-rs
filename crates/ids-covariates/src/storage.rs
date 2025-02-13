@@ -1,3 +1,4 @@
+use crate::converter::IntoSnapshot;
 use crate::error::CovariateError;
 use crate::models::*;
 use chrono::NaiveDate;
