@@ -696,6 +696,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "ids-core",
+ "ids-covariates",
  "log",
  "log4rs",
 ]

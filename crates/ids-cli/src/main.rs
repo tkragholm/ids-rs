@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format!("{}/occupation.csv", covariate_dir),
             );
 
-            let mut store = CovariateStore::new();
+            let store = CovariateStore::new();
             store.load_education(loader.load_education()?)?;
             store.load_income(loader.load_income()?)?;
             store.load_occupation(loader.load_occupation()?)?;
