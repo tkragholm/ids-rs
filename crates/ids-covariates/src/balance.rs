@@ -223,6 +223,10 @@ impl BalanceChecker {
             |snap| snap.education.clone(), // Remove the Some() wrapper
         )?;
 
+        // 2. As numeric (highest completed)
+        let education_summaries = self.calculate_education_balance(cases, controls)?;
+        summaries.extend(education_summaries);
+
         self.add_categorical_balance(
             &mut summaries,
             &mut missing_rates,
@@ -257,7 +261,12 @@ impl BalanceChecker {
         case_var / control_var
     }
 
-    pub fn save_to_files(&self, base_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_to_files(
+        &self,
+        base_path: &Path,
+        cases: &[(String, NaiveDate)],
+        controls: &[(String, NaiveDate)],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Save summaries
         let summaries_path = base_path.with_file_name("covariate_balance.csv");
         let results = self.calculate_balance(cases, controls)?;
@@ -285,10 +294,16 @@ impl BalanceChecker {
         let mut case_values = Vec::new();
         let mut control_values = Vec::new();
 
-        // Collect values
-        for (pnr, date) in cases {
-            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *date) {
-                if let Some(education) = covariates.education.last() {
+        // Collect values - considering the specific temporal structure of education data
+        for (pnr, index_date) in cases {
+            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *index_date) {
+                if let Some(education) = covariates
+                    .education
+                    .iter()
+                    .filter(|e| e.date <= *index_date) // Only consider education completed before index date
+                    .max_by_key(|e| e.date)
+                // Get the most recent education record
+                {
                     if let Some(value) = education.value.to_numeric_value() {
                         case_values.push(value);
                     }
@@ -296,9 +311,15 @@ impl BalanceChecker {
             }
         }
 
-        for (pnr, date) in controls {
-            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *date) {
-                if let Some(education) = covariates.education.last() {
+        // Similar for controls
+        for (pnr, index_date) in controls {
+            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *index_date) {
+                if let Some(education) = covariates
+                    .education
+                    .iter()
+                    .filter(|e| e.date <= *index_date)
+                    .max_by_key(|e| e.date)
+                {
                     if let Some(value) = education.value.to_numeric_value() {
                         control_values.push(value);
                     }
@@ -306,100 +327,17 @@ impl BalanceChecker {
             }
         }
 
-        // Calculate all statistics before consuming the vectors
+        // Calculate statistics
         let std_diff = Self::calculate_standardized_difference(&case_values, &control_values);
         let var_ratio = Self::calculate_variance_ratio(&case_values, &control_values);
         let mean_cases = case_values.mean();
         let mean_controls = control_values.mean();
 
         Ok(vec![CovariateSummary {
-            variable: "Education (years)".to_string(),
+            variable: "Education (highest completed)".to_string(),
             mean_cases,
             mean_controls,
             std_diff,
-            variance_ratio: var_ratio,
-        }])
-    }
-
-    // Similar implementations for income and occupation balance
-    // Add missing methods
-    fn calculate_income_balance(
-        &self,
-        cases: &[(String, NaiveDate)],
-        controls: &[(String, NaiveDate)],
-    ) -> Result<Vec<CovariateSummary>, CovariateError> {
-        let mut case_values = Vec::new();
-        let mut control_values = Vec::new();
-
-        // Collect values
-        for (pnr, date) in cases {
-            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *date) {
-                if let Some(income) = covariates.income.last() {
-                    case_values.push(income.value.to_numeric_value());
-                }
-            }
-        }
-
-        for (pnr, date) in controls {
-            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *date) {
-                if let Some(income) = covariates.income.last() {
-                    control_values.push(income.value.to_numeric_value());
-                }
-            }
-        }
-
-        // Calculate all statistics before consuming the vectors
-        let std_diff = Self::calculate_standardized_difference(&case_values, &control_values);
-        let var_ratio = Self::calculate_variance_ratio(&case_values, &control_values);
-        let mean_cases = case_values.mean();
-        let mean_controls = control_values.mean();
-
-        Ok(vec![CovariateSummary {
-            variable: "Income".to_string(),
-            mean_cases,
-            mean_controls,
-            std_diff,
-            variance_ratio: var_ratio,
-        }])
-    }
-
-    fn calculate_occupation_balance(
-        &self,
-        cases: &[(String, NaiveDate)],
-        controls: &[(String, NaiveDate)],
-    ) -> Result<Vec<CovariateSummary>, CovariateError> {
-        let mut case_values = Vec::new();
-        let mut control_values = Vec::new();
-
-        // Similar implementation as education balance but for occupation
-        for (pnr, date) in cases {
-            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *date) {
-                if let Some(occupation) = covariates.occupation.last() {
-                    // Convert occupation code to numeric value for analysis
-                    case_values.push(occupation.value.code.parse::<f64>().unwrap_or(0.0));
-                }
-            }
-        }
-
-        for (pnr, date) in controls {
-            if let Some(covariates) = self.store.get_covariates_at_date(pnr, *date) {
-                if let Some(occupation) = covariates.occupation.last() {
-                    control_values.push(occupation.value.code.parse::<f64>().unwrap_or(0.0));
-                }
-            }
-        }
-
-        // Calculate all statistics before consuming the vectors
-        let std_diff = Self::calculate_standardized_difference(&case_values, &control_values);
-        let var_ratio = Self::calculate_variance_ratio(&case_values, &control_values);
-        let mean_cases = case_values.mean();
-        let mean_controls = control_values.mean();
-
-        Ok(vec![CovariateSummary {
-            variable: "Occupation".to_string(),
-            mean_cases: mean_cases,
-            mean_controls: mean_controls,
-            std_diff: std_diff,
             variance_ratio: var_ratio,
         }])
     }
