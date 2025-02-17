@@ -286,10 +286,10 @@ impl BalanceChecker {
         let missing_rates_path = base_path.with_file_name("missing_data_rates.csv");
         let mut wtr = csv::Writer::from_path(missing_rates_path)?;
 
-        wtr.write_record(&["Variable", "Case Missing Rate", "Control Missing Rate"])?;
+        wtr.write_record(["Variable", "Case Missing Rate", "Control Missing Rate"])?;
 
         for (var, (case_rate, control_rate)) in &results.missing_data_rates {
-            wtr.write_record(&[var, &case_rate.to_string(), &control_rate.to_string()])?;
+            wtr.write_record([var, &case_rate.to_string(), &control_rate.to_string()])?;
         }
 
         wtr.flush()?;
@@ -332,7 +332,7 @@ impl BalanceChecker {
             .map_err(CovariateError::Csv)?;
         }
 
-        wtr.flush().map_err(|e| CovariateError::Io(e))?;
+        wtr.flush().map_err(CovariateError::Io)?;
         Ok(())
     }
 }

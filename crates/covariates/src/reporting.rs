@@ -15,7 +15,7 @@ impl BalanceReport {
         let mut wtr = csv::Writer::from_path(output_path)?;
 
         // Write summary statistics
-        wtr.write_record(&[
+        wtr.write_record([
             "Variable",
             "Mean (Cases)",
             "Mean (Controls)",
@@ -32,7 +32,7 @@ impl BalanceReport {
                 .get(&summary.variable)
                 .unwrap_or(&(0.0, 0.0));
 
-            wtr.write_record(&[
+            wtr.write_record([
                 &summary.variable,
                 &format!("{:.2}", summary.mean_cases),
                 &format!("{:.2}", summary.mean_controls),

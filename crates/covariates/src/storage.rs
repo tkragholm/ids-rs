@@ -5,6 +5,12 @@ pub struct CovariateStore {
     store: Box<dyn Store>,
 }
 
+impl Default for CovariateStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CovariateStore {
     pub fn new() -> Self {
         Self {
