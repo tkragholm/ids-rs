@@ -1,0 +1,17 @@
+[package]
+name = "covariates"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+core = { path = "../core" }
+loader = { path = "../loader" }
+types = { path = "../types" }
+chrono.workspace = true
+csv.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+log.workspace = true
+rayon.workspace = true
+dashmap.workspace = true
+statrs.workspace = true

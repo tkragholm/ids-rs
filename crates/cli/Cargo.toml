@@ -1,0 +1,17 @@
+[package]
+name = "cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+core = { path = "../core" }
+covariates = { path = "../covariates" }
+loader = { path = "../loader" }
+types = { path = "../types" }
+clap.workspace = true
+log.workspace = true
+log4rs.workspace = true
+
+[[bin]]
+name = "ids"
+path = "src/main.rs"

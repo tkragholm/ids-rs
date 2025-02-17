@@ -1,0 +1,35 @@
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::ProjectionMask;
+use std::fs::File;
+use std::path::Path;
+use types::error::IdsError;
+
+pub fn read_parquet(path: &Path, schema: Option<&Schema>) -> Result<Vec<RecordBatch>, IdsError> {
+    let file = File::open(path).map_err(|e| IdsError::Io(e))?;
+    let builder = ParquetRecordBatchReaderBuilder::try_new(file)
+        .map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
+
+    let mut reader = match schema {
+        Some(s) => {
+            let indices: Vec<usize> = (0..s.fields().len()).collect();
+            let mask = ProjectionMask::roots(builder.parquet_schema(), indices);
+            builder
+                .with_batch_size(8192)
+                .with_projection(mask)
+                .build()
+                .map_err(|e| IdsError::InvalidFormat(e.to_string()))?
+        }
+        None => builder
+            .build()
+            .map_err(|e| IdsError::InvalidFormat(e.to_string()))?,
+    };
+
+    let mut batches = Vec::new();
+    while let Some(batch_result) = reader.next() {
+        batches.push(batch_result.map_err(|e| IdsError::InvalidFormat(e.to_string()))?);
+    }
+
+    Ok(batches)
+}

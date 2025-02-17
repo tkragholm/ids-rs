@@ -1,0 +1,17 @@
+[package]
+name = "py"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+core = { path = "../core" }
+covariates = { path = "../covariates" }
+types = { path = "../types" }
+loader = { path = "../loader" }
+clap.workspace = true
+log.workspace = true
+log4rs.workspace = true
+
+[[bin]]
+name = "ids"
+path = "../cli/src/main.rs"

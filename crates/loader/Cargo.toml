@@ -1,0 +1,15 @@
+[package]
+name = "loader"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono.workspace = true
+thiserror.workspace = true
+log.workspace = true
+arrow.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true
+arrow-select.workspace = true
+parquet.workspace = true
+types = { path = "../types" }

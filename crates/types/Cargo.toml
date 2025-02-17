@@ -1,0 +1,18 @@
+[package]
+name = "types"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+
+[dependencies]
+chrono.workspace = true
+serde.workspace = true
+csv.workspace = true
+thiserror.workspace = true
+arrow.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true
+arrow-select.workspace = true
+parquet.workspace = true
+dashmap.workspace = true
