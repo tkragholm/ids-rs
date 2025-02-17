@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Validating input file format...");
             if let Err(e) = validate_csv_format(input) {
                 error!("CSV validation failed: {}", e);
-                return Err(e.into());
+                return Err(e);
             }
 
             info!("Reading data from {}...", input);
