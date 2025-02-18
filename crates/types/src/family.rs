@@ -19,6 +19,7 @@ pub struct FamilyRelations {
 
 #[derive(Clone)]
 pub struct FamilyStore {
+    #[allow(dead_code)]
     arrow_store: ArrowStore,
     relations: HashMap<String, FamilyRelations>,
 }

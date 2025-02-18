@@ -8,10 +8,11 @@ core = { path = "../core" }
 covariates = { path = "../covariates" }
 loader = { path = "../loader" }
 types = { path = "../types" }
+datagen = { path = "../datagen" }
 clap.workspace = true
 log.workspace = true
 log4rs.workspace = true
 
 [[bin]]
-name = "ids"
+name = "ids-py"
 path = "src/main.rs"

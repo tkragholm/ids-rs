@@ -1,6 +1,5 @@
 use clap::Parser;
 use core::{
-    generate_data,
     sampler::IncidenceDensitySampler,
     utils::{configure_logging, load_records, validate_csv_format, MatchingCriteria},
 };
@@ -9,6 +8,7 @@ use covariates::{
     matched_pairs::{is_case, load_matched_pairs},
     storage::CovariateStore,
 };
+use datagen::{GeneratorConfig, RegisterGenerator};
 use loader::ParquetLoader;
 use log::{error, info};
 use std::{fs, path::Path, time::Instant};
@@ -32,14 +32,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     configure_logging(Some(&format!("{}/cli.log", log_dir.display())))?;
 
     match &cli.command {
-        Commands::Generate {
+        Commands::GeneratePediatric {
             output,
             num_records,
             num_cases,
+            seed,
         } => {
-            info!("Generating synthetic data...");
-            generate_data::generate_pediatric_data(output, *num_records, *num_cases)?;
-            info!("Data generation completed. Output saved to: {}", output);
+            info!("Generating synthetic pediatric data...");
+
+            // Create generator with config
+            let config = GeneratorConfig::new(*num_records, *num_cases, cli.output_dir);
+            let config = if let Some(seed_value) = seed {
+                config.with_seed(*seed_value)
+            } else {
+                config
+            };
+
+            let mut generator = RegisterGenerator::new(config)?;
+
+            // Generate pediatric data
+            generator.generate_pediatric(output)?;
+            info!(
+                "Pediatric data generation completed. Output saved to: {}",
+                output
+            );
+        }
+        Commands::GenerateRegisters {
+            output_dir,
+            num_records,
+            num_cases,
+            start_year,
+            end_year,
+            seed,
+        } => {
+            info!("Generating synthetic register data...");
+            let config = GeneratorConfig::new(*num_records, *num_cases, output_dir.clone())
+                .with_year_range(*start_year, *end_year);
+
+            let config = if let Some(seed_value) = seed {
+                config.with_seed(*seed_value)
+            } else {
+                config
+            };
+
+            let mut generator = RegisterGenerator::new(config)?;
+
+            info!("Starting data generation for all registers...");
+            generator.generate_all()?;
+            info!("Register data generation completed in: {}", output_dir);
         }
         Commands::Sample {
             input,

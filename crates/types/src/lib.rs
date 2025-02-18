@@ -4,6 +4,7 @@ pub mod convert;
 pub mod error;
 pub mod family;
 pub mod models;
+pub mod pnr;
 pub mod prelude;
 pub mod snapshot;
 pub mod storage;

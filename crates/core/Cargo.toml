@@ -4,7 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-
 chrono.workspace = true
 log.workspace = true
 log4rs.workspace = true
@@ -12,17 +11,15 @@ csv.workspace = true
 rayon.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-
+types = { path = "../types" }
 
 colored = "3.0.0"
 bit-vec = "0.8.0"
-
 dashmap = "6.1.0"
 fastrand = "2.3.0"
 hashbrown = "0.15.2"
 humantime = "2.1.0"
 indicatif = "0.17.11"
-
 mimalloc = "0.1.43"
 ndarray = { version = "0.16.1", features = ["rayon"] }
 parking_lot = "0.12.3"

@@ -1,5 +1,12 @@
 use arrow_schema::{DataType, Field, Schema};
 
+/// Defines the schema for Annual Register (AKM) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - `SOCIO`: Socioeconomic classification (nullable)
+/// - `SOCIO02`: Alternative socioeconomic classification (nullable)
+/// - `SOCIO13`: Another socioeconomic classification (nullable)
 pub fn akm_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
@@ -9,6 +16,12 @@ pub fn akm_schema() -> Schema {
     ])
 }
 
+/// Defines the schema for Population Register (BEF) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Multiple demographic and family-related fields (all nullable)
+/// Including age, family composition, birth information, etc.
 pub fn bef_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
@@ -29,6 +42,11 @@ pub fn bef_schema() -> Schema {
     ])
 }
 
+/// Defines the schema for Individual (IND) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Employment and income-related fields (nullable)
 pub fn ind_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
@@ -38,6 +56,11 @@ pub fn ind_schema() -> Schema {
     ])
 }
 
+/// Defines the schema for Education (UDDF) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Education-related fields with date ranges (nullable)
 pub fn uddf_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
@@ -47,6 +70,11 @@ pub fn uddf_schema() -> Schema {
     ])
 }
 
+/// Defines the schema for Family Relations data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Family and parental information with dates (nullable)
 pub fn family_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),

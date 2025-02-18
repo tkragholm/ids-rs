@@ -5,7 +5,7 @@ members = [
     "crates/py",
     "crates/covariates",
     "crates/loader",
-    "crates/types",
+    "crates/types", "crates/datagen",
 ]
 
 # Set the resolver to version 2 as recommended
@@ -37,6 +37,7 @@ clap = { version = "4.5", features = ["derive"] }
 log4rs = { version = "1.2", features = ["console_appender"] }
 dashmap = "6.1.0"
 statrs = "0.18"
+rand = "0.8.5"
 
 [profile.release]
 lto = true
