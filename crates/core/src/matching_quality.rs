@@ -54,7 +54,7 @@ pub struct MatchingQualityParams {
 }
 
 impl MatchingQuality {
-    pub fn new(params: MatchingQualityParams) -> Self {
+    #[must_use] pub fn new(params: MatchingQualityParams) -> Self {
         let stats = MatchingStats {
             total_cases: params.total_cases,
             matched_cases: params.matched_cases,
@@ -82,7 +82,7 @@ impl MatchingQuality {
         Self { stats, plotting }
     }
 
-    pub fn calculate_percentiles(values: &[i64], percentiles: &[f64]) -> Vec<i64> {
+    #[must_use] pub fn calculate_percentiles(values: &[i64], percentiles: &[f64]) -> Vec<i64> {
         let mut sorted_values = values.to_vec();
         sorted_values.sort_unstable();
 
@@ -152,7 +152,7 @@ impl MatchingQuality {
         Ok(())
     }
 
-    pub fn format_report(&self) -> String {
+    #[must_use] pub fn format_report(&self) -> String {
         use colored::Colorize;
 
         let mut report = String::new();

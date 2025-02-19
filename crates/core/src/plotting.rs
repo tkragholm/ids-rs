@@ -29,7 +29,7 @@ impl Default for DefaultPlotter {
 }
 
 impl DefaultPlotter {
-    pub const fn new() -> Self {
+    #[must_use] pub const fn new() -> Self {
         Self
     }
 }

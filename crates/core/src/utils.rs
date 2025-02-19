@@ -130,9 +130,9 @@ pub fn validate_csv_format(filename: &str) -> Result<(), Box<dyn Error>> {
         "mother_bday",
         "father_bday",
     ];
-    for &header in required_headers.iter() {
+    for &header in &required_headers {
         if !headers.iter().any(|h| h == header) {
-            return Err(format!("Missing required header: {}", header).into());
+            return Err(format!("Missing required header: {header}").into());
         }
     }
 

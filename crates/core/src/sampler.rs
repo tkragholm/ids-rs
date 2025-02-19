@@ -98,7 +98,7 @@ impl IncidenceDensitySampler {
         })
     }
 
-    fn is_parent_match(case_parent: Option<i64>, control_parent: Option<i64>, window: i64) -> bool {
+    const fn is_parent_match(case_parent: Option<i64>, control_parent: Option<i64>, window: i64) -> bool {
         match (case_parent, control_parent) {
             (None, None) => true, // Match if both are missing
             (Some(case_date), Some(control_date)) => (case_date - control_date).abs() <= window,
@@ -141,7 +141,7 @@ impl IncidenceDensitySampler {
         )
     }
 
-    pub fn get_statistics(&self) -> String {
+    #[must_use] pub fn get_statistics(&self) -> String {
         let total_records = self.records.len();
         let total_cases = self.cases.len();
         let total_controls = self.sorted_controls.len();
@@ -272,7 +272,7 @@ impl IncidenceDensitySampler {
         Ok(case_control_pairs)
     }
 
-    pub fn evaluate_matching_quality(
+    #[must_use] pub fn evaluate_matching_quality(
         &self,
         case_control_pairs: &[CaseControlPair],
     ) -> crate::matching_quality::MatchingQuality {
@@ -483,7 +483,7 @@ impl IncidenceDensitySampler {
     }
 }
 
-fn calculate_date_diff(date1: Option<i64>, date2: Option<i64>) -> Option<i64> {
+const fn calculate_date_diff(date1: Option<i64>, date2: Option<i64>) -> Option<i64> {
     match (date1, date2) {
         (Some(d1), Some(d2)) => Some((d1 - d2).abs()),
         _ => None,
