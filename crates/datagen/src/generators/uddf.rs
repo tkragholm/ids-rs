@@ -97,13 +97,13 @@ impl super::RegisterGenerator {
                     Arc::new(Date32Array::from(
                         records
                             .iter()
-                            .map(|r| r.hf_vfra.map(|d| Self::date_to_days_since_epoch(d)))
+                            .map(|r| r.hf_vfra.map(Self::date_to_days_since_epoch))
                             .collect::<Vec<_>>(),
                     )),
                     Arc::new(Date32Array::from(
                         records
                             .iter()
-                            .map(|r| r.hf_vtil.map(|d| Self::date_to_days_since_epoch(d)))
+                            .map(|r| r.hf_vtil.map(Self::date_to_days_since_epoch))
                             .collect::<Vec<_>>(),
                     )),
                     Arc::new(Int32Array::from(

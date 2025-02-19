@@ -164,7 +164,7 @@ impl super::RegisterGenerator {
             Arc::new(Date32Array::from(
                 records
                     .iter()
-                    .map(|r| r.bop_vfra.map(|d| Self::date_to_days_since_epoch(d)))
+                    .map(|r| r.bop_vfra.map(Self::date_to_days_since_epoch))
                     .collect::<Vec<_>>(),
             )),
             Arc::new(StringArray::from(
