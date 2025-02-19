@@ -24,7 +24,7 @@ use types::error::IdsError;
 /// - The file is not a valid Parquet file
 /// - There are issues reading the record batches
 pub fn read_parquet(path: &Path, schema: Option<&Schema>) -> Result<Vec<RecordBatch>, IdsError> {
-    let file = File::open(path).map_err(|e| IdsError::Io(e))?;
+    let file = File::open(path).map_err(IdsError::Io)?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
         .map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
 
@@ -44,7 +44,7 @@ pub fn read_parquet(path: &Path, schema: Option<&Schema>) -> Result<Vec<RecordBa
     };
 
     let mut batches = Vec::new();
-    while let Some(batch_result) = reader.next() {
+    for batch_result in reader {
         batches.push(batch_result.map_err(|e| IdsError::InvalidFormat(e.to_string()))?);
     }
 

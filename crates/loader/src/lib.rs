@@ -16,6 +16,12 @@ pub trait StoreLoader {
 // Implement the loader trait
 pub struct ParquetLoader;
 
+impl Default for ParquetLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ParquetLoader {
     pub fn new() -> Self {
         Self
