@@ -16,7 +16,7 @@ pub trait DataReader {
     /// * `schema` - Schema defining the structure of the data
     ///
     /// # Returns
-    /// A vector of RecordBatches or an error
+    /// A vector of `RecordBatches` or an error
     fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError>;
 
     /// Read Annual Register (AKM) data for a specific year
@@ -56,11 +56,11 @@ pub struct FileReader {
 }
 
 impl FileReader {
-    /// Create a new FileReader with a specified base path
+    /// Create a new `FileReader` with a specified base path
     ///
     /// # Arguments
     /// * `base_path` - Root directory containing data files
-    pub fn new(base_path: String) -> Self {
+    #[must_use] pub const fn new(base_path: String) -> Self {
         Self { base_path }
     }
 }
@@ -73,14 +73,14 @@ impl DataReader for FileReader {
     fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
         let path = Path::new(&self.base_path)
             .join("akm")
-            .join(format!("{}.parquet", year));
+            .join(format!("{year}.parquet"));
         self.read_batches(&path, &schema::akm_schema())
     }
 
     fn read_bef(&self, year: i32, quarter: Option<i32>) -> Result<Vec<RecordBatch>, IdsError> {
         let filename = match quarter {
             Some(q) => format!("{}{:02}.parquet", year, q * 3),
-            None => format!("{}.parquet", year),
+            None => format!("{year}.parquet"),
         };
         let path = Path::new(&self.base_path).join("bef").join(filename);
         self.read_batches(&path, &schema::bef_schema())
@@ -89,14 +89,14 @@ impl DataReader for FileReader {
     fn read_ind(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
         let path = Path::new(&self.base_path)
             .join("ind")
-            .join(format!("{}.parquet", year));
+            .join(format!("{year}.parquet"));
         self.read_batches(&path, &schema::ind_schema())
     }
 
     fn read_uddf(&self, period: &str) -> Result<Vec<RecordBatch>, IdsError> {
         let path = Path::new(&self.base_path)
             .join("uddf")
-            .join(format!("{}.parquet", period));
+            .join(format!("{period}.parquet"));
         self.read_batches(&path, &schema::uddf_schema())
     }
 

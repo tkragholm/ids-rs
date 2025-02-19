@@ -6,7 +6,7 @@ use std::fs::File;
 use std::path::Path;
 use types::error::IdsError;
 
-/// Reads a Parquet file and returns its contents as a vector of RecordBatches.
+/// Reads a Parquet file and returns its contents as a vector of `RecordBatches`.
 ///
 /// # Arguments
 ///
@@ -15,7 +15,7 @@ use types::error::IdsError;
 ///
 /// # Returns
 ///
-/// A Result containing a vector of RecordBatches or an IdsError
+/// A Result containing a vector of `RecordBatches` or an `IdsError`
 ///
 /// # Errors
 ///

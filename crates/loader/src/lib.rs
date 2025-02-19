@@ -23,7 +23,7 @@ impl Default for ParquetLoader {
 }
 
 impl ParquetLoader {
-    pub fn new() -> Self {
+    #[must_use] pub const fn new() -> Self {
         Self
     }
 
@@ -73,7 +73,7 @@ impl StoreLoader for ParquetLoader {
             match reader.read_bef(year, None) {
                 Ok(batches) => {
                     log::info!("Loaded {} BEF batches for year {}", batches.len(), year);
-                    store.add_bef_data(format!("{}", year), batches);
+                    store.add_bef_data(format!("{year}"), batches);
                 }
                 Err(e) => log::warn!("Failed to load BEF data for year {}: {}", year, e),
             }
