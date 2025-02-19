@@ -2,11 +2,15 @@ use chrono::{Duration, NaiveDate};
 use rand::Rng;
 use std::collections::HashMap;
 
+pub type PersonInfo = (NaiveDate, String);
+pub type ParentPair = (PersonInfo, PersonInfo);
+pub type FamilyInfo = (PersonInfo, ParentPair);
+
 #[derive(Debug)]
 pub struct PnrPool {
-    pool: HashMap<usize, (NaiveDate, String)>,
-    children: HashMap<usize, (NaiveDate, String)>,
-    parents: HashMap<usize, (NaiveDate, String)>,
+    pool: HashMap<usize, PersonInfo>,
+    children: HashMap<usize, PersonInfo>,
+    parents: HashMap<usize, PersonInfo>,
 }
 
 impl PnrPool {
@@ -62,29 +66,23 @@ impl PnrPool {
         }
     }
 
-    pub fn get(&self, index: &usize) -> Option<(NaiveDate, String)> {
+    pub fn get(&self, index: &usize) -> Option<PersonInfo> {
         self.pool.get(index).map(|(date, pnr)| (*date, pnr.clone()))
     }
 
-    pub fn get_child(&self, index: &usize) -> Option<(NaiveDate, String)> {
+    pub fn get_child(&self, index: &usize) -> Option<PersonInfo> {
         self.children
             .get(index)
             .map(|(date, pnr)| (*date, pnr.clone()))
     }
 
-    pub fn get_parents(&self, index: &usize) -> Option<((NaiveDate, String), (NaiveDate, String))> {
+    pub fn get_parents(&self, index: &usize) -> Option<ParentPair> {
         let father = self.parents.get(&(index + 1000000))?;
         let mother = self.parents.get(&(index + 2000000))?;
         Some(((father.0, father.1.clone()), (mother.0, mother.1.clone())))
     }
 
-    pub fn get_family(
-        &self,
-        index: &usize,
-    ) -> Option<(
-        (NaiveDate, String),                        // Child
-        ((NaiveDate, String), (NaiveDate, String)), // Parents (Father, Mother)
-    )> {
+    pub fn get_family(&self, index: &usize) -> Option<FamilyInfo> {
         let child = self.get_child(index)?;
         let parents = self.get_parents(index)?;
         Some((child, parents))

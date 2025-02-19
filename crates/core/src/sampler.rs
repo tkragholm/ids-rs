@@ -11,6 +11,11 @@ use serde::Deserialize;
 use smallvec::SmallVec;
 use std::sync::Arc;
 
+type ControlGroup = SmallVec<[usize; 8]>;
+type CaseControlPair = (usize, ControlGroup);
+type MatchResult = Result<Vec<CaseControlPair>, SamplingError>;
+type BirthDateIndex = Arc<FxHashMap<i64, SmallVec<[usize; 16]>>>;
+
 #[derive(Debug, Deserialize)]
 pub struct Record {
     pub pnr: String,
@@ -30,7 +35,7 @@ pub struct IncidenceDensitySampler {
     criteria: MatchingCriteria,
     cases: Vec<usize>,
     sorted_controls: Vec<usize>,
-    birth_date_index: Arc<FxHashMap<i64, SmallVec<[usize; 16]>>>,
+    birth_date_index: BirthDateIndex,
 }
 
 impl IncidenceDensitySampler {
@@ -160,10 +165,7 @@ impl IncidenceDensitySampler {
         )
     }
 
-    pub fn sample_controls(
-        &self,
-        n_controls: usize,
-    ) -> Result<Vec<(usize, SmallVec<[usize; 8]>)>, SamplingError> {
+    pub fn sample_controls(&self, n_controls: usize) -> MatchResult {
         Self::print_header("Sampling Controls");
         const BATCH_SIZE: usize = 1024;
 
@@ -272,7 +274,7 @@ impl IncidenceDensitySampler {
 
     pub fn evaluate_matching_quality(
         &self,
-        case_control_pairs: &[(usize, SmallVec<[usize; 8]>)],
+        case_control_pairs: &[CaseControlPair],
     ) -> crate::matching_quality::MatchingQuality {
         let total_cases = self.cases.len();
         let matched_cases = case_control_pairs.len();
@@ -325,7 +327,7 @@ impl IncidenceDensitySampler {
                 &percentiles,
             );
 
-        crate::matching_quality::MatchingQuality::new(
+        let params = crate::matching_quality::MatchingQualityParams {
             total_cases,
             matched_cases,
             total_controls,
@@ -337,7 +339,9 @@ impl IncidenceDensitySampler {
             birth_date_percentiles,
             mother_age_percentiles,
             father_age_percentiles,
-        )
+        };
+
+        crate::matching_quality::MatchingQuality::new(params)
     }
 
     fn calculate_balance_metric(&self, diffs: &[i64]) -> f64 {
@@ -356,7 +360,7 @@ impl IncidenceDensitySampler {
 
     pub fn save_matches_to_csv(
         &self,
-        case_control_pairs: &[(usize, SmallVec<[usize; 8]>)],
+        case_control_pairs: &[CaseControlPair],
         filename: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Saving matches to {}", filename);
@@ -427,7 +431,7 @@ impl IncidenceDensitySampler {
 
     pub fn save_matching_statistics(
         &self,
-        case_control_pairs: &[(usize, SmallVec<[usize; 8]>)],
+        case_control_pairs: &[CaseControlPair],
         filename: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut wtr = csv::Writer::from_path(filename)?;

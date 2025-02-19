@@ -38,38 +38,41 @@ pub struct BalanceMetrics {
     pub parent_age: f64,
 }
 
+#[derive(Debug)]
+pub struct MatchingQualityParams {
+    pub total_cases: usize,
+    pub matched_cases: usize,
+    pub total_controls: usize,
+    pub birth_date_differences: Vec<i64>,
+    pub mother_age_differences: Vec<i64>,
+    pub father_age_differences: Vec<i64>,
+    pub birth_date_balance: f64,
+    pub parent_age_balance: f64,
+    pub birth_date_percentiles: Vec<i64>,
+    pub mother_age_percentiles: Vec<i64>,
+    pub father_age_percentiles: Vec<i64>,
+}
+
 impl MatchingQuality {
-    pub fn new(
-        total_cases: usize,
-        matched_cases: usize,
-        total_controls: usize,
-        birth_date_differences: Vec<i64>,
-        mother_age_differences: Vec<i64>,
-        father_age_differences: Vec<i64>,
-        birth_date_balance: f64,
-        parent_age_balance: f64,
-        birth_date_percentiles: Vec<i64>,
-        mother_age_percentiles: Vec<i64>,
-        father_age_percentiles: Vec<i64>,
-    ) -> Self {
+    pub fn new(params: MatchingQualityParams) -> Self {
         let stats = MatchingStats {
-            total_cases,
-            matched_cases,
-            total_controls,
-            avg_controls_per_case: total_controls as f64 / matched_cases as f64,
+            total_cases: params.total_cases,
+            matched_cases: params.matched_cases,
+            total_controls: params.total_controls,
+            avg_controls_per_case: params.total_controls as f64 / params.matched_cases as f64,
             differences: MatchingDifferences {
-                birth_date: birth_date_differences,
-                mother_age: mother_age_differences,
-                father_age: father_age_differences,
+                birth_date: params.birth_date_differences,
+                mother_age: params.mother_age_differences,
+                father_age: params.father_age_differences,
             },
             percentiles: MatchingPercentiles {
-                birth_date: birth_date_percentiles,
-                mother_age: mother_age_percentiles,
-                father_age: father_age_percentiles,
+                birth_date: params.birth_date_percentiles,
+                mother_age: params.mother_age_percentiles,
+                father_age: params.father_age_percentiles,
             },
             balance: BalanceMetrics {
-                birth_date: birth_date_balance,
-                parent_age: parent_age_balance,
+                birth_date: params.birth_date_balance,
+                parent_age: params.parent_age_balance,
             },
         };
 
