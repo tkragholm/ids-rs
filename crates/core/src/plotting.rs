@@ -22,6 +22,12 @@ pub trait Plottable: Debug {
 #[derive(Debug)]
 pub struct DefaultPlotter;
 
+impl Default for DefaultPlotter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultPlotter {
     pub const fn new() -> Self {
         Self
