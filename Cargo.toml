@@ -38,6 +38,7 @@ log4rs = { version = "1.2", features = ["console_appender"] }
 dashmap = "6.1.0"
 statrs = "0.18"
 rand = "0.8.5"
+smallvec = "1.13.2"
 
 [profile.release]
 lto = true
