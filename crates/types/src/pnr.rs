@@ -31,7 +31,7 @@ impl PnrPool {
         for i in 0..total_records {
             // Generate child's birth date within study period
             let days_offset = rng.gen_range(0..=birth_range_days);
-            let birth_date = earliest_birth + Duration::days(days_offset as i64);
+            let birth_date = earliest_birth + Duration::days(i64::from(days_offset));
 
             let sequence = rng.gen_range(0..10000);
             let pnr = format!("{}-{:04}", birth_date.format("%d%m%y"), sequence);
@@ -66,23 +66,23 @@ impl PnrPool {
         }
     }
 
-    pub fn get(&self, index: &usize) -> Option<PersonInfo> {
+    #[must_use] pub fn get(&self, index: &usize) -> Option<PersonInfo> {
         self.pool.get(index).map(|(date, pnr)| (*date, pnr.clone()))
     }
 
-    pub fn get_child(&self, index: &usize) -> Option<PersonInfo> {
+    #[must_use] pub fn get_child(&self, index: &usize) -> Option<PersonInfo> {
         self.children
             .get(index)
             .map(|(date, pnr)| (*date, pnr.clone()))
     }
 
-    pub fn get_parents(&self, index: &usize) -> Option<ParentPair> {
+    #[must_use] pub fn get_parents(&self, index: &usize) -> Option<ParentPair> {
         let father = self.parents.get(&(index + 1000000))?;
         let mother = self.parents.get(&(index + 2000000))?;
         Some(((father.0, father.1.clone()), (mother.0, mother.1.clone())))
     }
 
-    pub fn get_family(&self, index: &usize) -> Option<FamilyInfo> {
+    #[must_use] pub fn get_family(&self, index: &usize) -> Option<FamilyInfo> {
         let child = self.get_child(index)?;
         let parents = self.get_parents(index)?;
         Some((child, parents))

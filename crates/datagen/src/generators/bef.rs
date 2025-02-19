@@ -111,7 +111,7 @@ impl super::RegisterGenerator {
                 // Write to Parquet file
                 let output_path = Path::new(&self.config.output_dir)
                     .join("bef")
-                    .join(format!("{}{}.parquet", year, period));
+                    .join(format!("{year}{period}.parquet"));
 
                 crate::writer::ParquetWriter::write_batch(batch, &output_path)?;
 

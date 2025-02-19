@@ -5,7 +5,7 @@ use crate::{
     family::{FamilyRelations, FamilyStore},
     models::{Education, Income, Occupation, TimeVaryingValue},
     snapshot::CovariateSnapshot,
-    traits::*,
+    traits::{DataAccess, DateHelpers, FamilyAccess, Store},
 };
 use arrow::record_batch::RecordBatch;
 use chrono::Datelike;
@@ -29,7 +29,7 @@ impl Default for ArrowStore {
 }
 
 impl ArrowStore {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             family_store: None,
             akm_data: HashMap::new(),
@@ -49,7 +49,7 @@ impl ArrowStore {
 
         for &col in expected_columns {
             if !schema.fields().iter().any(|f| f.name() == col) {
-                return Err(IdsError::InvalidFormat(format!("Missing column: {}", col)));
+                return Err(IdsError::InvalidFormat(format!("Missing column: {col}")));
             }
         }
         Ok(())
@@ -298,7 +298,7 @@ impl ArrowAccess for ArrowStore {
     ) -> Result<Option<T>, IdsError> {
         let col = batch
             .column_by_name(column)
-            .ok_or_else(|| IdsError::MissingData(format!("Column {} not found", column)))?;
+            .ok_or_else(|| IdsError::MissingData(format!("Column {column} not found")))?;
 
         Ok(T::from_array(col, index))
     }

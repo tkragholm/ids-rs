@@ -1,4 +1,4 @@
-use crate::{error::IdsError, family::FamilyRelations, models::*, snapshot::CovariateSnapshot};
+use crate::{error::IdsError, family::FamilyRelations, models::{Education, Income, Occupation, TimeVaryingValue}, snapshot::CovariateSnapshot};
 use chrono::{Datelike, NaiveDate};
 
 // Core traits

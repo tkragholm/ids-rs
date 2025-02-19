@@ -87,7 +87,7 @@ impl super::RegisterGenerator {
 
             let output_path = Path::new(&self.config.output_dir)
                 .join("ind")
-                .join(format!("{}.parquet", year));
+                .join(format!("{year}.parquet"));
 
             crate::writer::ParquetWriter::write_batch(batch, &output_path)?;
 

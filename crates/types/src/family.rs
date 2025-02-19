@@ -25,7 +25,7 @@ pub struct FamilyStore {
 }
 
 impl FamilyStore {
-    pub fn new(arrow_store: ArrowStore) -> Self {
+    #[must_use] pub fn new(arrow_store: ArrowStore) -> Self {
         Self {
             arrow_store,
             relations: HashMap::new(),
@@ -97,7 +97,7 @@ impl FamilyStore {
         Ok(())
     }
 
-    pub fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
+    #[must_use] pub fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
         self.relations.get(pnr)
     }
 }

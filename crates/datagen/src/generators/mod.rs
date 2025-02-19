@@ -53,7 +53,7 @@ impl RegisterGenerator {
         self.pnr_pool.get_family(&index)
     }
 
-    fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
+    const fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
         date.signed_duration_since(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap())
             .num_days() as i32
     }

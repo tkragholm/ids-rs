@@ -21,7 +21,7 @@ impl Default for BaseStore {
 }
 
 impl BaseStore {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             education: TimeVaryingStore::new(),
             income: TimeVaryingStore::new(),

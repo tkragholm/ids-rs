@@ -54,8 +54,8 @@ impl super::RegisterGenerator {
                     socio13,
                     cprtjek: Some(cprtjek),
                     cprtype: Some(cprtype),
-                    version: Some(format!("V{}", year)),
-                    senr: Some(format!("S{:06}", i)),
+                    version: Some(format!("V{year}")),
+                    senr: Some(format!("S{i:06}")),
                 });
             }
 
@@ -102,7 +102,7 @@ impl super::RegisterGenerator {
             // Write to Parquet file
             let output_path = Path::new(&self.config.output_dir)
                 .join("akm")
-                .join(format!("{}.parquet", year));
+                .join(format!("{year}.parquet"));
 
             crate::writer::ParquetWriter::write_batch(batch, &output_path)?;
 

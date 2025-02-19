@@ -19,7 +19,7 @@ impl super::RegisterGenerator {
         pb.set_message("Generating pediatric records...");
 
         let mut writer = Writer::from_path(filename)
-            .map_err(|e| DataGenError::Generation(format!("Failed to create CSV file: {}", e)))?;
+            .map_err(|e| DataGenError::Generation(format!("Failed to create CSV file: {e}")))?;
 
         // Write header
         writer
@@ -30,7 +30,7 @@ impl super::RegisterGenerator {
                 "mother_bday",
                 "father_bday",
             ])
-            .map_err(|e| DataGenError::Generation(format!("Failed to write header: {}", e)))?;
+            .map_err(|e| DataGenError::Generation(format!("Failed to write header: {e}")))?;
 
         // Define the study period (2000-2018)
         let study_start = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
@@ -84,14 +84,14 @@ impl super::RegisterGenerator {
                     &mother_birth.format("%Y-%m-%d").to_string(),
                     &father_birth.format("%Y-%m-%d").to_string(),
                 ])
-                .map_err(|e| DataGenError::Generation(format!("Failed to write record: {}", e)))?;
+                .map_err(|e| DataGenError::Generation(format!("Failed to write record: {e}")))?;
 
             pb.inc(1);
         }
 
         writer
             .flush()
-            .map_err(|e| DataGenError::Generation(format!("Failed to flush writer: {}", e)))?;
+            .map_err(|e| DataGenError::Generation(format!("Failed to flush writer: {e}")))?;
 
         pb.finish_with_message("Pediatric data generation completed");
         Ok(())

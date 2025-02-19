@@ -65,7 +65,7 @@ impl super::RegisterGenerator {
 
                     records.push(UddfRecord {
                         pnr: pnr.clone(),
-                        hfaudd: Some(education.to_string()),
+                        hfaudd: Some((*education).to_string()),
                         hf_vfra: Some(completion_date),
                         hf_vtil: Some(completion_date + chrono::Duration::days(30)),
                         instnr: Some(self.rng.gen_range(100000..=999999)),
@@ -115,7 +115,7 @@ impl super::RegisterGenerator {
             // Write to Parquet file
             let output_path = Path::new(&self.config.output_dir)
                 .join("uddf")
-                .join(format!("{}09.parquet", year));
+                .join(format!("{year}09.parquet"));
 
             crate::writer::ParquetWriter::write_batch(batch, &output_path)?;
 

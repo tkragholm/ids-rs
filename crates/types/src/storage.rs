@@ -1,4 +1,4 @@
-use crate::{error::IdsError, models::*, traits::TimeVaryingAccess};
+use crate::{error::IdsError, models::TimeVaryingValue, traits::TimeVaryingAccess};
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ impl<T: Clone> Default for TimeVaryingStore<T> {
 }
 
 impl<T: Clone> TimeVaryingStore<T> {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             data: DashMap::new(),
         }

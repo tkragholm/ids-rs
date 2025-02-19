@@ -39,10 +39,10 @@ impl<T> ArrowDataHelper for T {
     ) -> Result<&'a StringArray, IdsError> {
         batch
             .column_by_name(column_name)
-            .ok_or_else(|| IdsError::MissingData(format!("{} column not found", column_name)))?
+            .ok_or_else(|| IdsError::MissingData(format!("{column_name} column not found")))?
             .as_any()
             .downcast_ref::<StringArray>()
-            .ok_or_else(|| IdsError::InvalidFormat(format!("Invalid {} array type", column_name)))
+            .ok_or_else(|| IdsError::InvalidFormat(format!("Invalid {column_name} array type")))
     }
 
     fn get_date_array<'a>(
@@ -52,10 +52,10 @@ impl<T> ArrowDataHelper for T {
     ) -> Result<&'a Date32Array, IdsError> {
         batch
             .column_by_name(column_name)
-            .ok_or_else(|| IdsError::MissingData(format!("{} column not found", column_name)))?
+            .ok_or_else(|| IdsError::MissingData(format!("{column_name} column not found")))?
             .as_any()
             .downcast_ref::<Date32Array>()
-            .ok_or_else(|| IdsError::InvalidFormat(format!("Invalid {} array type", column_name)))
+            .ok_or_else(|| IdsError::InvalidFormat(format!("Invalid {column_name} array type")))
     }
 
     fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate, IdsError> {
@@ -65,7 +65,7 @@ impl<T> ArrowDataHelper for T {
         epoch
             .checked_add_days(Days::new(days_since_epoch as u64))
             .ok_or_else(|| {
-                IdsError::InvalidDate(format!("Invalid date value: {}", days_since_epoch))
+                IdsError::InvalidDate(format!("Invalid date value: {days_since_epoch}"))
             })
     }
 }

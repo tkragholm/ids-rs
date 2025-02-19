@@ -24,7 +24,7 @@ pub struct CovariateSnapshot {
 }
 
 impl CovariateSnapshot {
-    pub fn new(date: NaiveDate) -> Self {
+    #[must_use] pub const fn new(date: NaiveDate) -> Self {
         Self {
             date,
             income: None,
@@ -43,25 +43,25 @@ impl CovariateSnapshot {
         }
     }
 
-    pub fn with_education(mut self, education: Option<Education>) -> Self {
+    #[must_use] pub fn with_education(mut self, education: Option<Education>) -> Self {
         self.education = education;
         self
     }
 
-    pub fn with_income(mut self, income: Option<Income>) -> Self {
+    #[must_use] pub fn with_income(mut self, income: Option<Income>) -> Self {
         self.income = income;
         self
     }
 
-    pub fn with_socioeconomic_status(mut self, status: Option<Occupation>) -> Self {
+    #[must_use] pub fn with_socioeconomic_status(mut self, status: Option<Occupation>) -> Self {
         self.socioeconomic_status = status;
         self
     }
 
-    pub fn combine(
-        person: CovariateSnapshot,
-        father: Option<CovariateSnapshot>,
-        mother: Option<CovariateSnapshot>,
+    #[must_use] pub fn combine(
+        person: Self,
+        father: Option<Self>,
+        mother: Option<Self>,
     ) -> Self {
         Self {
             date: person.date,

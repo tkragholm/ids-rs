@@ -15,7 +15,7 @@ pub struct CombinedStore {
 }
 
 impl CombinedStore {
-    pub fn new(base_store: BaseStore, arrow_store: ArrowStore) -> Self {
+    #[must_use] pub const fn new(base_store: BaseStore, arrow_store: ArrowStore) -> Self {
         Self {
             base_store,
             arrow_store,
