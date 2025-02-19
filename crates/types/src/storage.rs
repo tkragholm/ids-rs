@@ -7,6 +7,12 @@ pub struct TimeVaryingStore<T> {
     data: DashMap<String, Vec<TimeVaryingValue<T>>>,
 }
 
+impl<T: Clone> Default for TimeVaryingStore<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Clone> TimeVaryingStore<T> {
     pub fn new() -> Self {
         Self {

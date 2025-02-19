@@ -22,6 +22,12 @@ pub struct ArrowStore {
     pub uddf_data: HashMap<String, Vec<RecordBatch>>,
 }
 
+impl Default for ArrowStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArrowStore {
     pub fn new() -> Self {
         Self {

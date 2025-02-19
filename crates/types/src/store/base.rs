@@ -14,6 +14,12 @@ pub struct BaseStore {
     occupation: TimeVaryingStore<Occupation>,
 }
 
+impl Default for BaseStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BaseStore {
     pub fn new() -> Self {
         Self {

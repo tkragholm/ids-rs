@@ -8,8 +8,7 @@ impl ArrowPrimitive for i32 {
     fn from_array(array: &dyn Array, index: usize) -> Option<Self> {
         array
             .as_any()
-            .downcast_ref::<Int32Array>()
-            .and_then(|arr| Some(arr.value(index)))
+            .downcast_ref::<Int32Array>().map(|arr| arr.value(index))
     }
 }
 
@@ -17,8 +16,7 @@ impl ArrowPrimitive for f64 {
     fn from_array(array: &dyn Array, index: usize) -> Option<Self> {
         array
             .as_any()
-            .downcast_ref::<Float64Array>()
-            .and_then(|arr| Some(arr.value(index)))
+            .downcast_ref::<Float64Array>().map(|arr| arr.value(index))
     }
 }
 
@@ -26,7 +24,6 @@ impl ArrowPrimitive for String {
     fn from_array(array: &dyn Array, index: usize) -> Option<Self> {
         array
             .as_any()
-            .downcast_ref::<StringArray>()
-            .and_then(|arr| Some(arr.value(index).to_string()))
+            .downcast_ref::<StringArray>().map(|arr| arr.value(index).to_string())
     }
 }
