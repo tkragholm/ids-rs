@@ -16,7 +16,7 @@ pub struct BalanceResults {
 }
 
 impl BalanceChecker {
-    pub fn new(store: CovariateStore) -> Self {
+    #[must_use] pub const fn new(store: CovariateStore) -> Self {
         Self { store }
     }
 
@@ -120,18 +120,17 @@ impl BalanceChecker {
 
         // Add summary statistics for categorical variables
         for (category, count) in &case_freqs {
-            let case_prop = *count as f64 / cases.len() as f64;
+            let case_prop = f64::from(*count) / cases.len() as f64;
             let control_prop = control_freqs
                 .get(category)
-                .map(|&count| count as f64 / controls.len() as f64)
-                .unwrap_or(0.0);
+                .map_or(0.0, |&count| f64::from(count) / controls.len() as f64);
 
             summaries.push(CovariateSummary {
-                variable: format!("{} - {}", name, category),
+                variable: format!("{name} - {category}"),
                 mean_cases: case_prop,
                 mean_controls: control_prop,
                 std_diff: (case_prop - control_prop)
-                    / ((case_prop * (1.0 - case_prop) + control_prop * (1.0 - control_prop)) / 2.0)
+                    / (case_prop.mul_add(1.0 - case_prop, control_prop * (1.0 - control_prop)) / 2.0)
                         .sqrt(),
                 variance_ratio: 1.0, // Not applicable for categorical variables
             });
@@ -233,7 +232,7 @@ impl BalanceChecker {
             |snap| {
                 snap.education
                     .as_ref()
-                    .and_then(|e| e.years.map(|y| y as f64))
+                    .and_then(|e| e.years.map(f64::from))
             },
         )?;
 
@@ -280,7 +279,7 @@ impl BalanceChecker {
         // Save summaries
         let summaries_path = base_path.with_file_name("covariate_balance.csv");
         let results = self.calculate_balance(cases, controls)?;
-        BalanceChecker::save_balance_results(&results.summaries, &summaries_path)?;
+        Self::save_balance_results(&results.summaries, &summaries_path)?;
 
         // Save missing data rates
         let missing_rates_path = base_path.with_file_name("missing_data_rates.csv");
@@ -300,7 +299,7 @@ impl BalanceChecker {
         results: &[CovariateSummary],
         output_path: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let checker = BalanceChecker::new(CovariateStore::new());
+        let checker = Self::new(CovariateStore::new());
         checker.save_results(results, output_path)?;
         Ok(())
     }
@@ -342,6 +341,6 @@ impl BalanceChecker {
     ) -> Result<CovariateSnapshot, IdsError> {
         self.store
             .get_covariates_at_date(pnr, date)
-            .ok_or_else(|| IdsError::MissingData(format!("No covariates found for {}", pnr)))
+            .ok_or_else(|| IdsError::MissingData(format!("No covariates found for {pnr}")))
     }
 }

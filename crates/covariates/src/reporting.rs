@@ -7,7 +7,7 @@ pub struct BalanceReport {
 }
 
 impl BalanceReport {
-    pub fn new(results: BalanceResults) -> Self {
+    #[must_use] pub const fn new(results: BalanceResults) -> Self {
         Self { results }
     }
 
