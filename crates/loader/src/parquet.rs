@@ -28,7 +28,7 @@ pub fn read_parquet(path: &Path, schema: Option<&Schema>) -> Result<Vec<RecordBa
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
         .map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
 
-    let mut reader = match schema {
+    let reader = match schema {
         Some(s) => {
             let indices: Vec<usize> = (0..s.fields().len()).collect();
             let mask = ProjectionMask::roots(builder.parquet_schema(), indices);
