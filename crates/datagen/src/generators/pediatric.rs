@@ -36,7 +36,9 @@ impl super::RegisterGenerator {
         let study_start = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let study_end = NaiveDate::from_ymd_opt(2018, 12, 31).unwrap();
         let earliest_birth = NaiveDate::from_ymd_opt(1995, 1, 1).unwrap();
-        let latest_birth = study_end;
+        let _latest_birth = study_end;
+
+        let _birth_range_days = (study_end - earliest_birth).num_days() as i32;
 
         // Create treatment indices
         let mut indices: Vec<usize> = (0..self.config.total_records).collect();

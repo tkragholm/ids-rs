@@ -12,6 +12,6 @@ pub use types::{
 };
 
 pub use balance::BalanceChecker;
-pub use matched_pairs::{is_case, load_matched_pairs};
+pub use matched_pairs::load_matched_pairs;
 pub use models::CovariateSummary;
 pub use storage::CovariateStore;

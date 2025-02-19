@@ -4,31 +4,26 @@ use core::{
     utils::{configure_logging, load_records, validate_csv_format, MatchingCriteria},
 };
 use covariates::{
-    balance::BalanceChecker,
-    matched_pairs::{is_case, load_matched_pairs},
-    storage::CovariateStore,
+    balance::BalanceChecker, matched_pairs::load_matched_pairs, storage::CovariateStore,
 };
 use datagen::{GeneratorConfig, RegisterGenerator};
 use loader::ParquetLoader;
-use log::{error, info};
+use log::{error, info, warn};
+use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
 use types::{BaseStore, CombinedStore};
 
-// Import the CLI structs directly from cli.rs
 mod cli;
 use cli::{Cli, Commands};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    // Create output directory if it doesn't exist
     fs::create_dir_all(&cli.output_dir)?;
 
-    // Create log directory
     let log_dir = Path::new(&cli.output_dir).join("log");
     fs::create_dir_all(&log_dir)?;
 
-    // Configure logging
     configure_logging(Some(&format!("{}/cli.log", log_dir.display())))?;
 
     match &cli.command {
@@ -40,7 +35,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             info!("Generating synthetic pediatric data...");
 
-            // Create generator with config
             let config = GeneratorConfig::new(*num_records, *num_cases, cli.output_dir);
             let config = if let Some(seed_value) = seed {
                 config.with_seed(*seed_value)
@@ -50,12 +44,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut generator = RegisterGenerator::new(config)?;
 
-            // Generate pediatric data
             generator.generate_pediatric(output)?;
             info!(
                 "Pediatric data generation completed. Output saved to: {}",
                 output
             );
+            Ok(())
         }
         Commands::GenerateRegisters {
             output_dir,
@@ -80,6 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Starting data generation for all registers...");
             generator.generate_all()?;
             info!("Register data generation completed in: {}", output_dir);
+            Ok(())
         }
         Commands::Sample {
             input,
@@ -123,7 +118,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let quality = sampler.evaluate_matching_quality(&case_control_pairs);
                     info!("{}", quality.format_report());
 
-                    // Generate all plots
                     let plots_dir = Path::new(&cli.output_dir).join("plots");
                     fs::create_dir_all(&plots_dir)?;
 
@@ -150,6 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             info!("Total execution time: {:?}", start.elapsed());
+            Ok(())
         }
 
         Commands::CheckBalance {
@@ -158,36 +153,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             info!("Loading matched pairs from {}...", matches_file);
             let matched_pairs = load_matched_pairs(Path::new(matches_file))?;
+            info!("Loaded {} matched pairs", matched_pairs.len());
 
             info!("Loading covariate data from {}...", covariate_dir);
             let arrow_store = ParquetLoader::new().load_from_path(covariate_dir.clone())?;
+
+            // Debug ArrowStore contents
+            info!(
+                "Loaded store with: {} AKM years, {} BEF periods, {} IND years, {} UDDF periods",
+                arrow_store.akm_data.len(),
+                arrow_store.bef_data.len(),
+                arrow_store.ind_data.len(),
+                arrow_store.uddf_data.len()
+            );
+
             let store = CombinedStore::new(BaseStore::new(), arrow_store);
             let store = CovariateStore::with_store(Box::new(store));
-
             let checker = BalanceChecker::new(store);
 
-            // Extract cases and controls with their index dates
+            // First, collect the case PNRs into a HashSet for efficient lookup
+            let case_pnrs: HashSet<String> = matched_pairs
+                .iter()
+                .map(|(case_pnr, _, _)| case_pnr.clone())
+                .collect();
+
+            info!("Collected {} unique case PNRs", case_pnrs.len());
+
             let (cases, controls): (Vec<_>, Vec<_>) = matched_pairs
                 .into_iter()
-                .flat_map(|(case_id, case_date, control_ids)| {
-                    std::iter::once((case_id.clone(), case_date)).chain(
-                        control_ids
+                .flat_map(|(case_pnr, treatment_date, control_pnrs)| {
+                    std::iter::once((case_pnr.clone(), treatment_date)).chain(
+                        control_pnrs
                             .into_iter()
-                            .map(move |control_id| (control_id, case_date)),
+                            .map(move |control_pnr| (control_pnr, treatment_date)),
                     )
                 })
-                .partition(|(id, _)| is_case(id));
+                .partition(|(pnr, _)| case_pnrs.contains(pnr));
+
+            info!(
+                "Processing {} cases and {} controls",
+                cases.len(),
+                controls.len()
+            );
+
+            // Sample debug for first case
+            if let Some((id, date)) = cases.first() {
+                match checker.get_covariates_at_date(id, *date) {
+                    Ok(snapshot) => {
+                        info!("Sample case covariate snapshot: {:?}", snapshot);
+                    }
+                    Err(e) => {
+                        warn!("Failed to get covariates for sample case {}: {}", id, e);
+                    }
+                }
+            }
 
             info!("Calculating covariate balance...");
             let balance_results = checker.calculate_balance(&cases, &controls)?;
 
-            // Save balance results
+            info!("Got {} balance summaries", balance_results.summaries.len());
+
             let output_path = Path::new(&cli.output_dir).join("covariate_balance.csv");
             BalanceChecker::save_balance_results(&balance_results.summaries, &output_path)?;
 
             info!("Balance results saved to {}", output_path.display());
+
+            Ok(())
         }
     }
-
-    Ok(())
 }

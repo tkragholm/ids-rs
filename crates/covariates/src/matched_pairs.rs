@@ -2,7 +2,6 @@ use chrono::NaiveDate;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
-use types::error::IdsError as CovariateError;
 
 #[derive(Deserialize, Debug)]
 pub struct MatchedPairRecord {
@@ -22,23 +21,35 @@ pub struct MatchedPairRecord {
 }
 
 pub fn load_matched_pairs(
-    file_path: &Path,
-) -> Result<Vec<(String, NaiveDate, Vec<String>)>, CovariateError> {
-    let mut rdr = csv::Reader::from_path(file_path)?;
-    let mut pairs_map: HashMap<(String, NaiveDate), Vec<String>> = HashMap::new();
+    path: &Path,
+) -> Result<Vec<(String, NaiveDate, Vec<String>)>, Box<dyn std::error::Error>> {
+    let mut reader = csv::Reader::from_path(path)?;
+    let mut pairs: HashMap<(String, NaiveDate), Vec<String>> = HashMap::new();
 
-    for result in rdr.deserialize() {
-        let record: MatchedPairRecord = result?;
+    for result in reader.records() {
+        let record = result?;
 
-        // Use case_id and case_treatment_date as the key
-        let key = (record.case_id.clone(), record.case_treatment_date);
-        pairs_map.entry(key).or_default().push(record.control_id);
+        // Extract case information
+        let case_pnr = record.get(1).ok_or("Missing case_pnr")?.to_string();
+        let treatment_date = NaiveDate::parse_from_str(
+            record.get(3).ok_or("Missing case_treatment_date")?,
+            "%Y-%m-%d",
+        )?;
+
+        // Extract control information
+        let control_pnr = record.get(5).ok_or("Missing control_pnr")?.to_string();
+
+        // Add to pairs HashMap
+        pairs
+            .entry((case_pnr.clone(), treatment_date))
+            .or_default()
+            .push(control_pnr);
     }
 
-    // Convert the map to the required format
-    Ok(pairs_map
+    // Convert HashMap to Vec
+    Ok(pairs
         .into_iter()
-        .map(|((case_id, treatment_date), control_ids)| (case_id, treatment_date, control_ids))
+        .map(|((case_pnr, date), controls)| (case_pnr, date, controls))
         .collect())
 }
 
@@ -49,9 +60,3 @@ pub fn load_matched_pairs(
 //     let s: String = serde::Deserialize::deserialize(deserializer)?;
 //     Ok(s.split(',').map(String::from).collect())
 // }
-
-// Add missing functions
-pub fn is_case(id: &str) -> bool {
-    // Implement based on your ID format
-    id.starts_with("C")
-}

@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use statrs::statistics::Statistics;
 use std::collections::HashMap;
 use std::path::Path;
-use types::{error::IdsError as CovariateError, CovariateSnapshot};
+use types::{error::IdsError, CovariateSnapshot};
 
 pub struct BalanceChecker {
     store: CovariateStore,
@@ -28,7 +28,7 @@ impl BalanceChecker {
         controls: &[(String, NaiveDate)],
         name: &str,
         extractor: F,
-    ) -> Result<(), CovariateError>
+    ) -> Result<(), IdsError>
     where
         F: Fn(&CovariateSnapshot) -> Option<f64>,
     {
@@ -64,7 +64,7 @@ impl BalanceChecker {
         &self,
         subjects: &[(String, NaiveDate)],
         extractor: &F,
-    ) -> Result<(Vec<f64>, usize), CovariateError>
+    ) -> Result<(Vec<f64>, usize), IdsError>
     where
         F: Fn(&CovariateSnapshot) -> Option<f64>,
     {
@@ -91,7 +91,7 @@ impl BalanceChecker {
         controls: &[(String, NaiveDate)],
         name: &str,
         extractor: F,
-    ) -> Result<(), CovariateError>
+    ) -> Result<(), IdsError>
     where
         F: for<'a> Fn(&'a CovariateSnapshot) -> Option<String>,
     {
@@ -144,7 +144,7 @@ impl BalanceChecker {
         &self,
         subjects: &[(String, NaiveDate)],
         extractor: &F,
-    ) -> Result<(Vec<String>, usize), CovariateError>
+    ) -> Result<(Vec<String>, usize), IdsError>
     where
         F: Fn(&CovariateSnapshot) -> Option<String>,
     {
@@ -167,7 +167,7 @@ impl BalanceChecker {
         &self,
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
-    ) -> Result<BalanceResults, CovariateError> {
+    ) -> Result<BalanceResults, IdsError> {
         let mut summaries = Vec::new();
         let mut missing_rates = HashMap::new();
 
@@ -309,8 +309,8 @@ impl BalanceChecker {
         &self,
         results: &[CovariateSummary],
         output_path: &Path,
-    ) -> Result<(), CovariateError> {
-        let mut wtr = csv::Writer::from_path(output_path).map_err(CovariateError::Csv)?;
+    ) -> Result<(), IdsError> {
+        let mut wtr = csv::Writer::from_path(output_path).map_err(IdsError::Csv)?;
 
         wtr.write_record([
             "Variable",
@@ -319,7 +319,7 @@ impl BalanceChecker {
             "Standardized Difference",
             "Variance Ratio",
         ])
-        .map_err(CovariateError::Csv)?;
+        .map_err(IdsError::Csv)?;
 
         for result in results {
             wtr.write_record([
@@ -329,10 +329,19 @@ impl BalanceChecker {
                 &result.std_diff.to_string(),
                 &result.variance_ratio.to_string(),
             ])
-            .map_err(CovariateError::Csv)?;
+            .map_err(IdsError::Csv)?;
         }
 
-        wtr.flush().map_err(CovariateError::Io)?;
+        wtr.flush().map_err(IdsError::Io)?;
         Ok(())
+    }
+    pub fn get_covariates_at_date(
+        &self,
+        pnr: &str,
+        date: NaiveDate,
+    ) -> Result<CovariateSnapshot, IdsError> {
+        self.store
+            .get_covariates_at_date(pnr, date)
+            .ok_or_else(|| IdsError::MissingData(format!("No covariates found for {}", pnr)))
     }
 }

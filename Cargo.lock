@@ -2175,6 +2175,7 @@ dependencies = [
  "chrono",
  "csv",
  "dashmap",
+ "log",
  "parquet",
  "rand 0.8.5",
  "serde",

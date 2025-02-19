@@ -56,8 +56,8 @@ impl super::RegisterGenerator {
                     })?;
 
                     let (birth_date, pnr) = child;
-                    let (father_birth, father_pnr) = father;
-                    let (mother_birth, mother_pnr) = mother;
+                    let (_father_birth, father_pnr) = father;
+                    let (_mother_birth, mother_pnr) = mother;
 
                     // Generate all random values upfront
                     let gender = if self.rng.gen_bool(0.5) { "M" } else { "F" };

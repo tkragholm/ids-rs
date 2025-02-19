@@ -16,7 +16,7 @@ impl PnrPool {
         let mut parents = HashMap::new();
 
         // Define study period constants
-        let study_start = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        let _study_start = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let study_end = NaiveDate::from_ymd_opt(2018, 12, 31).unwrap();
         let earliest_birth = NaiveDate::from_ymd_opt(1995, 1, 1).unwrap();
         let latest_birth = study_end;

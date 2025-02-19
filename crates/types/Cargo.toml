@@ -17,3 +17,4 @@ arrow-select.workspace = true
 parquet.workspace = true
 dashmap.workspace = true
 rand.workspace = true
+log.workspace = true
