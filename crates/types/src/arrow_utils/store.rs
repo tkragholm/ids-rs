@@ -5,7 +5,7 @@ use crate::{
     family::{FamilyRelations, FamilyStore},
     models::{Education, Income, Occupation, TimeVaryingValue},
     snapshot::CovariateSnapshot,
-    traits::{DataAccess, DateHelpers, FamilyAccess, Store},
+    traits::{DataAccess, FamilyAccess, Store},
 };
 use arrow::record_batch::RecordBatch;
 use chrono::Datelike;
@@ -29,7 +29,8 @@ impl Default for ArrowStore {
 }
 
 impl ArrowStore {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             family_store: None,
             akm_data: HashMap::new(),
