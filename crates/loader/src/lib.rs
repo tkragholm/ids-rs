@@ -23,7 +23,8 @@ impl Default for ParquetLoader {
 }
 
 impl ParquetLoader {
-    #[must_use] pub const fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
@@ -40,10 +41,28 @@ impl StoreLoader for ParquetLoader {
 
         log::info!("Loading data from path: {}", base_path);
 
+        // Add data file existence checks
+        for dir in ["akm", "bef", "ind", "uddf"] {
+            let path = std::path::Path::new(&base_path).join(dir);
+            if !path.exists() {
+                log::warn!("Directory does not exist: {}", path.display());
+            } else {
+                // Log contents of directory
+                if let Ok(entries) = std::fs::read_dir(&path) {
+                    let files: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+                    log::info!("Found {} files in {}: {:?}", files.len(), dir, files);
+                }
+            }
+        }
+
         // Load family relations
         match reader.read_family() {
             Ok(family_batches) => {
-                log::info!("Loaded {} family relation batches", family_batches.len());
+                log::info!(
+                    "Loaded {} family relation batches with {} total rows",
+                    family_batches.len(),
+                    family_batches.iter().map(|b| b.num_rows()).sum::<usize>()
+                );
                 store.load_family_relations(family_batches)?;
             }
             Err(e) => log::warn!("Failed to load family relations: {}", e),

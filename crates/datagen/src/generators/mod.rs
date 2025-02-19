@@ -1,5 +1,6 @@
 mod akm;
 mod bef;
+mod family;
 mod ind;
 mod pediatric;
 mod uddf;
@@ -61,6 +62,9 @@ impl RegisterGenerator {
     pub fn generate_all(&mut self) -> Result<(), DataGenError> {
         // Create output directories
         self.create_directories()?;
+
+        // Generate family relationships first
+        self.generate_family()?;
 
         // Generate data for each register
         self.generate_akm()?;

@@ -18,25 +18,6 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Generate synthetic pediatric test data
-    GeneratePediatric {
-        /// Output file path for synthetic data
-        #[arg(short = 'o', long, default_value = "pediatric_data.csv")]
-        output: String,
-
-        /// Number of total records to generate
-        #[arg(short = 't', long, default_value_t = 1_200_000)]
-        num_records: usize,
-
-        /// Number of treatment cases to generate
-        #[arg(short = 'c', long, default_value_t = 50_000)]
-        num_cases: usize,
-
-        /// Random seed for reproducibility
-        #[arg(short = 'r', long)]
-        seed: Option<u64>,
-    },
-
     /// Generate synthetic register data
     GenerateRegisters {
         /// Directory for register data output
@@ -56,7 +37,7 @@ pub enum Commands {
         start_year: i32,
 
         /// End year for data generation
-        #[arg(short = 'e', long, default_value_t = 2022)]
+        #[arg(short = 'e', long, default_value_t = 2023)]
         end_year: i32,
 
         /// Random seed for reproducibility

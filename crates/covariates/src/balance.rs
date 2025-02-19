@@ -15,8 +15,10 @@ pub struct BalanceResults {
     pub missing_data_rates: HashMap<String, (f64, f64)>, // (case_rate, control_rate)
 }
 
+#[allow(clippy::cast_precision_loss)]
 impl BalanceChecker {
-    #[must_use] pub const fn new(store: CovariateStore) -> Self {
+    #[must_use]
+    pub const fn new(store: CovariateStore) -> Self {
         Self { store }
     }
 
@@ -32,9 +34,8 @@ impl BalanceChecker {
     where
         F: Fn(&CovariateSnapshot) -> Option<f64>,
     {
-        let (case_values, case_missing) = self.collect_numeric_values(cases, &extractor)?;
-        let (control_values, control_missing) =
-            self.collect_numeric_values(controls, &extractor)?;
+        let (case_values, case_missing) = self.collect_numeric_values(cases, &extractor);
+        let (control_values, control_missing) = self.collect_numeric_values(controls, &extractor);
 
         missing_rates.insert(
             name.to_string(),
@@ -64,7 +65,7 @@ impl BalanceChecker {
         &self,
         subjects: &[(String, NaiveDate)],
         extractor: &F,
-    ) -> Result<(Vec<f64>, usize), IdsError>
+    ) -> (Vec<f64>, usize)
     where
         F: Fn(&CovariateSnapshot) -> Option<f64>,
     {
@@ -80,7 +81,7 @@ impl BalanceChecker {
             }
         }
 
-        Ok((values, missing))
+        (values, missing)
     }
 
     fn add_categorical_balance<F>(
@@ -95,9 +96,9 @@ impl BalanceChecker {
     where
         F: for<'a> Fn(&'a CovariateSnapshot) -> Option<String>,
     {
-        let (case_values, case_missing) = self.collect_categorical_values(cases, &extractor)?;
+        let (case_values, case_missing) = self.collect_categorical_values(cases, &extractor);
         let (control_values, control_missing) =
-            self.collect_categorical_values(controls, &extractor)?;
+            self.collect_categorical_values(controls, &extractor);
 
         missing_rates.insert(
             name.to_string(),
@@ -130,7 +131,8 @@ impl BalanceChecker {
                 mean_cases: case_prop,
                 mean_controls: control_prop,
                 std_diff: (case_prop - control_prop)
-                    / (case_prop.mul_add(1.0 - case_prop, control_prop * (1.0 - control_prop)) / 2.0)
+                    / (case_prop.mul_add(1.0 - case_prop, control_prop * (1.0 - control_prop))
+                        / 2.0)
                         .sqrt(),
                 variance_ratio: 1.0, // Not applicable for categorical variables
             });
@@ -143,7 +145,7 @@ impl BalanceChecker {
         &self,
         subjects: &[(String, NaiveDate)],
         extractor: &F,
-    ) -> Result<(Vec<String>, usize), IdsError>
+    ) -> (Vec<String>, usize)
     where
         F: Fn(&CovariateSnapshot) -> Option<String>,
     {
@@ -159,9 +161,13 @@ impl BalanceChecker {
             }
         }
 
-        Ok((values, missing))
+        (values, missing)
     }
 
+    /// Calculate balance metrics between cases and controls
+    ///
+    /// # Errors
+    /// Returns an error if there are issues accessing covariate data
     pub fn calculate_balance(
         &self,
         cases: &[(String, NaiveDate)],
@@ -229,11 +235,7 @@ impl BalanceChecker {
             cases,
             controls,
             "Education (years)",
-            |snap| {
-                snap.education
-                    .as_ref()
-                    .and_then(|e| e.years.map(f64::from))
-            },
+            |snap| snap.education.as_ref().and_then(|e| e.years.map(f64::from)),
         )?;
 
         self.add_categorical_balance(
@@ -270,6 +272,10 @@ impl BalanceChecker {
         case_var / control_var
     }
 
+    /// Save balance results to files
+    ///
+    /// # Errors
+    /// Returns an error if there are issues writing to the output files
     pub fn save_to_files(
         &self,
         base_path: &Path,
@@ -295,6 +301,10 @@ impl BalanceChecker {
         Ok(())
     }
 
+    /// Save balance results to a CSV file
+    ///
+    /// # Errors
+    /// Returns an error if there are issues writing the results to the output file
     pub fn save_balance_results(
         results: &[CovariateSummary],
         output_path: &Path,
@@ -304,6 +314,10 @@ impl BalanceChecker {
         Ok(())
     }
 
+    /// Save covariate summaries to a CSV file
+    ///
+    /// # Errors
+    /// Returns an error if there are issues writing to the CSV file
     pub fn save_results(
         &self,
         results: &[CovariateSummary],
@@ -334,6 +348,11 @@ impl BalanceChecker {
         wtr.flush().map_err(IdsError::Io)?;
         Ok(())
     }
+
+    /// Get covariate snapshot for a subject at a specific date
+    ///
+    /// # Errors
+    /// Returns an error if no covariate data is found for the given subject and date
     pub fn get_covariates_at_date(
         &self,
         pnr: &str,

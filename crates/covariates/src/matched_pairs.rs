@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Represents a matched pair record with case and control information
 #[derive(Deserialize, Debug)]
 pub struct MatchedPairRecord {
     pub case_id: String,
@@ -20,9 +21,24 @@ pub struct MatchedPairRecord {
     pub father_age_diff_days: i64,
 }
 
-pub fn load_matched_pairs(
-    path: &Path,
-) -> Result<Vec<(String, NaiveDate, Vec<String>)>, Box<dyn std::error::Error>> {
+/// Type alias for the matched pairs result
+type MatchedPairsResult = Vec<(String, NaiveDate, Vec<String>)>;
+
+/// Loads matched pairs from a CSV file.
+///
+/// # Arguments
+/// * `path` - Path to the CSV file containing matched pairs data
+///
+/// # Returns
+/// A vector of tuples containing (case_pnr, treatment_date, control_pnrs)
+///
+/// # Errors
+/// Returns an error if:
+/// * The file cannot be read
+/// * The CSV format is invalid
+/// * Required fields are missing
+/// * Date parsing fails
+pub fn load_matched_pairs(path: &Path) -> Result<MatchedPairsResult, Box<dyn std::error::Error>> {
     let mut reader = csv::Reader::from_path(path)?;
     let mut pairs: HashMap<(String, NaiveDate), Vec<String>> = HashMap::new();
 
@@ -52,11 +68,3 @@ pub fn load_matched_pairs(
         .map(|((case_pnr, date), controls)| (case_pnr, date, controls))
         .collect())
 }
-
-// fn deserialize_control_ids<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-// where
-//     D: serde::Deserializer<'de>,
-// {
-//     let s: String = serde::Deserialize::deserialize(deserializer)?;
-//     Ok(s.split(',').map(String::from).collect())
-// }

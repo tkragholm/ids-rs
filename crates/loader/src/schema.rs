@@ -78,11 +78,11 @@ pub fn uddf_schema() -> Schema {
 pub fn family_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
-        Field::new("FOED_DAG", DataType::Date32, true),
-        Field::new("FAR_ID", DataType::Utf8, true),
-        Field::new("MOR_ID", DataType::Utf8, true),
-        Field::new("FAMILIE_ID", DataType::Utf8, true),
-        Field::new("FAR_FDAG", DataType::Date32, true),
-        Field::new("MOR_FDAG", DataType::Date32, true),
+        Field::new("BIRTH_DATE", DataType::Date32, true),
+        Field::new("FATHER_ID", DataType::Utf8, true),
+        Field::new("MOTHER_ID", DataType::Utf8, true),
+        Field::new("FAMILY_ID", DataType::Utf8, true),
+        Field::new("FATHER_BIRTH_DATE", DataType::Date32, true),
+        Field::new("MOTHER_BIRTH_DATE", DataType::Date32, true),
     ])
 }

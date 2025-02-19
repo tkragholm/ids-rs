@@ -60,14 +60,29 @@ impl FileReader {
     ///
     /// # Arguments
     /// * `base_path` - Root directory containing data files
-    #[must_use] pub const fn new(base_path: String) -> Self {
+    #[must_use]
+    pub const fn new(base_path: String) -> Self {
         Self { base_path }
     }
 }
 
 impl DataReader for FileReader {
     fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError> {
-        crate::parquet::read_parquet(path, Some(schema))
+        if !path.exists() {
+            log::warn!("File does not exist: {}", path.display());
+            return Ok(vec![]);
+        }
+
+        log::debug!("Reading batches from {}", path.display());
+        let batches = crate::parquet::read_parquet(path, Some(schema))?;
+        log::info!(
+            "Read {} batches with {} total rows from {}",
+            batches.len(),
+            batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            path.display()
+        );
+
+        Ok(batches)
     }
 
     fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
@@ -80,7 +95,7 @@ impl DataReader for FileReader {
     fn read_bef(&self, year: i32, quarter: Option<i32>) -> Result<Vec<RecordBatch>, IdsError> {
         let filename = match quarter {
             Some(q) => format!("{}{:02}.parquet", year, q * 3),
-            None => format!("{year}.parquet"),
+            None => format!("{year}12.parquet"),
         };
         let path = Path::new(&self.base_path).join("bef").join(filename);
         self.read_batches(&path, &schema::bef_schema())

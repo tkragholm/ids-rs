@@ -23,12 +23,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     configure_logging_with_dir(&cli.output_dir)?;
 
     match &cli.command {
-        Commands::GeneratePediatric {
-            output,
-            num_records,
-            num_cases,
-            seed,
-        } => handle_generate_pediatric(output, *num_records, *num_cases, *seed, &cli.output_dir),
         Commands::GenerateRegisters {
             output_dir,
             num_records,
@@ -75,29 +69,6 @@ fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-fn handle_generate_pediatric(
-    output: &str,
-    num_records: usize,
-    num_cases: usize,
-    seed: Option<u64>,
-    output_dir: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Generating synthetic pediatric data...");
-    let mut config = GeneratorConfig::new(num_records, num_cases, output_dir.to_string());
-    if let Some(s) = seed {
-        config = config.with_seed(s);
-    }
-
-    let mut generator = RegisterGenerator::new(config)?;
-    generator.generate_pediatric(output)?;
-
-    info!(
-        "Pediatric data generation completed. Output saved to: {}",
-        output
-    );
-    Ok(())
-}
-
 fn handle_generate_registers(
     output_dir: &str,
     num_records: usize,
@@ -115,6 +86,7 @@ fn handle_generate_registers(
 
     let mut generator = RegisterGenerator::new(config)?;
     generator.generate_all()?;
+    generator.generate_pediatric(output_dir)?;
 
     info!("Register data generation completed in: {}", output_dir);
     Ok(())

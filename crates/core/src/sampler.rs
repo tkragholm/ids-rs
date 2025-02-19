@@ -6,7 +6,7 @@ use fastrand::Rng;
 use humantime::format_duration;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::Deserialize;
 use smallvec::SmallVec;
 use std::sync::Arc;
@@ -39,13 +39,22 @@ pub struct IncidenceDensitySampler {
 }
 
 impl IncidenceDensitySampler {
+    const BATCH_SIZE: usize = 1024;
+
+    /// Creates a new IncidenceDensitySampler.
+    ///
+    /// # Panics
+    /// Panics if the epoch date (1970-01-01) cannot be created.
+    ///
+    /// # Errors
+    /// Returns a `SamplingError` if the matching criteria are invalid.
     pub fn new(records: Vec<Record>, criteria: MatchingCriteria) -> Result<Self, SamplingError> {
         criteria.validate()?;
         let n_records = records.len();
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
         let mut birth_date_index =
-            FxHashMap::with_capacity_and_hasher(n_records / 365, Default::default());
+            FxHashMap::with_capacity_and_hasher(n_records / 365, FxBuildHasher::default());
         let mut dates = Vec::with_capacity(n_records);
         let mut cases = Vec::with_capacity(50_000);
         let mut controls = Vec::with_capacity(n_records - 50_000);
@@ -98,7 +107,11 @@ impl IncidenceDensitySampler {
         })
     }
 
-    const fn is_parent_match(case_parent: Option<i64>, control_parent: Option<i64>, window: i64) -> bool {
+    const fn is_parent_match(
+        case_parent: Option<i64>,
+        control_parent: Option<i64>,
+        window: i64,
+    ) -> bool {
         match (case_parent, control_parent) {
             (None, None) => true, // Match if both are missing
             (Some(case_date), Some(control_date)) => (case_date - control_date).abs() <= window,
@@ -132,6 +145,7 @@ impl IncidenceDensitySampler {
         println!("{}", "=".repeat(text.len()).blue());
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn format_percentage(value: f64, total: f64) -> String {
         format!(
             "{:.1}% ({}/{})",
@@ -141,7 +155,8 @@ impl IncidenceDensitySampler {
         )
     }
 
-    #[must_use] pub fn get_statistics(&self) -> String {
+    #[must_use]
+    pub fn get_statistics(&self) -> String {
         let total_records = self.records.len();
         let total_cases = self.cases.len();
         let total_controls = self.sorted_controls.len();
@@ -165,23 +180,26 @@ impl IncidenceDensitySampler {
         )
     }
 
+    /// Samples controls for each case according to the matching criteria.
+    ///
+    /// # Panics
+    /// Panics if the progress bar template is invalid.
+    ///
+    /// # Errors
+    /// Returns a `SamplingError` if no eligible controls are found.
     pub fn sample_controls(&self, n_controls: usize) -> MatchResult {
         Self::print_header("Sampling Controls");
-        const BATCH_SIZE: usize = 1024;
 
         let start_time = std::time::Instant::now();
         let total_cases = self.cases.len();
-        let total_chunks = total_cases.div_ceil(BATCH_SIZE);
+        let total_chunks = total_cases.div_ceil(Self::BATCH_SIZE);
 
         println!(
-            "{}",
-            format!(
-                "│ {} {}\n│ {} {}",
-                "Total Cases:".bold(),
-                total_cases.to_string().yellow(),
-                "Batch Size:".bold(),
-                BATCH_SIZE.to_string().yellow()
-            )
+            "│ {} {}\n│ {} {}",
+            "Total Cases:".bold(),
+            total_cases.to_string().yellow(),
+            "Batch Size:".bold(),
+            Self::BATCH_SIZE.to_string().yellow()
         );
 
         let mp = MultiProgress::new();
@@ -195,7 +213,7 @@ impl IncidenceDensitySampler {
 
         let case_control_pairs: Vec<_> = self
             .cases
-            .par_chunks(BATCH_SIZE)
+            .par_chunks(Self::BATCH_SIZE)
             .map(|case_chunk| {
                 let mut rng = Rng::new();
                 let mut local_pairs = Vec::with_capacity(case_chunk.len());
@@ -254,6 +272,9 @@ impl IncidenceDensitySampler {
         pb.finish_with_message("Complete");
 
         let total_elapsed = start_time.elapsed();
+        #[allow(clippy::cast_precision_loss)]
+        let speed = total_cases as f64 / total_elapsed.as_secs_f64();
+
         println!(
             "\n{}\n│ {} {}\n│ {} {}\n│ {} {:.2}\n└────────────────────────────",
             "Sampling Results:".bold().green(),
@@ -262,7 +283,7 @@ impl IncidenceDensitySampler {
             "Total Matches:".bold(),
             case_control_pairs.len().to_string().yellow(),
             "Speed:".bold(),
-            (total_cases as f64 / total_elapsed.as_secs_f64())
+            speed
         );
 
         if case_control_pairs.is_empty() {
@@ -272,7 +293,8 @@ impl IncidenceDensitySampler {
         Ok(case_control_pairs)
     }
 
-    #[must_use] pub fn evaluate_matching_quality(
+    #[must_use]
+    pub fn evaluate_matching_quality(
         &self,
         case_control_pairs: &[CaseControlPair],
     ) -> crate::matching_quality::MatchingQuality {
@@ -305,9 +327,11 @@ impl IncidenceDensitySampler {
             }
         }
 
-        let birth_date_balance = self.calculate_balance_metric(&birth_date_differences);
-        let parent_age_balance = (self.calculate_balance_metric(&mother_age_differences)
-            + self.calculate_balance_metric(&father_age_differences))
+        #[allow(clippy::cast_precision_loss)]
+        let birth_date_balance = Self::calculate_balance_metric(&birth_date_differences);
+        #[allow(clippy::cast_precision_loss)]
+        let parent_age_balance = (Self::calculate_balance_metric(&mother_age_differences)
+            + Self::calculate_balance_metric(&father_age_differences))
             / 2.0;
 
         let percentiles = vec![0.25, 0.50, 0.75];
@@ -344,11 +368,13 @@ impl IncidenceDensitySampler {
         crate::matching_quality::MatchingQuality::new(params)
     }
 
-    fn calculate_balance_metric(&self, diffs: &[i64]) -> f64 {
+    fn calculate_balance_metric(diffs: &[i64]) -> f64 {
+        #[allow(clippy::cast_precision_loss)]
         let mean = diffs.iter().sum::<i64>() as f64 / diffs.len() as f64;
         let variance = diffs
             .iter()
             .map(|&x| {
+                #[allow(clippy::cast_precision_loss)]
                 let diff = x as f64 - mean;
                 diff * diff
             })
@@ -358,6 +384,10 @@ impl IncidenceDensitySampler {
         mean / variance.sqrt()
     }
 
+    /// Saves matched case-control pairs to a CSV file.
+    ///
+    /// # Errors
+    /// Returns an error if file writing fails.
     pub fn save_matches_to_csv(
         &self,
         case_control_pairs: &[CaseControlPair],
@@ -421,14 +451,18 @@ impl IncidenceDensitySampler {
             .map(|(_, controls)| controls.len())
             .sum();
         log::info!("Total case-control pairs written: {}", total_pairs);
-        log::info!(
-            "Average controls per case: {:.2}",
-            total_pairs as f64 / case_control_pairs.len() as f64
-        );
+
+        #[allow(clippy::cast_precision_loss)]
+        let avg_controls = total_pairs as f64 / case_control_pairs.len() as f64;
+        log::info!("Average controls per case: {:.2}", avg_controls);
 
         Ok(())
     }
 
+    /// Saves matching statistics to a CSV file.
+    ///
+    /// # Errors
+    /// Returns an error if file writing fails.
     pub fn save_matching_statistics(
         &self,
         case_control_pairs: &[CaseControlPair],
@@ -467,6 +501,7 @@ impl IncidenceDensitySampler {
                     )
                 });
 
+            #[allow(clippy::cast_precision_loss)]
             let n_controls = controls.len() as f64;
 
             wtr.write_record(&[

@@ -9,10 +9,11 @@ pub struct GeneratorConfig {
 }
 
 impl GeneratorConfig {
-    #[must_use] pub const fn new(total_records: usize, treatment_cases: usize, output_dir: String) -> Self {
+    #[must_use]
+    pub const fn new(total_records: usize, treatment_cases: usize, output_dir: String) -> Self {
         Self {
             start_year: 2000,
-            end_year: 2022,
+            end_year: 2023,
             total_records,
             treatment_cases,
             output_dir,
@@ -20,12 +21,14 @@ impl GeneratorConfig {
         }
     }
 
-    #[must_use] pub const fn with_seed(mut self, seed: u64) -> Self {
+    #[must_use]
+    pub const fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
         self
     }
 
-    #[must_use] pub const fn with_year_range(mut self, start: i32, end: i32) -> Self {
+    #[must_use]
+    pub const fn with_year_range(mut self, start: i32, end: i32) -> Self {
         self.start_year = start;
         self.end_year = end;
         self

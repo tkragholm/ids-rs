@@ -2,7 +2,7 @@ use crate::{error::DataGenError, models::BefRecord};
 use arrow::array::{Array, Date32Array, Int32Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use chrono::Datelike;
+use chrono::NaiveDate;
 
 use indicatif::ProgressBar;
 use rand::Rng;
@@ -48,6 +48,8 @@ impl super::RegisterGenerator {
             };
 
             for period in periods {
+                let current_date =
+                    NaiveDate::from_ymd_opt(year, period.parse::<u32>().unwrap(), 1).unwrap();
                 let mut records = Vec::with_capacity(self.config.total_records);
 
                 for i in 0..self.config.total_records {
@@ -59,6 +61,11 @@ impl super::RegisterGenerator {
                     let (_father_birth, father_pnr) = father;
                     let (_mother_birth, mother_pnr) = mother;
 
+                    // Skip if person isn't born yet
+                    if birth_date > current_date {
+                        continue;
+                    }
+
                     // Generate all random values upfront
                     let gender = if self.rng.gen_bool(0.5) { "M" } else { "F" };
                     let kommune = self.rng.gen_range(101..=851);
@@ -69,7 +76,7 @@ impl super::RegisterGenerator {
                         _ => "E",
                     };
                     let family_size = self.rng.gen_range(1..=6);
-                    let age = year - birth_date.year();
+                    let age = (current_date - birth_date).num_days() / 365;
                     let children = if age > 18 {
                         self.rng.gen_range(0..4)
                     } else {
@@ -164,7 +171,12 @@ impl super::RegisterGenerator {
             Arc::new(Date32Array::from(
                 records
                     .iter()
-                    .map(|r| r.bop_vfra.map(Self::date_to_days_since_epoch))
+                    .map(|r| {
+                        r.bop_vfra.map(|date| {
+                            date.signed_duration_since(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap())
+                                .num_days() as i32
+                        })
+                    })
                     .collect::<Vec<_>>(),
             )),
             Arc::new(StringArray::from(
@@ -194,7 +206,11 @@ impl super::RegisterGenerator {
             Arc::new(Date32Array::from(
                 records
                     .iter()
-                    .map(|r| Self::date_to_days_since_epoch(r.foed_dag))
+                    .map(|r| {
+                        r.foed_dag
+                            .signed_duration_since(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap())
+                            .num_days() as i32
+                    })
                     .collect::<Vec<_>>(),
             )),
             Arc::new(StringArray::from(

@@ -62,10 +62,27 @@ impl<T> ArrowDataHelper for T {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1)
             .ok_or_else(|| IdsError::InvalidDate("Invalid epoch date".to_string()))?;
 
-        epoch
-            .checked_add_days(Days::new(days_since_epoch as u64))
-            .ok_or_else(|| {
-                IdsError::InvalidDate(format!("Invalid date value: {days_since_epoch}"))
-            })
+        // Add validation for reasonable date range
+        if days_since_epoch < -25567 || days_since_epoch > 25567 {
+            // ~70 years before/after epoch
+            return Err(IdsError::InvalidDate(format!(
+                "Date value {} is outside reasonable range",
+                days_since_epoch
+            )));
+        }
+
+        if days_since_epoch >= 0 {
+            epoch
+                .checked_add_days(Days::new(days_since_epoch as u64))
+                .ok_or_else(|| {
+                    IdsError::InvalidDate(format!("Invalid date value: {}", days_since_epoch))
+                })
+        } else {
+            epoch
+                .checked_sub_days(Days::new(days_since_epoch.unsigned_abs() as u64))
+                .ok_or_else(|| {
+                    IdsError::InvalidDate(format!("Invalid date value: {}", days_since_epoch))
+                })
+        }
     }
 }

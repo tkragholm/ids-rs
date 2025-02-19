@@ -12,6 +12,18 @@ use crate::errors::SamplingError;
 
 static INIT: Once = Once::new();
 
+/// Configures logging with optional file output.
+///
+/// # Arguments
+/// * `log_file` - Optional path to a log file. If provided, logs will be written to both console and file.
+///
+/// # Errors
+/// Returns an error if:
+/// * The log file cannot be created or written to
+/// * The logging configuration is invalid
+///
+/// # Panics
+/// This function may panic if the logging configuration cannot be built due to invalid parameters
 pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
     INIT.call_once(|| {
         // Helper function to create a console appender
@@ -66,6 +78,13 @@ pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Validates an optional date.
+///
+/// # Arguments
+/// * `date` - Optional NaiveDate to validate
+///
+/// # Errors
+/// Returns `SamplingError::InvalidDate` if the date is present but invalid
 pub fn validate_optional_date(date: &Option<NaiveDate>) -> Result<(), SamplingError> {
     match date {
         Some(d) => validate_date(&d.to_string()),
@@ -73,6 +92,17 @@ pub fn validate_optional_date(date: &Option<NaiveDate>) -> Result<(), SamplingEr
     }
 }
 
+/// Loads and validates records from a CSV file.
+///
+/// # Arguments
+/// * `filename` - Path to the CSV file
+///
+/// # Errors
+/// Returns an error if:
+/// * The file cannot be opened or read
+/// * The CSV format is invalid
+/// * Any date fields contain invalid dates
+/// * Record parsing fails
 pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(filename)?;
     let mut records = Vec::new();
@@ -117,6 +147,17 @@ pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<d
     Ok(records)
 }
 
+/// Validates the format of a CSV file.
+///
+/// # Arguments
+/// * `filename` - Path to the CSV file to validate
+///
+/// # Errors
+/// Returns an error if:
+/// * The file cannot be opened or read
+/// * Required headers are missing
+/// * The number of fields in any row is incorrect
+/// * The CSV format is invalid
 pub fn validate_csv_format(filename: &str) -> Result<(), Box<dyn Error>> {
     let file = std::fs::File::open(filename)?;
     let mut rdr = csv::Reader::from_reader(file);
@@ -159,6 +200,13 @@ pub fn validate_csv_format(filename: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Validates a date string.
+///
+/// # Arguments
+/// * `date_str` - Date string in "YYYY-MM-DD" format
+///
+/// # Errors
+/// Returns `SamplingError::InvalidDate` if the date string cannot be parsed
 pub fn validate_date(date_str: &str) -> Result<(), SamplingError> {
     NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
         .map(|_| ()) // Convert success to () instead of NaiveDate
@@ -169,6 +217,10 @@ pub mod date_format {
     use chrono::NaiveDate;
     use serde::{self, Deserialize, Deserializer};
 
+    /// Deserializes a date string into a NaiveDate.
+    ///
+    /// # Errors
+    /// Returns a deserialization error if the date string cannot be parsed
     pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
     where
         D: Deserializer<'de>,
@@ -182,6 +234,10 @@ pub mod optional_date_format {
     use chrono::NaiveDate;
     use serde::{self, Deserialize, Deserializer};
 
+    /// Deserializes a date string into an Option<NaiveDate>.
+    ///
+    /// # Errors
+    /// Returns a deserialization error if the date string is neither "NA" nor a valid date
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
     where
         D: Deserializer<'de>,
@@ -203,6 +259,10 @@ pub struct MatchingCriteria {
 }
 
 impl MatchingCriteria {
+    /// Validates the matching criteria values.
+    ///
+    /// # Errors
+    /// Returns `SamplingError::InvalidCriteria` if either window value is not positive
     pub const fn validate(&self) -> Result<(), crate::errors::SamplingError> {
         if self.birth_date_window <= 0 || self.parent_date_window <= 0 {
             return Err(crate::errors::SamplingError::InvalidCriteria);
