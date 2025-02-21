@@ -58,8 +58,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Create output directory and log directory
     fs::create_dir_all(output_dir)?;
     fs::create_dir_all(Path::new(output_dir).join("log"))?;
+
+    // Create register subdirectories if needed
+    for dir in ["akm", "bef", "ind", "uddf"] {
+        fs::create_dir_all(Path::new(output_dir).join(dir))?;
+    }
+
     Ok(())
 }
 
@@ -86,9 +93,12 @@ fn handle_generate_registers(
 
     let mut generator = RegisterGenerator::new(config)?;
     generator.generate_all()?;
-    generator.generate_pediatric(output_dir)?;
 
-    info!("Register data generation completed in: {}", output_dir);
+    // Use a proper path for the pediatric data
+    let pediatric_path = Path::new(output_dir).join("pediatric.csv");
+    generator.generate_pediatric(pediatric_path.to_str().unwrap())?;
+
+    info!("Register data generation completed");
     Ok(())
 }
 

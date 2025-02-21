@@ -5,6 +5,7 @@ use indicatif::ProgressBar;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use std::collections::HashSet;
+use std::path::Path;
 
 impl super::RegisterGenerator {
     pub fn generate_pediatric(&mut self, filename: &str) -> Result<(), DataGenError> {
@@ -17,6 +18,11 @@ impl super::RegisterGenerator {
                 .unwrap(),
         );
         pb.set_message("Generating pediatric records...");
+
+        // Create parent directory if needed
+        if let Some(parent) = Path::new(filename).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
 
         let mut writer = Writer::from_path(filename)
             .map_err(|e| DataGenError::Generation(format!("Failed to create CSV file: {e}")))?;

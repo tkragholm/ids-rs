@@ -76,9 +76,14 @@ impl RegisterGenerator {
     }
 
     fn create_directories(&self) -> Result<(), DataGenError> {
+        // Create register directories
         for dir in ["akm", "bef", "ind", "uddf"] {
             std::fs::create_dir_all(Path::new(&self.config.output_dir).join(dir))?;
         }
+
+        // Create base output directory if it doesn't exist
+        std::fs::create_dir_all(&self.config.output_dir)?;
+
         Ok(())
     }
 }
