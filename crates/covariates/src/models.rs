@@ -1,15 +1,14 @@
-pub use types::models::{Education, Income, Occupation, TimeVaryingValue};
-pub use types::snapshot::CovariateSnapshot;
+pub use types::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};
 
-pub trait EducationExt {
-    fn to_numeric_value(&self) -> Option<f64>;
-}
+// pub trait EducationExt {
+//     fn to_numeric_value(&self) -> Option<f64>;
+// }
 
-impl EducationExt for Education {
-    fn to_numeric_value(&self) -> Option<f64> {
-        self.years.map(f64::from)
-    }
-}
+// impl EducationExt for Education {
+//     fn to_numeric_value(&self) -> Option<f64> {
+//         self.years.map(f64::from)
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub struct CovariateSummary {

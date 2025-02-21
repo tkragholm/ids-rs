@@ -14,6 +14,8 @@ pub enum IdsError {
     MissingData(String),
     #[error("Invalid format: {0}")]
     InvalidFormat(String),
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
     #[error("Sampling error: {0}")]
     Sampling(String),
     #[error("Covariate error: {0}")]

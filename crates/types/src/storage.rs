@@ -1,52 +1,56 @@
-use crate::{error::IdsError, models::TimeVaryingValue, traits::TimeVaryingAccess};
+use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use std::collections::HashMap;
 
-pub struct TimeVaryingStore<T> {
-    data: DashMap<String, Vec<TimeVaryingValue<T>>>,
+use crate::{
+    error::IdsError,
+    family::FamilyRelations,
+    models::{Covariate, CovariateType, TimeVaryingValue},
+};
+
+#[derive(Debug)]
+pub enum StorageBackend {
+    Arrow(ArrowStorage),
+    TimeVarying(TimeVaryingStorage),
 }
 
-impl<T: Clone> Default for TimeVaryingStore<T> {
-    fn default() -> Self {
-        Self::new()
-    }
+pub trait Storage: Send + Sync {
+    fn get_covariate(
+        &self,
+        pnr: &str,
+        covariate_type: CovariateType,
+        date: NaiveDate,
+    ) -> Result<Option<Covariate>, IdsError>;
+
+    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
+
+    fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError>;
 }
 
-impl<T: Clone> TimeVaryingStore<T> {
-    #[must_use] pub fn new() -> Self {
-        Self {
-            data: DashMap::new(),
-        }
-    }
-
-    fn load_internal(&self, values: Vec<TimeVaryingValue<T>>) -> Result<(), IdsError> {
-        let grouped: HashMap<String, Vec<TimeVaryingValue<T>>> =
-            values.into_iter().fold(HashMap::new(), |mut acc, value| {
-                acc.entry(value.pnr.clone()).or_default().push(value);
-                acc
-            });
-
-        for (pnr, mut values) in grouped {
-            values.sort_by_key(|v| v.date);
-            self.data.insert(pnr, values);
-        }
-        Ok(())
-    }
+#[derive(Debug, Clone)]
+pub struct ArrowStorage {
+    family_data: HashMap<String, FamilyRelations>,
+    akm_data: HashMap<i32, Vec<RecordBatch>>,
+    bef_data: HashMap<String, Vec<RecordBatch>>,
+    ind_data: HashMap<i32, Vec<RecordBatch>>,
+    uddf_data: HashMap<String, Vec<RecordBatch>>,
 }
 
-impl<T: Clone> TimeVaryingAccess<T> for TimeVaryingStore<T> {
-    fn get_at_date(&self, pnr: &str, date: NaiveDate) -> Option<Vec<T>> {
-        self.data.get(pnr).map(|values| {
-            values
-                .iter()
-                .filter(|v| v.date <= date)
-                .map(|v| v.value.clone())
-                .collect()
-        })
-    }
+#[derive(Debug)]
+pub struct TimeVaryingStorage {
+    data: DashMap<String, Vec<TimeVaryingValue<Covariate>>>,
+    family_data: HashMap<String, FamilyRelations>,
+}
 
-    fn load_data(&self, data: Vec<TimeVaryingValue<T>>) -> Result<(), IdsError> {
-        self.load_internal(data)
-    }
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub struct CacheKey {
+    pub pnr: String,
+    pub covariate_type: CovariateType,
+    pub date: NaiveDate,
+}
+
+pub struct DataStore {
+    storage: StorageBackend,
+    cache: DashMap<CacheKey, Covariate>,
 }

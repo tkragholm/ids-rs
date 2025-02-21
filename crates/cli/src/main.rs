@@ -12,6 +12,7 @@ use loader::ParquetLoader;
 use log::{error, info, warn};
 use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
+use types::arrow_utils::ArrowStore;
 use types::{BaseStore, CombinedStore};
 
 mod cli;
@@ -204,8 +205,7 @@ fn handle_balance_check(
     let arrow_store = ParquetLoader::new().load_from_path(covariate_dir.to_string())?;
     info!("Loaded covariate data from {}", covariate_dir);
 
-    let store = CombinedStore::new(BaseStore::new(), arrow_store);
-    let checker = BalanceChecker::new(CovariateStore::with_store(Box::new(store)));
+    let checker = BalanceChecker::new(arrow_store);
 
     let (cases, controls) = convert_to_case_control_pairs(&matched_pairs);
     process_balance_results(&checker, &cases, &controls, output_dir)?;
@@ -241,14 +241,45 @@ fn process_balance_results(
     controls: &[(String, NaiveDate)],
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some((id, date)) = cases.first() {
-        debug_sample_case(checker, id, date);
+    info!(
+        "Processing {} cases and {} controls",
+        cases.len(),
+        controls.len()
+    );
+
+    // Sample a few cases and controls to verify data
+    for (i, (pnr, date)) in cases.iter().take(5).enumerate() {
+        match checker.get_covariates_at_date(pnr, *date) {
+            Ok(snapshot) => {
+                info!(
+                    "Case {} (PNR: {}) covariate snapshot: {:?}",
+                    i, pnr, snapshot
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to get covariates for case {} (PNR: {}): {}",
+                    i, pnr, e
+                );
+            }
+        }
     }
 
     info!("Calculating covariate balance...");
     let balance_results = checker.calculate_balance(cases, controls)?;
 
-    info!("Got {} balance summaries", balance_results.summaries.len());
+    info!(
+        "Balance calculation complete. Found {} summaries",
+        balance_results.summaries.len()
+    );
+
+    // Log some sample results
+    for summary in balance_results.summaries.iter().take(5) {
+        info!(
+            "Balance summary for {}: cases={:.2}, controls={:.2}, std_diff={:.2}",
+            summary.variable, summary.mean_cases, summary.mean_controls, summary.std_diff
+        );
+    }
 
     let output_path = Path::new(output_dir).join("covariate_balance.csv");
     BalanceChecker::save_balance_results(&balance_results.summaries, &output_path)?;

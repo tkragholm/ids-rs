@@ -4,8 +4,10 @@ mod schema;
 
 pub use reader::{DataReader, FileReader};
 pub use types::{
-    arrow_utils::ArrowStore, error::IdsError, family::FamilyRelations, models::*,
-    snapshot::CovariateSnapshot,
+    error::IdsError,
+    family::FamilyRelations,
+    models::*,
+    store::{ArrowStore, Store, UnifiedStore},
 };
 
 // Create a loader trait instead of implementing directly on ArrowStore
@@ -37,7 +39,7 @@ impl ParquetLoader {
 impl StoreLoader for ParquetLoader {
     fn load_from_path(base_path: String) -> Result<ArrowStore, IdsError> {
         let reader = FileReader::new(base_path.clone());
-        let mut store = ArrowStore::new();
+        let mut store = UnifiedStore::new_arrow();
 
         log::info!("Loading data from path: {}", base_path);
 
@@ -134,6 +136,7 @@ impl StoreLoader for ParquetLoader {
             }
         }
 
-        Ok(store)
+        // Convert UnifiedStore to ArrowBackend at the end
+        store.into_arrow_backend()
     }
 }

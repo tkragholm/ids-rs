@@ -1,18 +1,24 @@
-use crate::{error::IdsError, family::FamilyRelations, models::{Education, Income, Occupation, TimeVaryingValue}, snapshot::CovariateSnapshot};
+use crate::{
+    error::IdsError,
+    family::FamilyRelations,
+    models::{Covariate, CovariateType, TimeVaryingValue},
+};
 use chrono::{Datelike, NaiveDate};
+use std::collections::HashMap;
 
 // Core traits
 pub trait DataAccess {
-    fn get_covariates_at_date(
+    fn get_covariates(
         &self,
         pnr: &str,
         date: NaiveDate,
-    ) -> Result<CovariateSnapshot, IdsError>;
+    ) -> Result<HashMap<CovariateType, Covariate>, IdsError>;
+
     fn get_family_covariates(
         &self,
         pnr: &str,
         date: NaiveDate,
-    ) -> Result<Option<CovariateSnapshot>, IdsError>;
+    ) -> Result<Option<HashMap<CovariateType, Covariate>>, IdsError>;
 }
 
 pub trait FamilyAccess {
@@ -23,9 +29,7 @@ pub trait FamilyAccess {
 
 // Data storage traits
 pub trait Store: DataAccess + FamilyAccess {
-    fn load_education(&self, data: Vec<TimeVaryingValue<Education>>) -> Result<(), IdsError>;
-    fn load_income(&self, data: Vec<TimeVaryingValue<Income>>) -> Result<(), IdsError>;
-    fn load_occupation(&self, data: Vec<TimeVaryingValue<Occupation>>) -> Result<(), IdsError>;
+    fn load_covariate(&self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError>;
 }
 
 pub trait TimeVaryingAccess<T> {

@@ -1,13 +1,17 @@
 use crate::models::CovariateSummary;
-use crate::storage::CovariateStore;
 use chrono::NaiveDate;
+use log::debug;
 use statrs::statistics::Statistics;
 use std::collections::HashMap;
 use std::path::Path;
-use types::{error::IdsError, CovariateSnapshot};
+use types::{
+    error::IdsError,
+    models::{Covariate, CovariateType, CovariateValue},
+    store::{ArrowStore, Store},
+};
 
 pub struct BalanceChecker {
-    store: CovariateStore,
+    store: ArrowStore,
 }
 
 pub struct BalanceResults {
@@ -18,7 +22,7 @@ pub struct BalanceResults {
 #[allow(clippy::cast_precision_loss)]
 impl BalanceChecker {
     #[must_use]
-    pub const fn new(store: CovariateStore) -> Self {
+    pub const fn new(store: ArrowStore) -> Self {
         Self { store }
     }
 
@@ -28,14 +32,17 @@ impl BalanceChecker {
         missing_rates: &mut HashMap<String, (f64, f64)>,
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
+        covariate_type: CovariateType,
         name: &str,
         extractor: F,
     ) -> Result<(), IdsError>
     where
-        F: Fn(&CovariateSnapshot) -> Option<f64>,
+        F: Fn(&Covariate) -> Option<f64>,
     {
-        let (case_values, case_missing) = self.collect_numeric_values(cases, &extractor);
-        let (control_values, control_missing) = self.collect_numeric_values(controls, &extractor);
+        let (case_values, case_missing) =
+            self.collect_numeric_values(cases, covariate_type, &extractor);
+        let (control_values, control_missing) =
+            self.collect_numeric_values(controls, covariate_type, &extractor);
 
         missing_rates.insert(
             name.to_string(),
@@ -64,20 +71,22 @@ impl BalanceChecker {
     fn collect_numeric_values<F>(
         &self,
         subjects: &[(String, NaiveDate)],
+        covariate_type: CovariateType,
         extractor: &F,
     ) -> (Vec<f64>, usize)
     where
-        F: Fn(&CovariateSnapshot) -> Option<f64>,
+        F: Fn(&Covariate) -> Option<f64>,
     {
         let mut values = Vec::new();
         let mut missing = 0;
 
         for (pnr, date) in subjects {
-            if let Some(snapshot) = self.store.get_covariates_at_date(pnr, *date) {
-                match extractor(&snapshot) {
+            match self.store.get_covariate(pnr, covariate_type, *date) {
+                Ok(Some(covariate)) => match extractor(&covariate) {
                     Some(value) => values.push(value),
                     None => missing += 1,
-                }
+                },
+                _ => missing += 1,
             }
         }
 
@@ -90,15 +99,34 @@ impl BalanceChecker {
         missing_rates: &mut HashMap<String, (f64, f64)>,
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
+        covariate_type: CovariateType,
         name: &str,
         extractor: F,
     ) -> Result<(), IdsError>
     where
-        F: for<'a> Fn(&'a CovariateSnapshot) -> Option<String>,
+        F: Fn(&Covariate) -> Option<String>,
     {
-        let (case_values, case_missing) = self.collect_categorical_values(cases, &extractor);
+        let (case_values, case_missing) =
+            self.collect_categorical_values(cases, covariate_type, &extractor);
         let (control_values, control_missing) =
-            self.collect_categorical_values(controls, &extractor);
+            self.collect_categorical_values(controls, covariate_type, &extractor);
+
+        // Log the counts of values we're finding
+        log::debug!(
+            "Found {} case values and {} control values for {}",
+            case_values.len(),
+            control_values.len(),
+            name
+        );
+
+        // Add debug logging for the first few values
+        if !case_values.is_empty() {
+            log::debug!(
+                "Sample {} case values: {:?}",
+                name,
+                &case_values[..std::cmp::min(5, case_values.len())]
+            );
+        }
 
         missing_rates.insert(
             name.to_string(),
@@ -118,6 +146,10 @@ impl BalanceChecker {
         for value in control_values {
             *control_freqs.entry(value).or_insert(0) += 1;
         }
+
+        // Log the frequency distributions
+        log::debug!("Case frequencies for {}: {:?}", name, case_freqs);
+        log::debug!("Control frequencies for {}: {:?}", name, control_freqs);
 
         // Add summary statistics for categorical variables
         for (category, count) in &case_freqs {
@@ -144,20 +176,22 @@ impl BalanceChecker {
     fn collect_categorical_values<F>(
         &self,
         subjects: &[(String, NaiveDate)],
+        covariate_type: CovariateType,
         extractor: &F,
     ) -> (Vec<String>, usize)
     where
-        F: Fn(&CovariateSnapshot) -> Option<String>,
+        F: Fn(&Covariate) -> Option<String>,
     {
         let mut values = Vec::new();
         let mut missing = 0;
 
         for (pnr, date) in subjects {
-            if let Some(snapshot) = self.store.get_covariates_at_date(pnr, *date) {
-                match extractor(&snapshot) {
+            match self.store.get_covariate(pnr, covariate_type, *date) {
+                Ok(Some(covariate)) => match extractor(&covariate) {
                     Some(value) => values.push(value),
                     None => missing += 1,
-                }
+                },
+                _ => missing += 1,
             }
         }
 
@@ -176,76 +210,88 @@ impl BalanceChecker {
         let mut summaries = Vec::new();
         let mut missing_rates = HashMap::new();
 
-        // Personal characteristics
-        self.add_numeric_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            "Income",
-            |snap| snap.income.as_ref().map(|i| i.amount),
-        )?;
+        debug!(
+            "Starting balance calculation for {} cases and {} controls",
+            cases.len(),
+            controls.len()
+        );
 
+        // Demographics and basic metrics
         self.add_numeric_balance(
             &mut summaries,
             &mut missing_rates,
             cases,
             controls,
-            "Socioeconomic Status",
-            |snap| {
-                snap.socioeconomic_status
-                    .as_ref()
-                    .and_then(|s| s.code.parse().ok())
+            CovariateType::Demographics,
+            "Family Size",
+            |covariate| match covariate {
+                Covariate::Demographics { family_size, .. } => Some(*family_size as f64),
+                _ => None,
             },
         )?;
 
-        // Parent characteristics
         self.add_numeric_balance(
             &mut summaries,
             &mut missing_rates,
             cases,
             controls,
-            "Father's Income",
-            |snap| snap.father_income.as_ref().map(|i| i.amount),
+            CovariateType::Demographics,
+            "Municipality",
+            |covariate| match covariate {
+                Covariate::Demographics { municipality, .. } => Some(*municipality as f64),
+                _ => None,
+            },
         )?;
 
-        self.add_numeric_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            "Mother's Income",
-            |snap| snap.mother_income.as_ref().map(|i| i.amount),
-        )?;
-
-        // Categorical variables
+        // Add family type as categorical
         self.add_categorical_balance(
             &mut summaries,
             &mut missing_rates,
             cases,
             controls,
-            "Education",
-            |snap| snap.education.as_ref().map(|e| e.level.clone()),
-        )?;
-
-        // As numeric (years of education)
-        self.add_numeric_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            "Education (years)",
-            |snap| snap.education.as_ref().and_then(|e| e.years.map(f64::from)),
-        )?;
-
-        self.add_categorical_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
+            CovariateType::Demographics,
             "Family Type",
-            |snap| snap.family_type.clone(),
+            |covariate| match covariate {
+                Covariate::Demographics { family_type, .. } => Some(family_type.clone()),
+                _ => None,
+            },
         )?;
+
+        // IND data
+        self.add_numeric_balance(
+            &mut summaries,
+            &mut missing_rates,
+            cases,
+            controls,
+            CovariateType::Income,
+            "Income",
+            |covariate| match covariate {
+                Covariate::Income { amount, .. } => Some(*amount),
+                _ => None,
+            },
+        )?;
+
+        // UDDF data
+        self.add_categorical_balance(
+            &mut summaries,
+            &mut missing_rates,
+            cases,
+            controls,
+            CovariateType::Education,
+            "Education Level",
+            |covariate| match covariate {
+                Covariate::Education { level, .. } => Some(level.clone()),
+                _ => None,
+            },
+        )?;
+
+        debug!("Generated {} balance summaries", summaries.len());
+        for summary in &summaries {
+            debug!(
+                "Summary for {}: case mean = {}, control mean = {}, std diff = {}",
+                summary.variable, summary.mean_cases, summary.mean_controls, summary.std_diff
+            );
+        }
 
         Ok(BalanceResults {
             summaries,
@@ -309,7 +355,7 @@ impl BalanceChecker {
         results: &[CovariateSummary],
         output_path: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let checker = Self::new(CovariateStore::new());
+        let checker = Self::new(ArrowStore::new());
         checker.save_results(results, output_path)?;
         Ok(())
     }
@@ -347,19 +393,5 @@ impl BalanceChecker {
 
         wtr.flush().map_err(IdsError::Io)?;
         Ok(())
-    }
-
-    /// Get covariate snapshot for a subject at a specific date
-    ///
-    /// # Errors
-    /// Returns an error if no covariate data is found for the given subject and date
-    pub fn get_covariates_at_date(
-        &self,
-        pnr: &str,
-        date: NaiveDate,
-    ) -> Result<CovariateSnapshot, IdsError> {
-        self.store
-            .get_covariates_at_date(pnr, date)
-            .ok_or_else(|| IdsError::MissingData(format!("No covariates found for {pnr}")))
     }
 }
