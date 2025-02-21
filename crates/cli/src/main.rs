@@ -4,16 +4,13 @@ use core::{
     sampler::IncidenceDensitySampler,
     utils::{configure_logging, load_records, validate_csv_format, MatchingCriteria},
 };
-use covariates::{
-    balance::BalanceChecker, matched_pairs::load_matched_pairs, storage::CovariateStore,
-};
+use covariates::{balance::BalanceChecker, matched_pairs::load_matched_pairs};
 use datagen::{GeneratorConfig, RegisterGenerator};
 use loader::ParquetLoader;
 use log::{error, info, warn};
 use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
-use types::arrow_utils::ArrowStore;
-use types::{BaseStore, CombinedStore};
+use types::models::CovariateType;
 
 mod cli;
 use cli::{Cli, Commands};
@@ -249,16 +246,16 @@ fn process_balance_results(
 
     // Sample a few cases and controls to verify data
     for (i, (pnr, date)) in cases.iter().take(5).enumerate() {
-        match checker.get_covariates_at_date(pnr, *date) {
-            Ok(snapshot) => {
-                info!(
-                    "Case {} (PNR: {}) covariate snapshot: {:?}",
-                    i, pnr, snapshot
-                );
+        match checker.get_covariate(pnr, CovariateType::Demographics, *date) {
+            Ok(Some(covariate)) => {
+                info!("Case {} (PNR: {}) demographics: {:?}", i, pnr, covariate);
+            }
+            Ok(None) => {
+                warn!("No demographics found for case {} (PNR: {})", i, pnr);
             }
             Err(e) => {
                 warn!(
-                    "Failed to get covariates for case {} (PNR: {}): {}",
+                    "Failed to get demographics for case {} (PNR: {}): {}",
                     i, pnr, e
                 );
             }
@@ -288,13 +285,29 @@ fn process_balance_results(
     Ok(())
 }
 
-fn debug_sample_case(checker: &BalanceChecker, id: &str, date: &NaiveDate) {
-    match checker.get_covariates_at_date(id, *date) {
-        Ok(snapshot) => {
-            info!("Sample case covariate snapshot: {:?}", snapshot);
-        }
-        Err(e) => {
-            warn!("Failed to get covariates for sample case {}: {}", id, e);
-        }
-    }
-}
+// fn debug_sample_case(checker: &BalanceChecker, id: &str, date: &NaiveDate) {
+//     #[allow(dead_code)]
+//     for covariate_type in &[
+//         CovariateType::Demographics,
+//         CovariateType::Education,
+//         CovariateType::Income,
+//     ] {
+//         match checker.get_covariate(id, *covariate_type, *date) {
+//             Ok(Some(covariate)) => {
+//                 info!(
+//                     "Sample case {:#?} covariate: {:#?}",
+//                     covariate_type, covariate
+//                 );
+//             }
+//             Ok(None) => {
+//                 warn!(
+//                     "No covariate data found for case {} of type {:?}",
+//                     id, covariate_type
+//                 );
+//             }
+//             Err(e) => {
+//                 warn!("Failed to get covariate for case {}: {}", id, e);
+//             }
+//         }
+//     }
+// }

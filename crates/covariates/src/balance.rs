@@ -26,6 +26,15 @@ impl BalanceChecker {
         Self { store }
     }
 
+    pub fn get_covariate(
+        &self,
+        pnr: &str,
+        covariate_type: CovariateType,
+        date: NaiveDate,
+    ) -> Result<Option<Covariate>, IdsError> {
+        self.store.get_covariate(pnr, covariate_type, date)
+    }
+
     fn add_numeric_balance<F>(
         &self,
         summaries: &mut Vec<CovariateSummary>,
@@ -224,8 +233,8 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Family Size",
-            |covariate| match covariate {
-                Covariate::Demographics { family_size, .. } => Some(*family_size as f64),
+            |covariate| match &covariate.value {
+                CovariateValue::Demographics { family_size, .. } => Some(*family_size as f64),
                 _ => None,
             },
         )?;
@@ -237,8 +246,8 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Municipality",
-            |covariate| match covariate {
-                Covariate::Demographics { municipality, .. } => Some(*municipality as f64),
+            |covariate| match &covariate.value {
+                CovariateValue::Demographics { municipality, .. } => Some(*municipality as f64),
                 _ => None,
             },
         )?;
@@ -251,8 +260,8 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Family Type",
-            |covariate| match covariate {
-                Covariate::Demographics { family_type, .. } => Some(family_type.clone()),
+            |covariate| match &covariate.value {
+                CovariateValue::Demographics { family_type, .. } => Some(family_type.clone()),
                 _ => None,
             },
         )?;
@@ -265,8 +274,8 @@ impl BalanceChecker {
             controls,
             CovariateType::Income,
             "Income",
-            |covariate| match covariate {
-                Covariate::Income { amount, .. } => Some(*amount),
+            |covariate| match &covariate.value {
+                CovariateValue::Income { amount, .. } => Some(*amount),
                 _ => None,
             },
         )?;
@@ -279,8 +288,8 @@ impl BalanceChecker {
             controls,
             CovariateType::Education,
             "Education Level",
-            |covariate| match covariate {
-                Covariate::Education { level, .. } => Some(level.clone()),
+            |covariate| match &covariate.value {
+                CovariateValue::Education { level, .. } => Some(level.clone()),
                 _ => None,
             },
         )?;
