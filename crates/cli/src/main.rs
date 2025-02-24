@@ -278,10 +278,12 @@ fn process_balance_results(
         );
     }
 
-    let output_path = Path::new(output_dir).join("covariate_balance.csv");
-    BalanceChecker::save_balance_results(&balance_results.summaries, &output_path)?;
+    // Use ComprehensiveReport instead of direct save
+    use covariates::reporting::ComprehensiveReport;
+    let report = ComprehensiveReport::new(balance_results);
+    report.save_to_files(Path::new(output_dir))?;
 
-    info!("Balance results saved to {}", output_path.display());
+    info!("Balance results saved to {}", output_dir);
     Ok(())
 }
 

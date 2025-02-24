@@ -1,29 +1,53 @@
 use crate::models::CovariateSummary;
+use crate::models::MatchedPairDetail;
 use chrono::NaiveDate;
+use dashmap::DashMap;
 use log::debug;
+use rayon::prelude::*;
 use statrs::statistics::Statistics;
 use std::collections::HashMap;
-use std::path::Path;
+use std::sync::Arc;
 use types::{
     error::IdsError,
     models::{Covariate, CovariateType, CovariateValue},
     store::{ArrowStore, Store},
 };
 
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct CacheKey {
+    pnr: String,
+    covariate_type: CovariateType,
+    date: NaiveDate,
+}
+
 pub struct BalanceChecker {
-    store: ArrowStore,
+    store: Arc<ArrowStore>,
+    cache: DashMap<CacheKey, Option<Covariate>>,
 }
 
 pub struct BalanceResults {
     pub summaries: Vec<CovariateSummary>,
     pub missing_data_rates: HashMap<String, (f64, f64)>, // (case_rate, control_rate)
+    pub matched_pair_details: Vec<MatchedPairDetail>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchedPairSummary {
+    pub case_pnr: String,
+    pub control_pnrs: Vec<String>,
+    pub treatment_date: NaiveDate,
+    pub summaries: Vec<CovariateSummary>,
+    pub missing_rates: HashMap<String, (f64, f64)>,
 }
 
 #[allow(clippy::cast_precision_loss)]
 impl BalanceChecker {
     #[must_use]
-    pub const fn new(store: ArrowStore) -> Self {
-        Self { store }
+    pub fn new(store: ArrowStore) -> Self {
+        Self {
+            store: Arc::new(store),
+            cache: DashMap::with_capacity(100_000),
+        }
     }
 
     pub fn get_covariate(
@@ -32,7 +56,20 @@ impl BalanceChecker {
         covariate_type: CovariateType,
         date: NaiveDate,
     ) -> Result<Option<Covariate>, IdsError> {
-        self.store.get_covariate(pnr, covariate_type, date)
+        let key = CacheKey {
+            pnr: pnr.to_string(),
+            covariate_type,
+            date,
+        };
+
+        Ok(match self.cache.get(&key) {
+            Some(cached) => cached.clone(),
+            None => {
+                let value = self.store.get_covariate(pnr, covariate_type, date)?;
+                self.cache.insert(key, value.clone());
+                value
+            }
+        })
     }
 
     fn add_numeric_balance<F>(
@@ -46,7 +83,7 @@ impl BalanceChecker {
         extractor: F,
     ) -> Result<(), IdsError>
     where
-        F: Fn(&Covariate) -> Option<f64>,
+        F: Fn(&Covariate) -> Option<f64> + Send + Sync,
     {
         let (case_values, case_missing) =
             self.collect_numeric_values(cases, covariate_type, &extractor);
@@ -84,22 +121,41 @@ impl BalanceChecker {
         extractor: &F,
     ) -> (Vec<f64>, usize)
     where
-        F: Fn(&Covariate) -> Option<f64>,
+        F: Fn(&Covariate) -> Option<f64> + Send + Sync,
     {
-        let mut values = Vec::new();
-        let mut missing = 0;
+        const BATCH_SIZE: usize = 10_000;
+        let chunk_size = (subjects.len() / rayon::current_num_threads()).max(BATCH_SIZE);
 
-        for (pnr, date) in subjects {
-            match self.store.get_covariate(pnr, covariate_type, *date) {
-                Ok(Some(covariate)) => match extractor(&covariate) {
-                    Some(value) => values.push(value),
-                    None => missing += 1,
-                },
-                _ => missing += 1,
-            }
+        let results: Vec<_> = subjects
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                let mut values = Vec::with_capacity(chunk.len());
+                let mut missing = 0;
+
+                for (pnr, date) in chunk {
+                    match self.get_covariate(pnr, covariate_type, *date) {
+                        Ok(Some(covariate)) => match extractor(&covariate) {
+                            Some(value) => values.push(value),
+                            None => missing += 1,
+                        },
+                        _ => missing += 1,
+                    }
+                }
+
+                (values, missing)
+            })
+            .collect();
+
+        let total_capacity: usize = results.iter().map(|(v, _)| v.len()).sum();
+        let mut all_values = Vec::with_capacity(total_capacity);
+        let mut total_missing = 0;
+
+        for (values, missing) in results {
+            all_values.extend(values);
+            total_missing += missing;
         }
 
-        (values, missing)
+        (all_values, total_missing)
     }
 
     fn add_categorical_balance<F>(
@@ -113,7 +169,7 @@ impl BalanceChecker {
         extractor: F,
     ) -> Result<(), IdsError>
     where
-        F: Fn(&Covariate) -> Option<String>,
+        F: Fn(&Covariate) -> Option<String> + Send + Sync,
     {
         let (case_values, case_missing) =
             self.collect_categorical_values(cases, covariate_type, &extractor);
@@ -189,22 +245,41 @@ impl BalanceChecker {
         extractor: &F,
     ) -> (Vec<String>, usize)
     where
-        F: Fn(&Covariate) -> Option<String>,
+        F: Fn(&Covariate) -> Option<String> + Send + Sync,
     {
-        let mut values = Vec::new();
-        let mut missing = 0;
+        const BATCH_SIZE: usize = 10_000;
+        let chunk_size = (subjects.len() / rayon::current_num_threads()).max(BATCH_SIZE);
 
-        for (pnr, date) in subjects {
-            match self.store.get_covariate(pnr, covariate_type, *date) {
-                Ok(Some(covariate)) => match extractor(&covariate) {
-                    Some(value) => values.push(value),
-                    None => missing += 1,
-                },
-                _ => missing += 1,
-            }
+        let results: Vec<_> = subjects
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                let mut values = Vec::with_capacity(chunk.len());
+                let mut missing = 0;
+
+                for (pnr, date) in chunk {
+                    match self.get_covariate(pnr, covariate_type, *date) {
+                        Ok(Some(covariate)) => match extractor(&covariate) {
+                            Some(value) => values.push(value),
+                            None => missing += 1,
+                        },
+                        _ => missing += 1,
+                    }
+                }
+
+                (values, missing)
+            })
+            .collect();
+
+        let total_capacity: usize = results.iter().map(|(v, _)| v.len()).sum();
+        let mut all_values = Vec::with_capacity(total_capacity);
+        let mut total_missing = 0;
+
+        for (values, missing) in results {
+            all_values.extend(values);
+            total_missing += missing;
         }
 
-        (values, missing)
+        (all_values, total_missing)
     }
 
     /// Calculate balance metrics between cases and controls
@@ -218,6 +293,7 @@ impl BalanceChecker {
     ) -> Result<BalanceResults, IdsError> {
         let mut summaries = Vec::new();
         let mut missing_rates = HashMap::new();
+        let mut matched_pair_details = Vec::new();
 
         debug!(
             "Starting balance calculation for {} cases and {} controls",
@@ -225,74 +301,60 @@ impl BalanceChecker {
             controls.len()
         );
 
-        // Demographics and basic metrics
-        self.add_numeric_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            CovariateType::Demographics,
-            "Family Size",
-            |covariate| match &covariate.value {
-                CovariateValue::Demographics { family_size, .. } => Some(*family_size as f64),
-                _ => None,
-            },
-        )?;
+        // Calculate overall balance
+        self.add_demographic_balance(&mut summaries, &mut missing_rates, cases, controls)?;
+        self.add_income_balance(&mut summaries, &mut missing_rates, cases, controls)?;
+        self.add_education_balance(&mut summaries, &mut missing_rates, cases, controls)?;
 
-        self.add_numeric_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            CovariateType::Demographics,
-            "Municipality",
-            |covariate| match &covariate.value {
-                CovariateValue::Demographics { municipality, .. } => Some(*municipality as f64),
-                _ => None,
-            },
-        )?;
+        // Calculate matched pair-specific balance
+        for (case_pnr, case_date) in cases {
+            let case_controls: Vec<_> = controls
+                .iter()
+                .filter(|(_, ctrl_date)| ctrl_date == case_date)
+                .collect();
 
-        // Add family type as categorical
-        self.add_categorical_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            CovariateType::Demographics,
-            "Family Type",
-            |covariate| match &covariate.value {
-                CovariateValue::Demographics { family_type, .. } => Some(family_type.clone()),
-                _ => None,
-            },
-        )?;
+            if !case_controls.is_empty() {
+                let mut pair_summaries = Vec::new();
+                let mut pair_missing_rates = HashMap::new();
 
-        // IND data
-        self.add_numeric_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            CovariateType::Income,
-            "Income",
-            |covariate| match &covariate.value {
-                CovariateValue::Income { amount, .. } => Some(*amount),
-                _ => None,
-            },
-        )?;
+                let case = vec![(case_pnr.clone(), *case_date)];
+                let ctrl_pairs: Vec<_> = case_controls
+                    .iter()
+                    .map(|(pnr, date)| (pnr.clone(), *date))
+                    .collect();
 
-        // UDDF data
-        self.add_categorical_balance(
-            &mut summaries,
-            &mut missing_rates,
-            cases,
-            controls,
-            CovariateType::Education,
-            "Education Level",
-            |covariate| match &covariate.value {
-                CovariateValue::Education { level, .. } => Some(level.clone()),
-                _ => None,
-            },
-        )?;
+                self.add_demographic_balance(
+                    &mut pair_summaries,
+                    &mut pair_missing_rates,
+                    &case,
+                    &ctrl_pairs,
+                )?;
+                self.add_income_balance(
+                    &mut pair_summaries,
+                    &mut pair_missing_rates,
+                    &case,
+                    &ctrl_pairs,
+                )?;
+                self.add_education_balance(
+                    &mut pair_summaries,
+                    &mut pair_missing_rates,
+                    &case,
+                    &ctrl_pairs,
+                )?;
+
+                for summary in pair_summaries {
+                    matched_pair_details.push(MatchedPairDetail {
+                        case_pnr: case_pnr.clone(),
+                        control_pnrs: ctrl_pairs.iter().map(|(pnr, _)| pnr.clone()).collect(),
+                        treatment_date: *case_date,
+                        variable: summary.variable,
+                        case_value: summary.mean_cases,
+                        control_value: summary.mean_controls,
+                        std_diff: summary.std_diff,
+                    });
+                }
+            }
+        }
 
         debug!("Generated {} balance summaries", summaries.len());
         for summary in &summaries {
@@ -305,7 +367,97 @@ impl BalanceChecker {
         Ok(BalanceResults {
             summaries,
             missing_data_rates: missing_rates,
+            matched_pair_details,
         })
+    }
+
+    fn add_demographic_balance(
+        &self,
+        summaries: &mut Vec<CovariateSummary>,
+        missing_rates: &mut HashMap<String, (f64, f64)>,
+        cases: &[(String, NaiveDate)],
+        controls: &[(String, NaiveDate)],
+    ) -> Result<(), IdsError> {
+        self.add_numeric_balance(
+            summaries,
+            missing_rates,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Family Size",
+            |covariate| match &covariate.value {
+                CovariateValue::Demographics { family_size, .. } => Some(*family_size as f64),
+                _ => None,
+            },
+        )?;
+
+        self.add_numeric_balance(
+            summaries,
+            missing_rates,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Municipality",
+            |covariate| match &covariate.value {
+                CovariateValue::Demographics { municipality, .. } => Some(*municipality as f64),
+                _ => None,
+            },
+        )?;
+
+        self.add_categorical_balance(
+            summaries,
+            missing_rates,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Family Type",
+            |covariate| match &covariate.value {
+                CovariateValue::Demographics { family_type, .. } => Some(family_type.clone()),
+                _ => None,
+            },
+        )
+    }
+
+    fn add_income_balance(
+        &self,
+        summaries: &mut Vec<CovariateSummary>,
+        missing_rates: &mut HashMap<String, (f64, f64)>,
+        cases: &[(String, NaiveDate)],
+        controls: &[(String, NaiveDate)],
+    ) -> Result<(), IdsError> {
+        self.add_numeric_balance(
+            summaries,
+            missing_rates,
+            cases,
+            controls,
+            CovariateType::Income,
+            "Income",
+            |covariate| match &covariate.value {
+                CovariateValue::Income { amount, .. } => Some(*amount),
+                _ => None,
+            },
+        )
+    }
+
+    fn add_education_balance(
+        &self,
+        summaries: &mut Vec<CovariateSummary>,
+        missing_rates: &mut HashMap<String, (f64, f64)>,
+        cases: &[(String, NaiveDate)],
+        controls: &[(String, NaiveDate)],
+    ) -> Result<(), IdsError> {
+        self.add_categorical_balance(
+            summaries,
+            missing_rates,
+            cases,
+            controls,
+            CovariateType::Education,
+            "Education Level",
+            |covariate| match &covariate.value {
+                CovariateValue::Education { level, .. } => Some(level.clone()),
+                _ => None,
+            },
+        )
     }
 
     fn calculate_standardized_difference(case_values: &[f64], control_values: &[f64]) -> f64 {
@@ -326,81 +478,120 @@ impl BalanceChecker {
 
         case_var / control_var
     }
-
-    /// Save balance results to files
-    ///
-    /// # Errors
-    /// Returns an error if there are issues writing to the output files
-    pub fn save_to_files(
-        &self,
-        base_path: &Path,
-        cases: &[(String, NaiveDate)],
-        controls: &[(String, NaiveDate)],
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        // Save summaries
-        let summaries_path = base_path.with_file_name("covariate_balance.csv");
-        let results = self.calculate_balance(cases, controls)?;
-        Self::save_balance_results(&results.summaries, &summaries_path)?;
-
-        // Save missing data rates
-        let missing_rates_path = base_path.with_file_name("missing_data_rates.csv");
-        let mut wtr = csv::Writer::from_path(missing_rates_path)?;
-
-        wtr.write_record(["Variable", "Case Missing Rate", "Control Missing Rate"])?;
-
-        for (var, (case_rate, control_rate)) in &results.missing_data_rates {
-            wtr.write_record([var, &case_rate.to_string(), &control_rate.to_string()])?;
+    fn calculate_pair_std_diff(case_value: f64, control_value: f64) -> f64 {
+        let pooled_var = (case_value.powi(2) + control_value.powi(2)) / 2.0;
+        if pooled_var == 0.0 {
+            0.0
+        } else {
+            (case_value - control_value) / pooled_var.sqrt()
         }
+    }
 
-        wtr.flush()?;
+    // Add a method to process a single matched pair
+    fn process_matched_pair(
+        &self,
+        case_pnr: &str,
+        control_pnr: &str,
+        date: NaiveDate,
+        covariate_type: CovariateType,
+        variable_name: &str,
+        value_extractor: impl Fn(&Covariate) -> Option<f64>,
+    ) -> Result<Option<MatchedPairDetail>, IdsError> {
+        let case_value = self
+            .get_covariate(case_pnr, covariate_type, date)?
+            .and_then(&value_extractor);
+
+        let control_value = self
+            .get_covariate(control_pnr, covariate_type, date)?
+            .and_then(&value_extractor);
+
+        match (case_value, control_value) {
+            (Some(case_val), Some(ctrl_val)) => Ok(Some(MatchedPairDetail {
+                case_pnr: case_pnr.to_string(),
+                control_pnrs: vec![control_pnr.to_string()],
+                treatment_date: date,
+                variable: variable_name.to_string(),
+                case_value: case_val,
+                control_value: ctrl_val,
+                std_diff: Self::calculate_pair_std_diff(case_val, ctrl_val),
+            })),
+            _ => Ok(None),
+        }
+    }
+
+    pub fn clear_cache(&self) {
+        self.cache.clear();
+    }
+
+    pub fn cache_size(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn process_in_batches<T, F>(
+        &self,
+        items: &[T],
+        batch_size: usize,
+        mut f: F,
+    ) -> Result<(), IdsError>
+    where
+        F: FnMut(&[T]) -> Result<(), IdsError>,
+    {
+        for batch in items.chunks(batch_size) {
+            f(batch)?;
+        }
         Ok(())
     }
 
-    /// Save balance results to a CSV file
-    ///
-    /// # Errors
-    /// Returns an error if there are issues writing the results to the output file
-    pub fn save_balance_results(
-        results: &[CovariateSummary],
-        output_path: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let checker = Self::new(ArrowStore::new());
-        checker.save_results(results, output_path)?;
-        Ok(())
+    pub fn get_variable_summary(&self, variable: &str) -> Option<&CovariateSummary> {
+        self.summaries.iter().find(|s| s.variable == variable)
     }
 
-    /// Save covariate summaries to a CSV file
-    ///
-    /// # Errors
-    /// Returns an error if there are issues writing to the CSV file
-    pub fn save_results(
-        &self,
-        results: &[CovariateSummary],
-        output_path: &Path,
-    ) -> Result<(), IdsError> {
-        let mut wtr = csv::Writer::from_path(output_path).map_err(IdsError::Csv)?;
+    pub fn get_matched_pair_details(&self, case_pnr: &str) -> Vec<&MatchedPairDetail> {
+        self.matched_pair_details
+            .iter()
+            .filter(|d| d.case_pnr == case_pnr)
+            .collect()
+    }
 
-        wtr.write_record([
-            "Variable",
-            "Mean (Cases)",
-            "Mean (Controls)",
-            "Standardized Difference",
-            "Variance Ratio",
-        ])
-        .map_err(IdsError::Csv)?;
+    pub fn summarize_std_differences(&self) -> HashMap<String, (f64, f64, f64)> {
+        let mut summaries = HashMap::new();
 
-        for result in results {
-            wtr.write_record([
-                &result.variable,
-                &result.mean_cases.to_string(),
-                &result.mean_controls.to_string(),
-                &result.std_diff.to_string(),
-                &result.variance_ratio.to_string(),
-            ])
-            .map_err(IdsError::Csv)?;
+        for detail in &self.matched_pair_details {
+            let stats = summaries
+                .entry(detail.variable.clone())
+                .or_insert((0.0, 0.0, 0));
+
+            stats.0 += detail.std_diff;
+            stats.1 += detail.std_diff.powi(2);
+            stats.2 += 1;
         }
 
-        wtr.flush().map_err(IdsError::Io)?;
-        Ok(())
+        summaries
+            .into_iter()
+            .map(|(var, (sum, sum_sq, n))| {
+                let n = n as f64;
+                let mean = sum / n;
+                let variance = (sum_sq / n) - mean.powi(2);
+                (var, (mean, variance.sqrt(), n))
+            })
+            .collect()
+    }
+
+    fn log_balance_statistics(&self, results: &BalanceResults) {
+        debug!("Balance calculation completed:");
+        debug!("Total summaries: {}", results.summaries.len());
+        debug!(
+            "Total matched pair details: {}",
+            results.matched_pair_details.len()
+        );
+
+        for summary in &results.summaries {
+            if summary.std_diff.abs() > 0.1 {
+                debug!(
+                    "Large imbalance detected for {}: std_diff = {:.3}",
+                    summary.variable, summary.std_diff
+                );
+            }
+        }
     }
 }

@@ -1,14 +1,5 @@
+use chrono::NaiveDate;
 pub use types::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};
-
-// pub trait EducationExt {
-//     fn to_numeric_value(&self) -> Option<f64>;
-// }
-
-// impl EducationExt for Education {
-//     fn to_numeric_value(&self) -> Option<f64> {
-//         self.years.map(f64::from)
-//     }
-// }
 
 #[derive(Debug, Clone)]
 pub struct CovariateSummary {
@@ -17,4 +8,15 @@ pub struct CovariateSummary {
     pub mean_controls: f64,
     pub std_diff: f64,
     pub variance_ratio: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchedPairDetail {
+    pub case_pnr: String,
+    pub control_pnrs: String,
+    pub treatment_date: NaiveDate,
+    pub variable: String,
+    pub case_value: f64,
+    pub control_value: f64,
+    pub std_diff: f64,
 }

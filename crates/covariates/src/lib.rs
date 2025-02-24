@@ -13,3 +13,4 @@ pub use types::{
 pub use balance::BalanceChecker;
 pub use matched_pairs::load_matched_pairs;
 pub use models::CovariateSummary;
+pub use reporting::{BalanceReport, ComprehensiveReport, CsvReport};
