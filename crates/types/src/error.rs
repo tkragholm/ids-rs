@@ -21,3 +21,17 @@ pub enum IdsError {
     #[error("Covariate error: {0}")]
     Covariate(String),
 }
+
+impl IdsError {
+    pub fn invalid_operation<T: std::fmt::Display>(msg: T) -> Self {
+        IdsError::InvalidOperation(msg.to_string())
+    }
+
+    pub fn missing_data<T: std::fmt::Display>(msg: T) -> Self {
+        IdsError::MissingData(msg.to_string())
+    }
+
+    pub fn invalid_format<T: std::fmt::Display>(msg: T) -> Self {
+        IdsError::InvalidFormat(msg.to_string())
+    }
+}

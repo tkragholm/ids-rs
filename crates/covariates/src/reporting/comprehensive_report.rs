@@ -78,7 +78,7 @@ impl ComprehensiveReport {
 
         wtr.write_record([
             "Case PNR",
-            "Control PNR",
+            "Control PNRs",
             "Treatment Date",
             "Variable",
             "Case Value",
@@ -89,7 +89,7 @@ impl ComprehensiveReport {
         for detail in &self.results.matched_pair_details {
             wtr.write_record([
                 &detail.case_pnr,
-                &detail.control_pnrs,
+                &detail.control_pnrs.join(";"), // Join multiple control PNRs with semicolon
                 &detail.treatment_date.to_string(),
                 &detail.variable,
                 &detail.case_value.to_string(),
