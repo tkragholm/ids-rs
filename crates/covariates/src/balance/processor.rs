@@ -11,6 +11,23 @@ impl ValueProcessor {
         Self
     }
 
+    fn create_progress_style(covariate_type: CovariateType) -> ProgressStyle {
+        ProgressStyle::default_bar()
+            .template(
+                "{prefix:.bold.dim} [{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} \
+                 ({percent}%) {msg}\n\
+                 ⏱️  ETA: {eta_precise:.dim} | 🚀 {per_sec:.green} records/sec | \
+                 📊 Processing: {covariate_type}",
+            )
+            .unwrap()
+            .with_key(
+                "covariate_type",
+                move |_state: &indicatif::ProgressState, w: &mut dyn std::fmt::Write| {
+                    write!(w, "{:?}", covariate_type).unwrap()
+                },
+            )
+    }
+
     pub fn collect_numeric_values<F>(
         &self,
         subjects: &[(String, NaiveDate)],
@@ -24,13 +41,14 @@ impl ValueProcessor {
         const BATCH_SIZE: usize = 10_000;
         let chunk_size = (subjects.len() / rayon::current_num_threads()).max(BATCH_SIZE);
 
-        let style = ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({percent}%) {msg}")
-            .unwrap();
-
-        let results: Vec<_> = subjects
+        let style = Self::create_progress_style(covariate_type);
+        let progress = subjects
             .par_chunks(chunk_size)
             .progress_with_style(style)
+            .with_prefix("Numeric Values")
+            .with_message("Processing numeric covariates...");
+
+        let results: Vec<_> = progress
             .map(|chunk| {
                 let mut values = Vec::with_capacity(chunk.len());
                 let mut missing = 0;
@@ -74,13 +92,14 @@ impl ValueProcessor {
         const BATCH_SIZE: usize = 10_000;
         let chunk_size = (subjects.len() / rayon::current_num_threads()).max(BATCH_SIZE);
 
-        let style = ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({percent}%) {msg}")
-            .unwrap();
-
-        let results: Vec<_> = subjects
+        let style = Self::create_progress_style(covariate_type);
+        let progress = subjects
             .par_chunks(chunk_size)
             .progress_with_style(style)
+            .with_prefix("Categorical Values")
+            .with_message("Processing categorical covariates...");
+
+        let results: Vec<_> = progress
             .map(|chunk| {
                 let mut values = Vec::with_capacity(chunk.len());
                 let mut missing = 0;

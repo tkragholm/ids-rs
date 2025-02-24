@@ -276,12 +276,13 @@ impl BalanceChecker {
                 .collect();
 
             for (control_pnr, _) in &matching_controls {
+                // Family Size
                 if let Some(detail) = self.process_matched_pair(
                     case_pnr,
                     control_pnr,
                     *case_date,
                     CovariateType::Demographics,
-                    "Demographics",
+                    "Family Size",
                     |cov| match &cov.value {
                         CovariateValue::Demographics { family_size, .. } => {
                             Some(*family_size as f64)
@@ -291,8 +292,58 @@ impl BalanceChecker {
                 )? {
                     results.add_pair_detail(detail);
                 }
+
+                // Municipality
+                if let Some(detail) = self.process_matched_pair(
+                    case_pnr,
+                    control_pnr,
+                    *case_date,
+                    CovariateType::Demographics,
+                    "Municipality",
+                    |cov| match &cov.value {
+                        CovariateValue::Demographics { municipality, .. } => {
+                            Some(*municipality as f64)
+                        }
+                        _ => None,
+                    },
+                )? {
+                    results.add_pair_detail(detail);
+                }
+
+                // Income
+                if let Some(detail) = self.process_matched_pair(
+                    case_pnr,
+                    control_pnr,
+                    *case_date,
+                    CovariateType::Income,
+                    "Income",
+                    |cov| match &cov.value {
+                        CovariateValue::Income { amount, .. } => Some(*amount),
+                        _ => None,
+                    },
+                )? {
+                    results.add_pair_detail(detail);
+                }
+
+                // Education Level
+                if let Some(detail) = self.process_matched_pair(
+                    case_pnr,
+                    control_pnr,
+                    *case_date,
+                    CovariateType::Education,
+                    "Education Level",
+                    |cov| match &cov.value {
+                        CovariateValue::Education { level, .. } => {
+                            Some(level.parse().unwrap_or(0.0))
+                        }
+                        _ => None,
+                    },
+                )? {
+                    results.add_pair_detail(detail);
+                }
             }
         }
+
         Ok(())
     }
 
