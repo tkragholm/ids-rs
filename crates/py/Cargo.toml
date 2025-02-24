@@ -15,5 +15,5 @@ log4rs.workspace = true
 chrono = { workspace = true }
 
 [[bin]]
-name = "ids"
+name = "ids-py"
 path = "../cli/src/main.rs"

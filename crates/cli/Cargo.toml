@@ -16,5 +16,5 @@ smallvec.workspace = true
 chrono.workspace = true
 
 [[bin]]
-name = "ids-py"
+name = "ids"
 path = "src/main.rs"
