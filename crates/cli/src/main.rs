@@ -6,6 +6,8 @@ use core::{
 };
 use covariates::{balance::BalanceChecker, matched_pairs::load_matched_pairs};
 use datagen::{GeneratorConfig, RegisterGenerator};
+use indicatif::MultiProgress;
+use indicatif_log_bridge::LogWrapper;
 use loader::ParquetLoader;
 use log::{error, info, warn};
 use std::collections::HashSet;
@@ -16,6 +18,12 @@ mod cli;
 use cli::{Cli, Commands};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let logger = env_logger::Builder::from_env(env_logger::Env::default()).build();
+    let level = logger.filter();
+    let multi = MultiProgress::new();
+
+    LogWrapper::new(multi.clone(), logger).try_init().unwrap();
+    log::set_max_level(level);
     let cli = Cli::parse();
     setup_directories(&cli.output_dir)?;
     configure_logging_with_dir(&cli.output_dir)?;

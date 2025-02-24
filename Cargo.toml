@@ -35,6 +35,7 @@ parquet = { version = "54.1.0", features = ["arrow"] }
 thiserror = "2.0.11"
 rayon = "1.10.0"
 indicatif = { version = "0.17.11", features = ["rayon"] }
+indicatif-log-bridge = "0.2.3"
 clap = { version = "4.5", features = ["derive"] }
 log4rs = { version = "1.2", features = ["console_appender"] }
 dashmap = "6.1.0"

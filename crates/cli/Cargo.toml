@@ -11,9 +11,12 @@ types = { path = "../types" }
 datagen = { path = "../datagen" }
 clap.workspace = true
 log.workspace = true
+env_logger.workspace = true
 log4rs.workspace = true
 smallvec.workspace = true
 chrono.workspace = true
+indicatif-log-bridge.workspace = true
+indicatif.workspace = true
 
 [[bin]]
 name = "ids"

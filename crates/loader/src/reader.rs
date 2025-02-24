@@ -74,14 +74,7 @@ impl DataReader for FileReader {
         }
 
         log::debug!("Reading batches from {}", path.display());
-        let batches = crate::parquet::read_parquet(path, Some(schema))?;
-        log::info!(
-            "Read {} batches with {} total rows from {}",
-            batches.len(),
-            batches.iter().map(|b| b.num_rows()).sum::<usize>(),
-            path.display()
-        );
-
+        let batches = crate::parquet::read_parquet(path, Some(schema), None)?;
         Ok(batches)
     }
 

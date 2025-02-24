@@ -12,7 +12,10 @@ datagen = { path = "../datagen" }
 clap.workspace = true
 log.workspace = true
 log4rs.workspace = true
+env_logger.workspace = true
 chrono = { workspace = true }
+indicatif.workspace = true
+indicatif-log-bridge.workspace = true
 
 [[bin]]
 name = "ids-py"

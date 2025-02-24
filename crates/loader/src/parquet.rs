@@ -1,5 +1,7 @@
+use crate::LoaderProgress;
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
+
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ProjectionMask;
 use std::fs::File;
@@ -23,8 +25,23 @@ use types::error::IdsError;
 /// - The file cannot be opened
 /// - The file is not a valid Parquet file
 /// - There are issues reading the record batches
-pub fn read_parquet(path: &Path, schema: Option<&Schema>) -> Result<Vec<RecordBatch>, IdsError> {
+pub fn read_parquet(
+    path: &Path,
+    schema: Option<&Schema>,
+    progress: Option<&LoaderProgress>,
+) -> Result<Vec<RecordBatch>, IdsError> {
     let file = File::open(path).map_err(IdsError::Io)?;
+    let file_size = file.metadata().map(|m| m.len()).unwrap_or(0);
+
+    let pb = progress.map(|p| {
+        p.create_file_progress(
+            file_size,
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown"),
+        )
+    });
+
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
         .map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
 
@@ -45,8 +62,15 @@ pub fn read_parquet(path: &Path, schema: Option<&Schema>) -> Result<Vec<RecordBa
 
     let mut batches = Vec::new();
     for batch_result in reader {
-        batches.push(batch_result.map_err(|e| IdsError::InvalidFormat(e.to_string()))?);
+        let batch = batch_result.map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
+        if let Some(pb) = &pb {
+            pb.inc(batch.get_array_memory_size() as u64);
+        }
+        batches.push(batch);
     }
 
+    if let Some(pb) = pb {
+        pb.finish_with_message("Complete");
+    }
     Ok(batches)
 }

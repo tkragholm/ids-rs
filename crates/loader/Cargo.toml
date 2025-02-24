@@ -12,4 +12,6 @@ arrow-array.workspace = true
 arrow-schema.workspace = true
 arrow-select.workspace = true
 parquet.workspace = true
+indicatif.workspace = true
 types = { path = "../types" }
+indicatif-log-bridge.workspace = true
