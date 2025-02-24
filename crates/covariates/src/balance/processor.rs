@@ -1,5 +1,6 @@
 use super::checker::BalanceChecker;
 use chrono::NaiveDate;
+use indicatif::{ParallelProgressIterator, ProgressStyle};
 use rayon::prelude::*;
 use types::models::{Covariate, CovariateType};
 
@@ -23,8 +24,13 @@ impl ValueProcessor {
         const BATCH_SIZE: usize = 10_000;
         let chunk_size = (subjects.len() / rayon::current_num_threads()).max(BATCH_SIZE);
 
+        let style = ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({percent}%) {msg}")
+            .unwrap();
+
         let results: Vec<_> = subjects
             .par_chunks(chunk_size)
+            .progress_with_style(style)
             .map(|chunk| {
                 let mut values = Vec::with_capacity(chunk.len());
                 let mut missing = 0;
@@ -68,8 +74,13 @@ impl ValueProcessor {
         const BATCH_SIZE: usize = 10_000;
         let chunk_size = (subjects.len() / rayon::current_num_threads()).max(BATCH_SIZE);
 
+        let style = ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({percent}%) {msg}")
+            .unwrap();
+
         let results: Vec<_> = subjects
             .par_chunks(chunk_size)
+            .progress_with_style(style)
             .map(|chunk| {
                 let mut values = Vec::with_capacity(chunk.len());
                 let mut missing = 0;

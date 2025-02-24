@@ -6,6 +6,7 @@ use super::{
 };
 use crate::models::{CovariateSummary, MatchedPairDetail};
 use chrono::NaiveDate;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::debug;
 use std::{collections::HashMap, sync::Arc};
 use types::{
@@ -55,13 +56,24 @@ impl BalanceChecker {
             controls.len()
         );
 
+        let multi_progress = MultiProgress::new();
+        let overall_style = ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+            .unwrap();
+
+        let overall_pb = multi_progress.add(ProgressBar::new(3)); // 3 steps: demographics, income, education
+        overall_pb.set_style(overall_style);
+        overall_pb.set_message("Calculating balance...");
+
         let mut results = BalanceResults::new();
 
         // Calculate overall balance
-        self.add_all_balances(&mut results, cases, controls)?;
+        self.add_all_balances(&mut results, cases, controls, &overall_pb)?;
 
         // Calculate matched pair details
+        overall_pb.set_message("Processing matched pairs...");
         self.add_matched_pair_details(&mut results, cases, controls)?;
+        overall_pb.finish_with_message("Balance calculation complete");
 
         self.log_balance_statistics(&results);
         Ok(results)
@@ -126,10 +138,20 @@ impl BalanceChecker {
         results: &mut BalanceResults,
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
+        overall_pb: &ProgressBar,
     ) -> Result<(), IdsError> {
+        overall_pb.set_message("Processing demographics...");
         self.add_demographic_balance(results, cases, controls)?;
+        overall_pb.inc(1);
+
+        overall_pb.set_message("Processing income...");
         self.add_income_balance(results, cases, controls)?;
+        overall_pb.inc(1);
+
+        overall_pb.set_message("Processing education...");
         self.add_education_balance(results, cases, controls)?;
+        overall_pb.inc(1);
+
         Ok(())
     }
 

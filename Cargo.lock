@@ -670,6 +670,7 @@ dependencies = [
  "core",
  "csv",
  "dashmap",
+ "indicatif",
  "loader",
  "log",
  "rayon",
@@ -1094,6 +1095,7 @@ dependencies = [
  "console",
  "number_prefix",
  "portable-atomic",
+ "rayon",
  "unicode-width",
  "web-time",
 ]
