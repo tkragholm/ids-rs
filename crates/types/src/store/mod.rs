@@ -45,11 +45,12 @@ enum StoreBackend {
 }
 
 impl UnifiedStore {
-    pub fn new_arrow() -> Self {
-        Self {
-            backend: StoreBackend::Arrow(ArrowStore::new()),
+    pub fn new_arrow() -> Result<Self, IdsError> {
+        // Changed to return Result
+        Ok(Self {
+            backend: StoreBackend::Arrow(ArrowStore::new()?),
             cache: DashMap::new(),
-        }
+        })
     }
 
     pub fn new_time_varying() -> Self {

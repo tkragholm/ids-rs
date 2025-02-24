@@ -4,6 +4,7 @@ use crate::{
     family::FamilyRelations,
     family::FamilyStore,
     models::{Covariate, CovariateType, TimeVaryingValue},
+    translation::TranslationMaps,
 };
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
@@ -16,17 +17,23 @@ pub struct ArrowStore {
     bef_data: HashMap<String, Vec<RecordBatch>>,
     ind_data: HashMap<i32, Vec<RecordBatch>>,
     uddf_data: HashMap<String, Vec<RecordBatch>>,
+    translations: TranslationMaps,
 }
 
 impl ArrowStore {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self, IdsError> {
+        // Changed name to try_new to indicate fallibility
+        let translations =
+            TranslationMaps::new().map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
+
+        Ok(Self {
             family_data: HashMap::new(),
             akm_data: HashMap::new(),
             bef_data: HashMap::new(),
             ind_data: HashMap::new(),
             uddf_data: HashMap::new(),
-        }
+            translations,
+        })
     }
 
     pub fn add_akm_data(&mut self, year: i32, batches: Vec<RecordBatch>) {
@@ -90,16 +97,31 @@ impl ArrowStore {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
                     let family_size: Option<i32> = self.get_value(batch, "ANTPERSF", idx)?;
                     let municipality: Option<i32> = self.get_value(batch, "KOM", idx)?;
-                    let family_type: Option<String> = self.get_value(batch, "FAMILIE_TYPE", idx)?;
+                    let family_type: Option<i32> = self.get_value(batch, "FAMILIE_TYPE", idx)?;
+                    let statsb: Option<i32> = self.get_value(batch, "STATSB", idx)?;
 
                     if let (Some(family_size), Some(municipality), Some(family_type)) =
                         (family_size, municipality, family_type)
                     {
-                        return Ok(Some(Covariate::demographics(
+                        let mut covariate = Covariate::demographics(
                             family_size,
                             municipality,
-                            family_type,
-                        )));
+                            family_type.to_string(),
+                        );
+
+                        // Add translated values to metadata
+                        if let Some(statsb) = statsb {
+                            if let Some(translated) =
+                                self.translations.translate_statsb(&statsb.to_string())
+                            {
+                                covariate.metadata.insert(
+                                    "statsb_translated".to_string(),
+                                    translated.to_string(),
+                                );
+                            }
+                        }
+
+                        return Ok(Some(covariate));
                     }
                 }
             }

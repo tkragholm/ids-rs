@@ -50,7 +50,7 @@
     },
     {
       "name": "FAMILIE_TYPE",
-      "type": "UInt8"
+      "type": "Int8"
     },
     {
       "name": "FAR_ID",

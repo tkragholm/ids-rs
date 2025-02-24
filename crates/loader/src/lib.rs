@@ -100,7 +100,7 @@ impl ParquetLoader {
 impl StoreLoader for ParquetLoader {
     fn load_from_path(base_path: String) -> Result<ArrowStore, IdsError> {
         let reader = FileReader::new(base_path.clone());
-        let mut store = UnifiedStore::new_arrow();
+        let mut store = UnifiedStore::new_arrow()?;
         let mut progress = LoaderProgress::new();
 
         log::info!("Loading data from path: {}", base_path);
