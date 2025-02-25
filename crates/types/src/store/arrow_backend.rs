@@ -22,7 +22,6 @@ pub struct ArrowStore {
 
 impl ArrowStore {
     pub fn new() -> Result<Self, IdsError> {
-        // Changed name to try_new to indicate fallibility
         let translations =
             TranslationMaps::new().map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
 
@@ -111,9 +110,10 @@ impl ArrowStore {
 
                         // Add translated values to metadata
                         if let Some(statsb) = statsb {
-                            if let Some(translated) =
-                                self.translations.translate_statsb(&statsb.to_string())
-                            {
+                            if let Some(translated) = self.translations.translate(
+                                crate::translation::TranslationType::Statsb,
+                                &statsb.to_string(),
+                            ) {
                                 covariate.metadata.insert(
                                     "statsb_translated".to_string(),
                                     translated.to_string(),

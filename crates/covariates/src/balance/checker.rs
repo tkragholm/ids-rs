@@ -11,7 +11,7 @@ use log::debug;
 use std::{collections::HashMap, sync::Arc};
 use types::{
     error::IdsError,
-    models::{Covariate, CovariateType, CovariateValue},
+    models::{Covariate, CovariateType},
     store::ArrowStore,
 };
 
@@ -167,10 +167,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Family Size",
-            |covariate| match &covariate.value {
-                CovariateValue::Demographics { family_size, .. } => Some(*family_size as f64),
-                _ => None,
-            },
+            |covariate| covariate.get_family_size().map(|val| val as f64),
         )?;
         results.add_summary(summary);
         results.add_missing_rate("Family Size".to_string(), missing_rates.0, missing_rates.1);
@@ -181,10 +178,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Municipality",
-            |covariate| match &covariate.value {
-                CovariateValue::Demographics { municipality, .. } => Some(*municipality as f64),
-                _ => None,
-            },
+            |covariate| covariate.get_municipality().map(|val| val as f64),
         )?;
         results.add_summary(summary);
         results.add_missing_rate("Municipality".to_string(), missing_rates.0, missing_rates.1);
@@ -195,10 +189,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Family Type",
-            |covariate| match &covariate.value {
-                CovariateValue::Demographics { family_type, .. } => Some(family_type.clone()),
-                _ => None,
-            },
+            |covariate| covariate.get_family_type(),
         )?;
 
         for summary in summaries {
@@ -221,10 +212,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Income,
             "Income",
-            |covariate| match &covariate.value {
-                CovariateValue::Income { amount, .. } => Some(*amount),
-                _ => None,
-            },
+            |covariate| covariate.get_income_amount(),
         )?;
 
         results.add_summary(summary);
@@ -245,10 +233,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Education,
             "Education Level",
-            |covariate| match &covariate.value {
-                CovariateValue::Education { level, .. } => Some(level.clone()),
-                _ => None,
-            },
+            |covariate| covariate.get_education_level(),
         )?;
 
         for summary in summaries {
@@ -283,12 +268,7 @@ impl BalanceChecker {
                     *case_date,
                     CovariateType::Demographics,
                     "Family Size",
-                    |cov| match &cov.value {
-                        CovariateValue::Demographics { family_size, .. } => {
-                            Some(*family_size as f64)
-                        }
-                        _ => None,
-                    },
+                    |cov| cov.get_family_size().map(|val| val as f64),
                 )? {
                     results.add_pair_detail(detail);
                 }
@@ -300,12 +280,7 @@ impl BalanceChecker {
                     *case_date,
                     CovariateType::Demographics,
                     "Municipality",
-                    |cov| match &cov.value {
-                        CovariateValue::Demographics { municipality, .. } => {
-                            Some(*municipality as f64)
-                        }
-                        _ => None,
-                    },
+                    |cov| cov.get_municipality().map(|val| val as f64),
                 )? {
                     results.add_pair_detail(detail);
                 }
@@ -317,10 +292,7 @@ impl BalanceChecker {
                     *case_date,
                     CovariateType::Income,
                     "Income",
-                    |cov| match &cov.value {
-                        CovariateValue::Income { amount, .. } => Some(*amount),
-                        _ => None,
-                    },
+                    |cov| cov.get_income_amount(),
                 )? {
                     results.add_pair_detail(detail);
                 }
@@ -332,11 +304,9 @@ impl BalanceChecker {
                     *case_date,
                     CovariateType::Education,
                     "Education Level",
-                    |cov| match &cov.value {
-                        CovariateValue::Education { level, .. } => {
-                            Some(level.parse().unwrap_or(0.0))
-                        }
-                        _ => None,
+                    |cov| {
+                        cov.get_education_level()
+                            .and_then(|level| level.parse::<f64>().ok())
                     },
                 )? {
                     results.add_pair_detail(detail);

@@ -2,6 +2,17 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TranslationType {
+    Statsb,
+    Civst,
+    FamilyType,
+    FmMark,
+    Hustype,
+    Reg,
+    Socio13,
+}
+
 #[derive(Debug, Clone)]
 pub struct TranslationMaps {
     statsb: HashMap<String, String>,
@@ -26,32 +37,17 @@ impl TranslationMaps {
         })
     }
 
-    pub fn translate_statsb(&self, code: &str) -> Option<&str> {
-        self.statsb.get(code).map(String::as_str)
-    }
-
-    pub fn translate_civst(&self, code: &str) -> Option<&str> {
-        self.civst.get(code).map(String::as_str)
-    }
-
-    pub fn translate_family_type(&self, code: &str) -> Option<&str> {
-        self.family_type.get(code).map(String::as_str)
-    }
-
-    pub fn translate_fm_mark(&self, code: &str) -> Option<&str> {
-        self.fm_mark.get(code).map(String::as_str)
-    }
-
-    pub fn translate_hustype(&self, code: &str) -> Option<&str> {
-        self.hustype.get(code).map(String::as_str)
-    }
-
-    pub fn translate_reg(&self, code: &str) -> Option<&str> {
-        self.reg.get(code).map(String::as_str)
-    }
-
-    pub fn translate_socio13(&self, code: &str) -> Option<&str> {
-        self.socio13.get(code).map(String::as_str)
+    pub fn translate(&self, translation_type: TranslationType, code: &str) -> Option<&str> {
+        let map = match translation_type {
+            TranslationType::Statsb => &self.statsb,
+            TranslationType::Civst => &self.civst,
+            TranslationType::FamilyType => &self.family_type,
+            TranslationType::FmMark => &self.fm_mark,
+            TranslationType::Hustype => &self.hustype,
+            TranslationType::Reg => &self.reg,
+            TranslationType::Socio13 => &self.socio13,
+        };
+        map.get(code).map(String::as_str)
     }
 }
 
