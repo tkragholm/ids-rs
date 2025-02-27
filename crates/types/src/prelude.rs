@@ -3,7 +3,7 @@ pub use crate::{
     error::IdsError,
     family::FamilyRelations,
     models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue},
-    store::{Store, UnifiedStore},
+    storage::{DataStore, Storage},
     traits::DateHelpers,
     traits::FamilyAccess,
 };

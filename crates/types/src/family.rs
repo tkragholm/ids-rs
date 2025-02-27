@@ -1,10 +1,9 @@
 use crate::{
     arrow_utils::ArrowAccess, // Add ArrowValue back
     error::IdsError,
-    store::ArrowStore,
 };
 use arrow::{
-    array::Array, // Add specific array types
+    array::Array, 
     record_batch::RecordBatch,
 };
 use chrono::NaiveDate; // Add Days type from chrono
@@ -23,21 +22,25 @@ pub struct FamilyRelations {
 
 #[derive(Clone, Debug)]
 pub struct FamilyStore {
-    pub arrow_backend: ArrowStore,
     pub relations: HashMap<String, FamilyRelations>,
+}
+
+impl Default for FamilyStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FamilyStore {
     #[must_use]
-    pub fn new(arrow_backend: ArrowStore) -> Self {
+    pub fn new() -> Self {
         Self {
-            arrow_backend,
             relations: HashMap::new(),
         }
     }
 
-    pub fn get_arrow_backend(&self) -> &ArrowStore {
-        &self.arrow_backend
+    pub fn get_relations(&self) -> HashMap<String, FamilyRelations> {
+        self.relations.clone()
     }
 
     pub fn load_family_relations(&mut self, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
@@ -48,17 +51,22 @@ impl FamilyStore {
     }
 
     fn process_batch(&mut self, batch: &RecordBatch) -> Result<(), IdsError> {
-        let pnr_array = self.get_string_array(batch, "PNR")?;
-        let birth_date_array = self.get_date_array(batch, "BIRTH_DATE")?;
-        let father_id_array = self.get_string_array(batch, "FATHER_ID")?;
-        let father_birth_date_array = self.get_date_array(batch, "FATHER_BIRTH_DATE")?;
-        let mother_id_array = self.get_string_array(batch, "MOTHER_ID")?;
-        let mother_birth_date_array = self.get_date_array(batch, "MOTHER_BIRTH_DATE")?;
-        let family_id_array = self.get_string_array(batch, "FAMILY_ID")?;
+        // Use a simple struct type that will get the generic impl of ArrowAccess
+        struct TempAccess;
+        
+        let accessor = TempAccess;
+        
+        let pnr_array = accessor.get_string_array(batch, "PNR")?;
+        let birth_date_array = accessor.get_date_array(batch, "BIRTH_DATE")?;
+        let father_id_array = accessor.get_string_array(batch, "FATHER_ID")?;
+        let father_birth_date_array = accessor.get_date_array(batch, "FATHER_BIRTH_DATE")?;
+        let mother_id_array = accessor.get_string_array(batch, "MOTHER_ID")?;
+        let mother_birth_date_array = accessor.get_date_array(batch, "MOTHER_BIRTH_DATE")?;
+        let family_id_array = accessor.get_string_array(batch, "FAMILY_ID")?;
 
         for i in 0..batch.num_rows() {
             let pnr = pnr_array.value(i).to_string();
-            let birth_date = self.convert_date32_to_naive_date(birth_date_array.value(i))?;
+            let birth_date = accessor.convert_date32_to_naive_date(birth_date_array.value(i))?;
 
             let relation = FamilyRelations {
                 pnr: pnr.clone(),
@@ -71,7 +79,7 @@ impl FamilyStore {
                 father_birth_date: if father_birth_date_array.is_null(i) {
                     None
                 } else {
-                    Some(self.convert_date32_to_naive_date(father_birth_date_array.value(i))?)
+                    Some(accessor.convert_date32_to_naive_date(father_birth_date_array.value(i))?)
                 },
                 mother_id: if mother_id_array.is_null(i) {
                     None
@@ -81,7 +89,7 @@ impl FamilyStore {
                 mother_birth_date: if mother_birth_date_array.is_null(i) {
                     None
                 } else {
-                    Some(self.convert_date32_to_naive_date(mother_birth_date_array.value(i))?)
+                    Some(accessor.convert_date32_to_naive_date(mother_birth_date_array.value(i))?)
                 },
                 family_id: if family_id_array.is_null(i) {
                     None

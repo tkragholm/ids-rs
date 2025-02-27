@@ -12,7 +12,7 @@ use std::{collections::HashMap, sync::Arc};
 use types::{
     error::IdsError,
     models::{Covariate, CovariateType},
-    store::ArrowStore,
+    storage::ArrowBackend as ArrowStore,
 };
 
 pub struct BalanceChecker {
@@ -329,12 +329,12 @@ impl BalanceChecker {
         let case_value = self
             .get_covariate(case_pnr, covariate_type, date)?
             .as_ref()
-            .and_then(|cov| value_extractor(cov));
+            .and_then(&value_extractor);
 
         let control_value = self
             .get_covariate(control_pnr, covariate_type, date)?
             .as_ref()
-            .and_then(|cov| value_extractor(cov));
+            .and_then(&value_extractor);
 
         match (case_value, control_value) {
             (Some(case_val), Some(ctrl_val)) => Ok(Some(MatchedPairDetail::new(

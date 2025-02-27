@@ -16,6 +16,12 @@ pub struct MatchedPairSummary {
     pub missing_rates: HashMap<String, (f64, f64)>,
 }
 
+impl Default for BalanceResults {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BalanceResults {
     pub fn new() -> Self {
         Self {

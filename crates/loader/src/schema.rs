@@ -21,7 +21,7 @@ pub fn akm_schema() -> Schema {
 /// # Fields
 /// - `PNR`: Unique personal identifier (non-nullable)
 /// - Multiple demographic and family-related fields (all nullable)
-/// Including age, family composition, birth information, etc.
+///   Including age, family composition, birth information, etc.
 pub fn bef_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),

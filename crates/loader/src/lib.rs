@@ -7,7 +7,7 @@ pub use types::{
     error::IdsError,
     family::FamilyRelations,
     models::*,
-    store::{ArrowStore, Store, UnifiedStore},
+    storage::{ArrowBackend as ArrowStore, Storage as Store, DataStore as UnifiedStore},
 };
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -16,6 +16,12 @@ pub struct LoaderProgress {
     multi_progress: MultiProgress,
     main_pb: ProgressBar,
     sub_pb: Option<ProgressBar>,
+}
+
+impl Default for LoaderProgress {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LoaderProgress {
@@ -111,11 +117,9 @@ impl StoreLoader for ParquetLoader {
             let path = std::path::Path::new(&base_path).join(dir);
             if !path.exists() {
                 log::warn!("Directory does not exist: {}", path.display());
-            } else {
-                if let Ok(entries) = std::fs::read_dir(&path) {
-                    let files: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
-                    log::info!("Found {} files in {}: {:?}", files.len(), dir, files);
-                }
+            } else if let Ok(entries) = std::fs::read_dir(&path) {
+                let files: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+                log::info!("Found {} files in {}: {:?}", files.len(), dir, files);
             }
         }
 
@@ -143,7 +147,9 @@ impl StoreLoader for ParquetLoader {
                         pb.inc(1);
                     }
                     log::info!("Loaded {} AKM batches for year {}", batches.len(), year);
-                    store.add_akm_data(year, batches);
+                    if let Err(e) = store.add_akm_data(year, batches) {
+                        log::warn!("Failed to add AKM data for year {}: {}", year, e);
+                    }
                 }
                 Err(e) => log::warn!("Failed to load AKM data for year {}: {}", year, e),
             }
@@ -160,7 +166,9 @@ impl StoreLoader for ParquetLoader {
                         pb.inc(1);
                     }
                     log::info!("Loaded {} IND batches for year {}", batches.len(), year);
-                    store.add_ind_data(year, batches);
+                    if let Err(e) = store.add_ind_data(year, batches) {
+                        log::warn!("Failed to add IND data for year {}: {}", year, e);
+                    }
                 }
                 Err(e) => log::warn!("Failed to load IND data for year {}: {}", year, e),
             }
@@ -178,7 +186,9 @@ impl StoreLoader for ParquetLoader {
                         pb.inc(1);
                     }
                     log::info!("Loaded {} BEF batches for year {}", batches.len(), year);
-                    store.add_bef_data(format!("{year}"), batches);
+                    if let Err(e) = store.add_bef_data(format!("{year}"), batches) {
+                        log::warn!("Failed to add BEF data for year {}: {}", year, e);
+                    }
                 }
                 Err(e) => log::warn!("Failed to load BEF data for year {}: {}", year, e),
             }
@@ -194,7 +204,9 @@ impl StoreLoader for ParquetLoader {
                             year,
                             quarter
                         );
-                        store.add_bef_data(format!("{}{:02}", year, quarter * 3), batches);
+                        if let Err(e) = store.add_bef_data(format!("{}{:02}", year, quarter * 3), batches) {
+                            log::warn!("Failed to add BEF data for year {} Q{}: {}", year, quarter, e);
+                        }
                     }
                     Err(e) => log::warn!(
                         "Failed to load BEF data for year {} Q{}: {}",
@@ -224,7 +236,9 @@ impl StoreLoader for ParquetLoader {
                         batches.len(),
                         period
                     );
-                    store.add_uddf_data(period.to_string(), batches);
+                    if let Err(e) = store.add_uddf_data(period.to_string(), batches) {
+                        log::warn!("Failed to add UDDF data for period {}: {}", period, e);
+                    }
                 }
                 Err(e) => log::warn!("Failed to load UDDF data for period {}: {}", period, e),
             }
@@ -232,6 +246,10 @@ impl StoreLoader for ParquetLoader {
         progress.main_pb.inc(1);
         progress.main_pb.finish_with_message("Loading complete");
 
-        store.into_arrow_backend()
+        // In the updated version, we just take the ArrowBackend via as_arrow_backend
+        match store.as_arrow_backend() {
+            Some(backend) => Ok(backend.clone()),
+            None => Err(IdsError::invalid_operation("Failed to access arrow backend"))
+        }
     }
 }

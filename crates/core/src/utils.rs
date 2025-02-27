@@ -10,6 +10,9 @@ use log4rs::{
 
 use crate::errors::SamplingError;
 
+// Export the console submodule
+pub mod console;
+
 static INIT: Once = Once::new();
 
 /// Configures logging with optional file output.
@@ -115,23 +118,23 @@ pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<d
                 // Validate dates with detailed error messages
                 if let Err(e) = validate_date(&record.bday.to_string()) {
                     log::error!("Invalid birth date at record {}: {}", idx + 1, e);
-                    return Err(Box::new(SamplingError::InvalidDate));
+                    return Err(Box::new(SamplingError::invalid_date("Invalid birth date".to_string())));
                 }
 
                 if let Err(e) = validate_optional_date(&record.mother_bday) {
                     log::error!("Invalid mother birth date at record {}: {}", idx + 1, e);
-                    return Err(Box::new(SamplingError::InvalidDate));
+                    return Err(Box::new(SamplingError::invalid_date("Invalid mother birth date".to_string())));
                 }
 
                 if let Err(e) = validate_optional_date(&record.father_bday) {
                     log::error!("Invalid father birth date at record {}: {}", idx + 1, e);
-                    return Err(Box::new(SamplingError::InvalidDate));
+                    return Err(Box::new(SamplingError::invalid_date("Invalid father birth date".to_string())));
                 }
 
                 if let Some(treatment_date) = record.treatment_date {
                     if let Err(e) = validate_date(&treatment_date.to_string()) {
                         log::error!("Invalid treatment date at record {}: {}", idx + 1, e);
-                        return Err(Box::new(SamplingError::InvalidDate));
+                        return Err(Box::new(SamplingError::invalid_date("Invalid treatment date".to_string())));
                     }
                 }
 
@@ -206,11 +209,11 @@ pub fn validate_csv_format(filename: &str) -> Result<(), Box<dyn Error>> {
 /// * `date_str` - Date string in "YYYY-MM-DD" format
 ///
 /// # Errors
-/// Returns `SamplingError::InvalidDate` if the date string cannot be parsed
+/// Returns `SamplingError::invalid_date` if the date string cannot be parsed
 pub fn validate_date(date_str: &str) -> Result<(), SamplingError> {
     NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
         .map(|_| ()) // Convert success to () instead of NaiveDate
-        .map_err(|_| SamplingError::InvalidDate)
+        .map_err(|_| SamplingError::invalid_date("Invalid date format".to_string()))
 }
 
 pub mod date_format {
@@ -262,10 +265,10 @@ impl MatchingCriteria {
     /// Validates the matching criteria values.
     ///
     /// # Errors
-    /// Returns `SamplingError::InvalidCriteria` if either window value is not positive
-    pub const fn validate(&self) -> Result<(), crate::errors::SamplingError> {
+    /// Returns `SamplingError::invalid_criteria` if either window value is not positive
+    pub fn validate(&self) -> Result<(), crate::errors::SamplingError> {
         if self.birth_date_window <= 0 || self.parent_date_window <= 0 {
-            return Err(crate::errors::SamplingError::InvalidCriteria);
+            return Err(crate::errors::SamplingError::invalid_criteria("Birth or parent date window must be positive"));
         }
         Ok(())
     }

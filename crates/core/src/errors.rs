@@ -1,23 +1,20 @@
-use thiserror::Error;
+pub use types::error::IdsError;
 
-#[derive(Error, Debug)]
-pub enum SamplingError {
-    #[error("Invalid date format")]
-    InvalidDate,
-    #[error("No eligible controls found for case")]
-    NoEligibleControls,
-    #[error("Invalid matching criteria")]
-    InvalidCriteria,
-    #[error("CSV error: {0}")]
-    CsvError(#[from] csv::Error),
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+// Type aliases to maintain compatibility
+pub type PlottingError = IdsError;
+pub type SamplingError = IdsError;
+
+// Re-export the main IdsError to make it easier to use in this crate
+pub type Error = IdsError;
+
+// For backwards compatibility with existing code
+pub trait IntoSamplingError<T> {
+    fn into_sampling_error(self, msg: &str) -> Result<T, SamplingError>;
 }
 
-#[derive(Error, Debug)]
-pub enum PlottingError {
-    #[error("Plotting error: {0}")]
-    PlotError(String),
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+// Implement for any Result that can be converted to a String
+impl<T, E: std::fmt::Display> IntoSamplingError<T> for Result<T, E> {
+    fn into_sampling_error(self, msg: &str) -> Result<T, SamplingError> {
+        self.map_err(|e| SamplingError::sampling(format!("{msg}: {e}")))
+    }
 }

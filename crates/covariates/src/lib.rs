@@ -12,5 +12,5 @@ pub use reporting::{BalanceReport, ComprehensiveReport, CsvReport};
 pub use types::{
     error::IdsError as CovariateError,
     models::{Covariate, CovariateType, CovariateValue},
-    store::Store,
+    storage::Storage as Store,
 };

@@ -54,7 +54,7 @@ impl IncidenceDensitySampler {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
         let mut birth_date_index =
-            FxHashMap::with_capacity_and_hasher(n_records / 365, FxBuildHasher::default());
+            FxHashMap::with_capacity_and_hasher(n_records / 365, FxBuildHasher);
         let mut dates = Vec::with_capacity(n_records);
         let mut cases = Vec::with_capacity(50_000);
         let mut controls = Vec::with_capacity(n_records - 50_000);
@@ -145,7 +145,7 @@ impl IncidenceDensitySampler {
         println!("{}", "=".repeat(text.len()).blue());
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(dead_code, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn format_percentage(value: f64, total: f64) -> String {
         format!(
             "{:.1}% ({}/{})",
@@ -157,27 +157,58 @@ impl IncidenceDensitySampler {
 
     #[must_use]
     pub fn get_statistics(&self) -> String {
+        use crate::utils::console::ConsoleOutput;
+        
         let total_records = self.records.len();
         let total_cases = self.cases.len();
         let total_controls = self.sorted_controls.len();
+        let case_pct = total_cases as f64 / total_records as f64 * 100.0;
+        let control_pct = total_controls as f64 / total_records as f64 * 100.0;
 
-        format!(
-            "{}\n\
-                │ {} {}\n\
-                │ {} {}\n\
-                │ {} {}\n\
-                │ {} {:.2}\n\
-                └────────────────────────────",
-            "Dataset Statistics:".bold().green(),
+        let mut stats = String::new();
+        
+        stats.push_str(&format!("\n{}\n", "Dataset Statistics".green().bold()));
+        stats.push_str(&format!("{}\n", "═".repeat(18).green()));
+        
+        stats.push_str(&format!(
+            "│ {} {}\n",
             "Total Records:".bold(),
-            total_records.to_string().yellow(),
+            ConsoleOutput::format_number(total_records).yellow()
+        ));
+        
+        stats.push_str(&format!(
+            "│ {} {} ({:.1}%)\n",
             "Cases:".bold(),
-            Self::format_percentage(total_cases as f64, total_records as f64).yellow(),
+            ConsoleOutput::format_number(total_cases).yellow(),
+            case_pct
+        ));
+        
+        stats.push_str(&format!(
+            "│ {} {} ({:.1}%)\n",
             "Controls:".bold(),
-            Self::format_percentage(total_controls as f64, total_records as f64).yellow(),
+            ConsoleOutput::format_number(total_controls).yellow(),
+            control_pct
+        ));
+        
+        let ratio = total_controls as f64 / total_cases as f64;
+        let ratio_str = format!("{:.2}", ratio);
+        let ratio_colored = if ratio >= 3.0 {
+            ratio_str.green()
+        } else if ratio >= 1.0 {
+            ratio_str.yellow()
+        } else {
+            ratio_str.red()
+        };
+        
+        stats.push_str(&format!(
+            "│ {} {}\n",
             "Case/Control Ratio:".bold(),
-            (total_controls as f64 / total_cases as f64)
-        )
+            ratio_colored
+        ));
+        
+        stats.push_str(&format!("└{}\n", "─".repeat(30)));
+        
+        stats
     }
 
     /// Samples controls for each case according to the matching criteria.

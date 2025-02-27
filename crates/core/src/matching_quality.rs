@@ -154,84 +154,119 @@ impl MatchingQuality {
 
     #[must_use] pub fn format_report(&self) -> String {
         use colored::Colorize;
+        use crate::utils::console::ConsoleOutput;
 
         let mut report = String::new();
 
+        // Title
         report.push_str(&format!("\n{}\n", "Matching Quality Report".bold().green()));
+        report.push_str(&format!("{}\n", "═".repeat(22).green()));
+        
+        // Matching metrics
+        let matching_rate = self.stats.matched_cases as f64 / self.stats.total_cases as f64;
+        let control_utilization = self.stats.matched_cases as f64 * self.stats.avg_controls_per_case
+            / self.stats.total_controls as f64;
+        
         report.push_str(&format!(
-            "│ {} {}/{} ({:.1}%)\n",
+            "│ {} {}/{} ({})\n",
             "Matching Rate:".bold(),
-            self.stats.matched_cases,
+            self.stats.matched_cases.to_string().yellow(),
             self.stats.total_cases,
-            (self.stats.matched_cases as f64 / self.stats.total_cases as f64) * 100.0
+            ConsoleOutput::format_percentage(matching_rate)
         ));
 
         report.push_str(&format!(
-            "│ {} {}/{} ({:.1}%)\n",
+            "│ {} {}/{} ({})\n",
             "Control Utilization:".bold(),
-            self.stats.matched_cases * self.stats.avg_controls_per_case as usize,
+            (self.stats.matched_cases * self.stats.avg_controls_per_case as usize).to_string().yellow(),
             self.stats.total_controls,
-            (self.stats.matched_cases as f64 * self.stats.avg_controls_per_case
-                / self.stats.total_controls as f64)
-                * 100.0
+            ConsoleOutput::format_percentage(control_utilization)
         ));
 
         report.push_str(&format!(
-            "│ {} {:.2}\n",
+            "│ {} {}\n",
             "Average Controls per Case:".bold(),
-            self.stats.avg_controls_per_case
+            format!("{:.2}", self.stats.avg_controls_per_case).yellow()
         ));
 
-        report.push_str("\nPercentiles (Birth Date Differences):\n");
+        // Birth date differences
+        report.push_str(&format!("\n{}\n", "Birth Date Differences".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(21).blue()));
         report.push_str(&format!(
-            "  25th: {} days\n",
-            self.stats.percentiles.birth_date[0]
+            "  25th percentile: {} days\n",
+            self.stats.percentiles.birth_date[0].to_string().yellow()
         ));
         report.push_str(&format!(
-            "  50th: {} days\n",
-            self.stats.percentiles.birth_date[1]
+            "  50th percentile: {} days\n",
+            self.stats.percentiles.birth_date[1].to_string().yellow()
         ));
         report.push_str(&format!(
-            "  75th: {} days\n",
-            self.stats.percentiles.birth_date[2]
-        ));
-
-        report.push_str("\nPercentiles (Mother Age Differences):\n");
-        report.push_str(&format!(
-            "  25th: {} days\n",
-            self.stats.percentiles.mother_age[0]
-        ));
-        report.push_str(&format!(
-            "  50th: {} days\n",
-            self.stats.percentiles.mother_age[1]
-        ));
-        report.push_str(&format!(
-            "  75th: {} days\n",
-            self.stats.percentiles.mother_age[2]
+            "  75th percentile: {} days\n",
+            self.stats.percentiles.birth_date[2].to_string().yellow()
         ));
 
-        report.push_str("\nPercentiles (Father Age Differences):\n");
+        // Mother age differences
+        report.push_str(&format!("\n{}\n", "Mother Age Differences".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(21).blue()));
         report.push_str(&format!(
-            "  25th: {} days\n",
-            self.stats.percentiles.father_age[0]
+            "  25th percentile: {} days\n",
+            self.stats.percentiles.mother_age[0].to_string().yellow()
         ));
         report.push_str(&format!(
-            "  50th: {} days\n",
-            self.stats.percentiles.father_age[1]
+            "  50th percentile: {} days\n",
+            self.stats.percentiles.mother_age[1].to_string().yellow()
         ));
         report.push_str(&format!(
-            "  75th: {} days\n",
-            self.stats.percentiles.father_age[2]
+            "  75th percentile: {} days\n",
+            self.stats.percentiles.mother_age[2].to_string().yellow()
         ));
 
-        report.push_str("\nBalance Metrics:\n");
+        // Father age differences
+        report.push_str(&format!("\n{}\n", "Father Age Differences".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(21).blue()));
         report.push_str(&format!(
-            "  Birth Date Balance: {:.3}\n",
-            self.stats.balance.birth_date
+            "  25th percentile: {} days\n",
+            self.stats.percentiles.father_age[0].to_string().yellow()
         ));
         report.push_str(&format!(
-            "  Parent Age Balance: {:.3}\n",
-            self.stats.balance.parent_age
+            "  50th percentile: {} days\n",
+            self.stats.percentiles.father_age[1].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  75th percentile: {} days\n",
+            self.stats.percentiles.father_age[2].to_string().yellow()
+        ));
+
+        // Balance metrics
+        report.push_str(&format!("\n{}\n", "Balance Metrics".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(14).blue()));
+        
+        // Color-code the balance metrics (lower is better)
+        let birth_balance_str = format!("{:.3}", self.stats.balance.birth_date);
+        let birth_balance = if self.stats.balance.birth_date < 0.1 {
+            birth_balance_str.green()
+        } else if self.stats.balance.birth_date < 0.2 {
+            birth_balance_str.yellow()
+        } else {
+            birth_balance_str.red()
+        };
+        
+        let parent_balance_str = format!("{:.3}", self.stats.balance.parent_age);
+        let parent_balance = if self.stats.balance.parent_age < 0.1 {
+            parent_balance_str.green()
+        } else if self.stats.balance.parent_age < 0.2 {
+            parent_balance_str.yellow()
+        } else {
+            parent_balance_str.red()
+        };
+        
+        report.push_str(&format!(
+            "  Birth Date Balance: {}\n",
+            birth_balance
+        ));
+        report.push_str(&format!(
+            "  Parent Age Balance: {}\n",
+            parent_balance
         ));
 
         report

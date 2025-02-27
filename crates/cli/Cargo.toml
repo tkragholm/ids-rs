@@ -17,6 +17,7 @@ smallvec.workspace = true
 chrono.workspace = true
 indicatif-log-bridge.workspace = true
 indicatif.workspace = true
+colored = "2.0"
 
 [[bin]]
 name = "ids"

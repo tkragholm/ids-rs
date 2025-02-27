@@ -1,19 +1,16 @@
-use thiserror::Error;
+pub use types::error::{DataGenError, IdsError};
 
-#[derive(Error, Debug)]
-pub enum DataGenError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+// Re-export the main IdsError to make it easier to use in this crate
+pub type Error = IdsError;
 
-    #[error("Arrow error: {0}")]
-    Arrow(#[from] arrow::error::ArrowError),
+// For backwards compatibility with existing code
+pub trait IntoDataGenError<T> {
+    fn into_datagen_error(self, msg: &str) -> Result<T, DataGenError>;
+}
 
-    #[error("Parquet error: {0}")]
-    Parquet(#[from] parquet::errors::ParquetError),
-
-    #[error("Invalid configuration: {0}")]
-    Config(String),
-
-    #[error("Generation error: {0}")]
-    Generation(String),
+// Implement for any Result that can be converted to a String
+impl<T, E: std::fmt::Display> IntoDataGenError<T> for Result<T, E> {
+    fn into_datagen_error(self, msg: &str) -> Result<T, DataGenError> {
+        self.map_err(|e| DataGenError::generation(format!("{msg}: {e}")))
+    }
 }

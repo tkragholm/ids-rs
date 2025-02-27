@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use types::models::{Covariate, CovariateType};
-use types::store::Store;
+use types::storage::Storage as Store;
 use types::IdsError;
 
 #[derive(Hash, Eq, PartialEq, Clone)]
