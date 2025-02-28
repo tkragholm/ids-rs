@@ -16,3 +16,4 @@ rayon = { workspace = true }
 dashmap = { workspace = true }
 statrs = { workspace = true }
 indicatif = { workspace = true }
+rand = { workspace = true }

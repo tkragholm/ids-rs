@@ -27,7 +27,17 @@ static INIT: Once = Once::new();
 ///
 /// # Panics
 /// This function may panic if the logging configuration cannot be built due to invalid parameters
-pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
+/// Configures logging with a specific log level
+///
+/// # Arguments
+/// * `log_file` - Optional path to a log file. If provided, logs will be written to both console and file.
+/// * `level` - The log level to set
+///
+/// # Errors
+/// Returns an error if:
+/// * The log file cannot be created or written to
+/// * The logging configuration is invalid
+pub fn configure_logging_with_level(log_file: Option<&str>, level: LevelFilter) -> Result<(), Box<dyn Error>> {
     INIT.call_once(|| {
         // Helper function to create a console appender
         let create_console_appender = || {
@@ -60,7 +70,7 @@ pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
         }
 
         let config = config_builder
-            .build(root.build(LevelFilter::Debug))
+            .build(root.build(level))
             .unwrap_or_else(|_| {
                 // Create a new console appender for the fallback configuration
                 Config::builder()
@@ -70,7 +80,7 @@ pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
                     .build(
                         Root::builder()
                             .appender("console")
-                            .build(LevelFilter::Debug),
+                            .build(level),
                     )
                     .unwrap()
             });
@@ -79,6 +89,10 @@ pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
     });
 
     Ok(())
+}
+
+pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
+    configure_logging_with_level(log_file, LevelFilter::Info)
 }
 
 /// Validates an optional date.

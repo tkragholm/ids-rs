@@ -93,13 +93,47 @@ pub trait ArrowValue: Sized {
 // Default implementation of ArrowAccess
 impl<T> ArrowAccess for T {
     fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>, IdsError> {
-        let pnr_array = self.get_string_array(batch, "PNR")?;
-
-        for i in 0..pnr_array.len() {
-            if pnr_array.is_valid(i) && pnr_array.value(i) == pnr {
-                return Ok(Some(i));
+        // First try to get column with exact name "PNR"
+        if let Ok(pnr_array) = self.get_string_array(batch, "PNR") {
+            // First check for exact match
+            for i in 0..pnr_array.len() {
+                if pnr_array.is_valid(i) && pnr_array.value(i) == pnr {
+                    return Ok(Some(i));
+                }
+            }
+            
+            // If exact match not found, try case-insensitive match
+            let pnr_lower = pnr.to_lowercase();
+            for i in 0..pnr_array.len() {
+                if pnr_array.is_valid(i) && pnr_array.value(i).to_lowercase() == pnr_lower {
+                    log::debug!("Found case-insensitive PNR match: {} (original: {})", pnr_array.value(i), pnr);
+                    return Ok(Some(i));
+                }
             }
         }
+        
+        // If PNR column not found or no match, try looking for "pnr" (lowercase)
+        if let Ok(pnr_array) = self.get_string_array(batch, "pnr") {
+            // Try exact match first
+            for i in 0..pnr_array.len() {
+                if pnr_array.is_valid(i) && pnr_array.value(i) == pnr {
+                    log::debug!("Found PNR match in lowercase 'pnr' column");
+                    return Ok(Some(i));
+                }
+            }
+            
+            // If no exact match, try case-insensitive
+            let pnr_lower = pnr.to_lowercase();
+            for i in 0..pnr_array.len() {
+                if pnr_array.is_valid(i) && pnr_array.value(i).to_lowercase() == pnr_lower {
+                    log::debug!("Found case-insensitive match in lowercase 'pnr' column: {} (original: {})", 
+                        pnr_array.value(i), pnr);
+                    return Ok(Some(i));
+                }
+            }
+        }
+        
+        // No match found in either column
         Ok(None)
     }
 

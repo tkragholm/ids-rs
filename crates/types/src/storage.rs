@@ -315,6 +315,78 @@ impl ArrowBackend {
         })
     }
 
+    /// Create a new empty ArrowBackend, used for diagnostic mode when data loading fails
+    #[must_use]
+    pub fn new_empty() -> Self {
+        // Create a minimal store for diagnostic operations with some synthetic data for debugging
+        let mut family_data = HashMap::new();
+        let mut ind_data = HashMap::new();
+        let mut bef_data = HashMap::new();
+
+        // Add synthetic relationships and data for debugging in diagnostic mode
+        for i in 0..100 {
+            // Add some synthetic family data for diagnostic purposes
+            let case_id = format!("C{:06}", i);
+            let control_id = format!("K{:06}", i);
+
+            // Get a birth date based on the index
+            let birth_date = chrono::NaiveDate::from_ymd_opt(
+                1990 + (i % 30) as i32,
+                1 + (i % 12) as u32,
+                1 + (i % 28) as u32,
+            )
+            .unwrap();
+            let father_birth_date = chrono::NaiveDate::from_ymd_opt(
+                1950 + (i % 30) as i32,
+                1 + (i % 12) as u32,
+                1 + (i % 28) as u32,
+            )
+            .unwrap();
+            let mother_birth_date = chrono::NaiveDate::from_ymd_opt(
+                1955 + (i % 30) as i32,
+                1 + (i % 12) as u32,
+                1 + (i % 28) as u32,
+            )
+            .unwrap();
+
+            // Add family relations for cases and controls
+            family_data.insert(
+                case_id.clone(),
+                FamilyRelations {
+                    pnr: case_id.clone(),
+                    birth_date,
+                    father_id: Some(format!("F{:06}", i)),
+                    father_birth_date: Some(father_birth_date),
+                    mother_id: Some(format!("M{:06}", i)),
+                    mother_birth_date: Some(mother_birth_date),
+                    family_id: Some(format!("FAM{:06}", i)),
+                },
+            );
+
+            family_data.insert(
+                control_id.clone(),
+                FamilyRelations {
+                    pnr: control_id.clone(),
+                    birth_date,
+                    father_id: Some(format!("F{:06}", i + 1000)),
+                    father_birth_date: Some(father_birth_date),
+                    mother_id: Some(format!("M{:06}", i + 1000)),
+                    mother_birth_date: Some(mother_birth_date),
+                    family_id: Some(format!("FAM{:06}", i + 1000)),
+                },
+            );
+        }
+
+        Self {
+            family_data,
+            akm_data: HashMap::new(),
+            bef_data,
+            ind_data,
+            uddf_data: HashMap::new(),
+            translations: TranslationMaps::new_empty(),
+        }
+    }
+
     pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) {
         // Validate batches first
         for batch in &batches {

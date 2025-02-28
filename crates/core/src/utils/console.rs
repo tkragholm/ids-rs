@@ -46,6 +46,11 @@ impl ConsoleOutput {
         println!("{} {}", "!".yellow().bold(), message);
     }
     
+    /// Print an info message
+    pub fn info(message: &str) {
+        println!("{} {}", "ℹ".blue().bold(), message);
+    }
+    
     /// Format a percentage with appropriate color based on value
     pub fn format_percentage(value: f64) -> ColoredString {
         let percentage = format!("{:.2}%", value * 100.0);

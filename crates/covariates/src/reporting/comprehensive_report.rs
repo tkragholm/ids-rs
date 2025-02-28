@@ -25,12 +25,113 @@ impl ComprehensiveReport {
 
         // Save matched pair summaries
         self.save_matched_pair_summaries(base_path)?;
+        
+        // Save matched pair summary statistics
+        self.save_matched_pair_summary(&base_path.join("matched_pair_summary.csv"))?;
 
+        Ok(())
+    }
+    
+    /// Generate plots for the balance analysis
+    ///
+    /// # Errors
+    /// Returns an error if there are issues generating the plots
+    pub fn generate_plots(&self, plots_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs;
+        
+        // Ensure plots directory exists
+        fs::create_dir_all(plots_dir)?;
+        
+        // Generate standardized difference distribution plot
+        self.generate_std_diff_distribution_plot(plots_dir)?;
+        
+        // Generate missing data rate plot
+        self.generate_missing_data_plot(plots_dir)?;
+        
+        Ok(())
+    }
+    
+    /// Generate a plot showing the distribution of standardized differences
+    fn generate_std_diff_distribution_plot(&self, plots_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        // This is a placeholder. In a real implementation, we would use a plotting library
+        // like plotters to create visualization of standardized differences.
+        
+        // Create a simple text-based plot visualization for now
+        let plot_path = plots_dir.join("std_diff_distribution.txt");
+        let mut content = String::new();
+        
+        content.push_str("Standardized Difference Distribution (ASCII Visualization)\n");
+        content.push_str("=====================================================\n\n");
+        
+        let summaries = self.summarize_matched_pair_balance();
+        
+        for (variable, std_diffs) in summaries {
+            // Get basic stats
+            let mean = std_diffs.iter().sum::<f64>() / std_diffs.len() as f64;
+            
+            // Create a simple histogram
+            let mut histogram = [0; 11]; // -0.5 to 0.5 in 0.1 increments
+            
+            for &diff in &std_diffs {
+                if diff >= -0.5 && diff <= 0.5 {
+                    let bin = ((diff + 0.5) / 0.1).floor() as usize;
+                    let bin = bin.min(10); // Ensure we don't go out of bounds
+                    histogram[bin] += 1;
+                }
+            }
+            
+            // Normalize for display
+            let max_count = histogram.iter().copied().max().unwrap_or(1);
+            let scale = 40.0 / max_count as f64;
+            
+            content.push_str(&format!("{} (mean: {:.3}):\n", variable, mean));
+            
+            for (i, &count) in histogram.iter().enumerate() {
+                let lower = -0.5 + i as f64 * 0.1;
+                let upper = lower + 0.1;
+                let bar_len = (count as f64 * scale).round() as usize;
+                let bar = "#".repeat(bar_len);
+                
+                content.push_str(&format!("[{:.1}, {:.1}): {} {}\n", lower, upper, bar, count));
+            }
+            content.push('\n');
+        }
+        
+        // Write to file
+        std::fs::write(plot_path, content)?;
+        
+        Ok(())
+    }
+    
+    /// Generate a plot showing missing data rates
+    fn generate_missing_data_plot(&self, plots_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        // Create a simple text-based plot for missing data rates
+        let plot_path = plots_dir.join("missing_data_rates.txt");
+        let mut content = String::new();
+        
+        content.push_str("Missing Data Rates (ASCII Visualization)\n");
+        content.push_str("=====================================\n\n");
+        
+        for (var, (case_rate, control_rate)) in &self.results.missing_data_rates {
+            let case_bar_len = (case_rate * 50.0).round() as usize;
+            let control_bar_len = (control_rate * 50.0).round() as usize;
+            
+            let case_bar = "#".repeat(case_bar_len);
+            let control_bar = "#".repeat(control_bar_len);
+            
+            content.push_str(&format!("{}:\n", var));
+            content.push_str(&format!("Cases:    {} {:.1}%\n", case_bar, case_rate * 100.0));
+            content.push_str(&format!("Controls: {} {:.1}%\n\n", control_bar, control_rate * 100.0));
+        }
+        
+        // Write to file
+        std::fs::write(plot_path, content)?;
+        
         Ok(())
     }
 
     fn save_overall_summaries(&self, base_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        let path = base_path.with_file_name("covariate_balance.csv");
+        let path = base_path.join("covariate_balance.csv");
         let mut wtr = csv::Writer::from_path(path)?;
 
         wtr.write_record([
@@ -56,7 +157,7 @@ impl ComprehensiveReport {
     }
 
     fn save_missing_rates(&self, base_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        let path = base_path.with_file_name("missing_data_rates.csv");
+        let path = base_path.join("missing_data_rates.csv");
         let mut wtr = csv::Writer::from_path(path)?;
 
         wtr.write_record(["Variable", "Case Missing Rate", "Control Missing Rate"])?;
@@ -73,7 +174,7 @@ impl ComprehensiveReport {
         &self,
         base_path: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = base_path.with_file_name("matched_pair_balance.csv");
+        let path = base_path.join("matched_pair_details.csv");
         let mut wtr = csv::Writer::from_path(path)?;
 
         wtr.write_record([

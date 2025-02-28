@@ -36,6 +36,19 @@ impl TranslationMaps {
             socio13: load_translation_map("mappings/socio13.json")?,
         })
     }
+    
+    /// Create an empty translation map for diagnostic purposes
+    pub fn new_empty() -> Self {
+        Self {
+            statsb: HashMap::new(),
+            civst: HashMap::new(),
+            family_type: HashMap::new(),
+            fm_mark: HashMap::new(),
+            hustype: HashMap::new(),
+            reg: HashMap::new(),
+            socio13: HashMap::new(),
+        }
+    }
 
     pub fn translate(&self, translation_type: TranslationType, code: &str) -> Option<&str> {
         let map = match translation_type {
@@ -52,7 +65,26 @@ impl TranslationMaps {
 }
 
 fn load_translation_map(path: &str) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
-    let file = File::open(Path::new(path))?;
+    // Log the attempted path
+    log::info!("Loading translation map from path: {}", path);
+    
+    // Make the path more robust - try with current directory if a relative path is provided
+    let file_result = File::open(Path::new(path));
+    
+    if let Err(ref e) = file_result {
+        log::warn!("Failed to open translation map at {}: {}", path, e);
+        
+        // Try with current directory
+        let current_dir = std::env::current_dir()?;
+        let absolute_path = current_dir.join(path);
+        log::info!("Trying absolute path: {}", absolute_path.display());
+        
+        let file = File::open(absolute_path)?;
+        let map: HashMap<String, String> = serde_json::from_reader(file)?;
+        return Ok(map);
+    }
+    
+    let file = file_result?;
     let map: HashMap<String, String> = serde_json::from_reader(file)?;
     Ok(map)
 }

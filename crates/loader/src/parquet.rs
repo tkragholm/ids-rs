@@ -4,6 +4,7 @@ use arrow_schema::Schema;
 
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ProjectionMask;
+use parquet::schema::types::SchemaDescriptor;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
@@ -33,8 +34,62 @@ pub fn read_parquet(
     schema: Option<&Schema>,
     progress: Option<&LoaderProgress>,
 ) -> Result<Vec<RecordBatch>, IdsError> {
-    let file = File::open(path).map_err(IdsError::Io)?;
-    let file_size = file.metadata().map(|m| m.len()).unwrap_or(0);
+    log::info!("Attempting to read parquet file: {}", path.display());
+    
+    // Check if the file exists
+    if !path.exists() {
+        log::error!("File not found: {}", path.display());
+        return Err(IdsError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("File not found: {}", path.display())
+        )));
+    }
+    
+    // Try to get the canonical path to better understand where we're looking
+    let canonical_path = match path.canonicalize() {
+        Ok(p) => {
+            log::debug!("Canonical path resolved: {} -> {}", path.display(), p.display());
+            p
+        },
+        Err(e) => {
+            log::warn!("Unable to resolve canonical path for {}: {}", path.display(), e);
+            path.to_path_buf()
+        }
+    };
+    
+    // Double-check if it's a file
+    if !path.is_file() {
+        log::error!("Path exists but is not a file: {}", path.display());
+        return Err(IdsError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Path is not a file: {}", path.display())
+        )));
+    }
+    
+    // Open the file
+    let file = match File::open(path) {
+        Ok(f) => {
+            log::debug!("Successfully opened file: {}", canonical_path.display());
+            f
+        },
+        Err(e) => {
+            log::error!("Error opening file {}: {}", canonical_path.display(), e);
+            return Err(IdsError::Io(e));
+        }
+    };
+    
+    // Get file size for progress reporting
+    let file_size = match file.metadata() {
+        Ok(meta) => {
+            let size = meta.len();
+            log::debug!("File size: {} bytes", size);
+            size
+        },
+        Err(e) => {
+            log::warn!("Unable to get file size for {}: {}", path.display(), e);
+            0
+        }
+    };
 
     let pb = progress.map(|p| {
         p.create_file_progress(
@@ -45,16 +100,44 @@ pub fn read_parquet(
         )
     });
 
-    let builder = ParquetRecordBatchReaderBuilder::try_new(file)
-        .map_err(|e| IdsError::invalid_format(format!("Invalid Parquet file: {}", e)))?;
+    let builder = match ParquetRecordBatchReaderBuilder::try_new(file) {
+        Ok(b) => b,
+        Err(e) => {
+            log::error!("Failed to create ParquetRecordBatchReaderBuilder for {}: {}", path.display(), e);
+            return Err(IdsError::invalid_format(format!("Invalid Parquet file format at {}: {}", path.display(), e)));
+        }
+    };
 
     // Increase batch size for better performance
     let batch_size = 16384; // Doubled from original 8192
     
     let reader = match schema {
         Some(s) => {
-            let indices: Vec<usize> = (0..s.fields().len()).collect();
-            let mask = ProjectionMask::roots(builder.parquet_schema(), indices);
+            // Safety check to prevent index out of bounds error
+            let schema_len = s.fields().len();
+            // Only include indices that are within the range of the Parquet schema
+            let parquet_schema = builder.parquet_schema();
+            
+            // Get the root field count in a schema-descriptor safe way
+            // Get count of root fields in the schema
+            let root_schema = parquet_schema.root_schema();
+            let parquet_schema_len = root_schema.get_fields().len();
+            
+            // Verify and log schema lengths
+            log::debug!("Arrow schema field count: {}, Parquet schema field count: {}", 
+                      schema_len, parquet_schema_len);
+            
+            // Create a safe projection that only includes fields that exist in both schemas
+            let safe_indices: Vec<usize> = (0..schema_len)
+                .filter(|i| *i < parquet_schema_len)
+                .collect();
+            
+            if safe_indices.len() < schema_len {
+                log::warn!("Schema mismatch: Arrow schema has {} fields but Parquet schema has only {} fields. Using only common fields.",
+                          schema_len, parquet_schema_len);
+            }
+            
+            let mask = ProjectionMask::roots(parquet_schema, safe_indices);
             builder
                 .with_batch_size(batch_size)
                 .with_projection(mask)

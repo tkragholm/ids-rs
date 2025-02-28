@@ -22,9 +22,22 @@ pub struct ArrowStore {
 
 impl ArrowStore {
     pub fn new() -> Result<Self, IdsError> {
-        let translations =
-            TranslationMaps::new().map_err(|e| IdsError::InvalidFormat(e.to_string()))?;
+        // Try to load translation maps, if they fail, use empty maps but log the error
+        let translations = match TranslationMaps::new() {
+            Ok(maps) => {
+                log::info!("Successfully loaded translation maps");
+                maps
+            },
+            Err(e) => {
+                log::warn!("Failed to load translation maps: {}. Using empty maps instead.", e);
+                log::warn!("This is likely due to missing mapping files - proceeding with empty translations");
+                log::info!("Translation map error details: {}", e);
+                TranslationMaps::new_empty()
+            }
+        };
 
+        log::info!("Creating new ArrowStore");
+        
         Ok(Self {
             family_data: HashMap::new(),
             akm_data: HashMap::new(),

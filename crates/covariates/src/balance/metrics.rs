@@ -32,6 +32,67 @@ impl BalanceMetrics {
     where
         F: Fn(&Covariate) -> Option<f64> + Send + Sync,
     {
+        // Print some diagnostic info about the input
+        if !cases.is_empty() {
+            log::debug!(
+                "Sample cases: {} pairs, first case PNR: {}, date: {}", 
+                cases.len(),
+                cases[0].0,
+                cases[0].1
+            );
+        }
+        
+        // Add debug log for cache size in the balance checker
+        log::debug!("Balance checker cache size: {}", checker.cache_size());
+        
+        // Sample the first few cases to diagnose PNR format and matching issues
+        for (i, (case_pnr, case_date)) in cases.iter().enumerate().take(5) {
+            log::debug!("Checking case entry {}: PNR {} at date {}", i, case_pnr, case_date);
+            
+            // Try both original PNR and the C/K format just to be extra sure
+            match checker.get_covariate(case_pnr, covariate_type, *case_date) {
+                Ok(Some(_)) => {
+                    // Found a value - this is good
+                    log::debug!("✓ Successfully found covariate for case PNR: {}", case_pnr);
+                }
+                Ok(None) => {
+                    // No value found - log with PNR format info for diagnosis
+                    if case_pnr.starts_with('C') {
+                        log::debug!("✗ No covariate found for C-format case PNR: {}", case_pnr);
+                    } else {
+                        log::debug!("✗ No covariate found for regular case PNR: {}", case_pnr);
+                    }
+                    
+                    // If this is the first few, dump out diagnostic info about exactly what we're looking for
+                    if i < 2 {
+                        log::debug!("Dumping cache key details for debugging:");
+                        log::debug!("PNR: '{}', Type: {:?}, Date: {}", case_pnr, covariate_type, case_date);
+                        
+                        // Also try searching for it in a different format to diagnose case sensitivity issues
+                        let alternate_pnr = if case_pnr.contains('-') {
+                            case_pnr.replace('-', "")
+                        } else if case_pnr.len() > 6 {
+                            format!("{}-{}", &case_pnr[0..6], &case_pnr[6..])
+                        } else {
+                            case_pnr.clone()
+                        };
+                        
+                        if alternate_pnr != *case_pnr {
+                            log::debug!("Also trying alternate PNR format: '{}'", alternate_pnr);
+                            match checker.get_covariate(&alternate_pnr, covariate_type, *case_date) {
+                                Ok(Some(_)) => log::debug!("✓ Found with alternate format!"),
+                                _ => log::debug!("✗ Still not found with alternate format"),
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Error accessing covariate - this is unexpected
+                    log::warn!("✗ Error accessing covariate for PNR {}: {}", case_pnr, e);
+                }
+            }
+        }
+        
         let (case_values, case_missing) =
             self.processor
                 .collect_numeric_values(cases, covariate_type, checker, &extractor);
@@ -39,6 +100,12 @@ impl BalanceMetrics {
             self.processor
                 .collect_numeric_values(controls, covariate_type, checker, &extractor);
 
+        // Log the actual values found for debugging
+        log::debug!(
+            "Found {} numeric values for cases and {} for controls, missing {} and {} respectively", 
+            case_values.len(), control_values.len(), case_missing, control_missing
+        );
+        
         let missing_rates = (
             case_missing as f64 / cases.len() as f64,
             control_missing as f64 / controls.len() as f64,

@@ -70,8 +70,28 @@ pub enum Commands {
         #[arg(short = 'm', long, help = "CSV file containing the matched case-control pairs from sampling", required = true)]
         matches_file: String,
 
-        /// Directory containing the register data files with covariates
-        #[arg(short = 'c', long, help = "Directory containing parquet files with covariate data for analysis", required = true)]
-        covariate_dir: String,
+        /// Base directory containing the register data files with covariates
+        #[arg(short = 'c', long, help = "Base directory containing register data. Can be omitted if all custom paths are specified. Expected structure is a directory containing 'family.parquet' and/or subdirectories 'akm', 'bef', 'ind', 'uddf'")]
+        covariate_dir: Option<String>,
+        
+        /// Path to the family.parquet file
+        #[arg(long, value_name = "FILE", help = "Path to the family relationships data. Can be either a directory containing 'family.parquet' or a direct path to the parquet file. Either absolute or relative paths are supported.")]
+        family_file: Option<String>,
+        
+        /// Path to the AKM register directory
+        #[arg(long, value_name = "DIR", help = "Path to the directory containing AKM register files (named like '2000.parquet', '2001.parquet', etc.). Either absolute or relative paths are supported.")]
+        akm_dir: Option<String>,
+        
+        /// Path to the BEF register directory
+        #[arg(long, value_name = "DIR", help = "Path to the directory containing BEF register files (named like '200012.parquet', '201903.parquet', etc.). Either absolute or relative paths are supported.")]
+        bef_dir: Option<String>,
+        
+        /// Path to the IND register directory
+        #[arg(long, value_name = "DIR", help = "Path to the directory containing IND register files (named like '2000.parquet', '2001.parquet', etc.). Either absolute or relative paths are supported.")]
+        ind_dir: Option<String>,
+        
+        /// Path to the UDDF register directory
+        #[arg(long, value_name = "DIR", help = "Path to the directory containing UDDF register files (named like '202009.parquet', '202209.parquet', etc.). Either absolute or relative paths are supported.")]
+        uddf_dir: Option<String>,
     },
 }
