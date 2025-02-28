@@ -33,14 +33,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Initialize logging system with progress bars
-    let logger = env_logger::Builder::from_env(env_logger::Env::default()).build();
+    // Create a custom environment with a modified default filter
+    // This allows us to control the logger behavior more precisely
+    let env = env_logger::Env::default()
+        .filter_or("RUST_LOG", "warn");
+    
+    // Build the logger with our custom env settings
+    let logger = env_logger::Builder::from_env(env)
+        .format_timestamp(Some(env_logger::TimestampPrecision::Seconds))
+        .format_module_path(false) // Make logs cleaner
+        .build();
+    
+    // Get the filter level to properly set max log level
     let level = logger.filter();
+    
+    // Create a MultiProgress for use with the LogWrapper
     let multi = MultiProgress::new();
 
-    // Connect logger with progress bars
+    // Connect logger with progress bars to prevent progress bars from being interrupted by logs
     if let Err(e) = LogWrapper::new(multi.clone(), logger).try_init() {
         eprintln!("Warning: Failed to initialize logger: {}", e);
     }
+    
+    // Set the global max log level
     log::set_max_level(level);
 
     // Parse command line arguments

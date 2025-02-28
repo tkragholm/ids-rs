@@ -25,7 +25,7 @@ pub struct BefRecord {
     pub bop_vfra: Option<NaiveDate>,
     pub civst: Option<String>,
     pub familie_id: Option<String>,
-    pub familie_type: Option<String>,
+    pub familie_type: Option<i32>,
     pub far_id: Option<String>,
     pub foed_dag: NaiveDate,
     pub koen: String,

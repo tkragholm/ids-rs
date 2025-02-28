@@ -109,16 +109,31 @@ impl ArrowStore {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
                     let family_size: Option<i32> = self.get_value(batch, "ANTPERSF", idx)?;
                     let municipality: Option<i32> = self.get_value(batch, "KOM", idx)?;
-                    let family_type: Option<i32> = self.get_value(batch, "FAMILIE_TYPE", idx)?;
+                    // Try to get FAMILIE_TYPE as i32 first, then as string if that fails
+                    let family_type_result: Result<Option<i32>, IdsError> = self.get_value(batch, "FAMILIE_TYPE", idx);
+                    let family_type_str: Result<Option<String>, IdsError> = self.get_value(batch, "FAMILIE_TYPE", idx);
+                    
+                    // Get STATSB
                     let statsb: Option<i32> = self.get_value(batch, "STATSB", idx)?;
 
-                    if let (Some(family_size), Some(municipality), Some(family_type)) =
-                        (family_size, municipality, family_type)
-                    {
+                    // Get a valid family_type string one way or another
+                    let family_type_value = if let Ok(Some(ft)) = family_type_result {
+                        // If i32 works, use that
+                        ft.to_string()
+                    } else if let Ok(Some(ft_str)) = family_type_str {
+                        // If string works, use that
+                        ft_str
+                    } else {
+                        // If both fail, we don't have a valid family type
+                        log::debug!("Could not get FAMILIE_TYPE for PNR {}", pnr);
+                        return Ok(None);
+                    };
+
+                    if let (Some(family_size), Some(municipality)) = (family_size, municipality) {
                         let mut covariate = Covariate::demographics(
                             family_size,
                             municipality,
-                            family_type.to_string(),
+                            family_type_value,
                         );
 
                         // Add translated values to metadata

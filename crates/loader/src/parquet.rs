@@ -132,9 +132,28 @@ pub fn read_parquet(
                 .filter(|i| *i < parquet_schema_len)
                 .collect();
             
+            // Create a thread-local counter for schema mismatch warnings
+            thread_local! {
+                static SCHEMA_MISMATCH_WARNING_COUNT: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
+            }
+            
+            // Check for schema mismatch
             if safe_indices.len() < schema_len {
-                log::warn!("Schema mismatch: Arrow schema has {} fields but Parquet schema has only {} fields. Using only common fields.",
-                          schema_len, parquet_schema_len);
+                // Only log the first schema mismatch warning per thread
+                SCHEMA_MISMATCH_WARNING_COUNT.with(|count| {
+                    let mut count = count.borrow_mut();
+                    if *count == 0 {
+                        // First occurrence - log as warning but with minimal details
+                        log::warn!("Schema mismatch detected: Arrow schema has more fields than Parquet schema. Using only common fields.");
+                        // More detailed message at debug level
+                        log::debug!("Schema details: Arrow has {} fields, Parquet has {} fields", 
+                                  schema_len, parquet_schema_len);
+                    } else if *count == 1 {
+                        // Second occurrence - notify at info level that further warnings will be suppressed
+                        log::info!("Additional schema mismatches will not be logged (total: {})", *count + 1);
+                    }
+                    *count += 1;
+                });
             }
             
             let mask = ProjectionMask::roots(parquet_schema, safe_indices);

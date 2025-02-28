@@ -31,7 +31,7 @@ impl super::RegisterGenerator {
             Field::new("BOP_VFRA", DataType::Date32, true),
             Field::new("CIVST", DataType::Utf8, true),
             Field::new("FAMILIE_ID", DataType::Utf8, true),
-            Field::new("FAMILIE_TYPE", DataType::Utf8, true),
+            Field::new("FAMILIE_TYPE", DataType::Int32, true),
             Field::new("FAR_ID", DataType::Utf8, true),
             Field::new("FOED_DAG", DataType::Date32, false),
             Field::new("KOEN", DataType::Utf8, false),
@@ -83,6 +83,9 @@ impl super::RegisterGenerator {
                         0
                     };
 
+                    // Get a random statsb code according to our defined rules
+                    let statsb_code = self.get_random_statsb();
+
                     records.push(BefRecord {
                         pnr,
                         aegte_id: if civil_status == "G" {
@@ -102,13 +105,13 @@ impl super::RegisterGenerator {
                         bop_vfra: Some(birth_date),
                         civst: Some(civil_status.to_string()),
                         familie_id: Some(format!("F{:08}", i / (family_size as usize))),
-                        familie_type: Some(format!("TYPE{}", self.rng.gen_range(1..=5))),
+                        familie_type: Some(self.rng.gen_range(1..=10)),
                         far_id: Some(father_pnr),
                         foed_dag: birth_date,
                         koen: gender.to_string(),
                         kom: Some(kommune),
                         mor_id: Some(mother_pnr),
-                        statsb: Some("DNK".to_string()),
+                        statsb: Some(statsb_code),
                     });
                 }
 
@@ -128,6 +131,41 @@ impl super::RegisterGenerator {
 
         pb.finish_with_message("BEF generation completed");
         Ok(())
+    }
+
+    fn get_random_statsb(&mut self) -> String {
+        // Most people should be Danish (5100)
+        if self.rng.gen_ratio(9, 10) {
+            // 90% chance of being Danish
+            return "5100".to_string(); // Denmark code
+        }
+
+        // For the other 10%, choose one of these common countries
+        // You can adjust this list based on your needs
+        let common_codes = [
+            "5120", // Sweden
+            "5110", // Norway
+            "5170", // Great Britain
+            "5180", // Germany
+            "5130", // France
+            "5150", // Italy
+            "5172", // Turkey
+            "5436", // Iraq
+            "5448", // China
+            "5432", // India
+            "5472", // Pakistan
+        ];
+
+        if self.rng.gen_ratio(8, 10) {
+            // 80% of the remaining 10% (8% total)
+            common_codes[self.rng.gen_range(0..common_codes.len())].to_string()
+        } else {
+            // For the remaining 2%, choose a completely random code
+            // This is a simplified approach - in reality you might want to
+            // filter out certain codes or apply other rules
+            let random_code = self.rng.gen_range(5100..=5999);
+            random_code.to_string()
+        }
     }
 
     fn calculate_bef_periods(&self) -> u64 {
@@ -191,11 +229,8 @@ impl super::RegisterGenerator {
                     .map(|r| r.familie_id.as_deref())
                     .collect::<Vec<_>>(),
             )),
-            Arc::new(StringArray::from(
-                records
-                    .iter()
-                    .map(|r| r.familie_type.as_deref())
-                    .collect::<Vec<_>>(),
+            Arc::new(Int32Array::from(
+                records.iter().map(|r| r.familie_type).collect::<Vec<_>>(),
             )),
             Arc::new(StringArray::from(
                 records
