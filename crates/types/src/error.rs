@@ -105,6 +105,11 @@ impl IdsError {
     pub fn invalid_criteria<T: std::fmt::Display>(msg: T) -> Self {
         IdsError::InvalidCriteria(msg.to_string())
     }
+    
+    /// Create an IO error with a message
+    pub fn io_error<T: std::fmt::Display>(msg: T) -> Self {
+        IdsError::Io(std::io::Error::new(std::io::ErrorKind::Other, msg.to_string()))
+    }
 }
 
 // Type aliases for backwards compatibility

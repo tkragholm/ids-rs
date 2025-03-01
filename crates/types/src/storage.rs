@@ -320,8 +320,8 @@ impl ArrowBackend {
     pub fn new_empty() -> Self {
         // Create a minimal store for diagnostic operations with some synthetic data for debugging
         let mut family_data = HashMap::new();
-        let mut ind_data = HashMap::new();
-        let mut bef_data = HashMap::new();
+        let ind_data = HashMap::new();
+        let bef_data = HashMap::new();
 
         // Add synthetic relationships and data for debugging in diagnostic mode
         for i in 0..100 {
@@ -517,10 +517,10 @@ impl ArrowBackend {
 
                         // Add translated values to metadata - now using string statsb directly
                         if let Some(statsb) = statsb {
-                            if let Some(translated) = self.translations.translate(
-                                crate::translation::TranslationType::Statsb,
-                                &statsb,
-                            ) {
+                            if let Some(translated) = self
+                                .translations
+                                .translate(crate::translation::TranslationType::Statsb, &statsb)
+                            {
                                 covariate.metadata.insert(
                                     "statsb_translated".to_string(),
                                     translated.to_string(),

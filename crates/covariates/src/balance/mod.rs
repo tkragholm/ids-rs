@@ -2,7 +2,7 @@ mod cache;
 mod checker;
 mod metrics;
 mod processor;
-mod results;
+pub mod results;
 mod stats;
 
 pub use checker::BalanceChecker;
