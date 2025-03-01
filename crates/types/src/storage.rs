@@ -503,7 +503,8 @@ impl ArrowBackend {
                     let family_size: Option<i32> = self.get_value(batch, "ANTPERSF", idx)?;
                     let municipality: Option<i32> = self.get_value(batch, "KOM", idx)?;
                     let family_type: Option<i32> = self.get_value(batch, "FAMILIE_TYPE", idx)?;
-                    let statsb: Option<i32> = self.get_value(batch, "STATSB", idx)?;
+                    // Fix: Get STATSB as a string value, not an integer
+                    let statsb: Option<String> = self.get_value(batch, "STATSB", idx)?;
 
                     if let (Some(family_size), Some(municipality), Some(family_type)) =
                         (family_size, municipality, family_type)
@@ -514,11 +515,11 @@ impl ArrowBackend {
                             family_type.to_string(),
                         );
 
-                        // Add translated values to metadata
+                        // Add translated values to metadata - now using string statsb directly
                         if let Some(statsb) = statsb {
                             if let Some(translated) = self.translations.translate(
                                 crate::translation::TranslationType::Statsb,
-                                &statsb.to_string(),
+                                &statsb,
                             ) {
                                 covariate.metadata.insert(
                                     "statsb_translated".to_string(),

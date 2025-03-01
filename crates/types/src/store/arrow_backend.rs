@@ -113,8 +113,8 @@ impl ArrowStore {
                     let family_type_result: Result<Option<i32>, IdsError> = self.get_value(batch, "FAMILIE_TYPE", idx);
                     let family_type_str: Result<Option<String>, IdsError> = self.get_value(batch, "FAMILIE_TYPE", idx);
                     
-                    // Get STATSB
-                    let statsb: Option<i32> = self.get_value(batch, "STATSB", idx)?;
+                    // Get STATSB as string to match parquet schema
+                    let statsb: Option<String> = self.get_value(batch, "STATSB", idx)?;
 
                     // Get a valid family_type string one way or another
                     let family_type_value = if let Ok(Some(ft)) = family_type_result {
@@ -136,11 +136,11 @@ impl ArrowStore {
                             family_type_value,
                         );
 
-                        // Add translated values to metadata
+                        // Add translated values to metadata - use string directly
                         if let Some(statsb) = statsb {
                             if let Some(translated) = self.translations.translate(
                                 crate::translation::TranslationType::Statsb,
-                                &statsb.to_string(),
+                                &statsb,
                             ) {
                                 covariate.metadata.insert(
                                     "statsb_translated".to_string(),
