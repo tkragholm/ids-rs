@@ -20,4 +20,4 @@ colored = "2.0"
 
 [[bin]]
 name = "ids-py"
-path = "../cli/src/main.rs"
+path = "src/bin/main.rs"

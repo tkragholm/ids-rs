@@ -1,4 +1,3 @@
-use cli;
 use chrono::NaiveDate;
 use clap::Parser;
 use core::{
@@ -15,16 +14,18 @@ use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
 use types::models::CovariateType;
 
-mod cli_internal;
-use cli_internal::{Cli, Commands};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+use crate::cli::{Cli, Commands};
     // Check for the most common command line mistake - missing space after --family-file
-    for (_i, arg) in std::env::args().enumerate() {
+    for (i, arg) in std::env::args().enumerate() {
         if arg.starts_with("--family-file") && arg != "--family-file" {
-            eprintln!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
+            eprintln!(
+                "ERROR: Detected possible command line issue. You provided '{}' without a space.",
+                arg
+            );
             eprintln!("       Did you mean to write: --family-file {}", &arg[13..]);
-            eprintln!("       Check other parameters too. Put a space between each flag and its value.");
+            eprintln!(
+                "       Check other parameters too. Put a space between each flag and its value."
+            );
             std::process::exit(1);
         }
     }
@@ -32,18 +33,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging system with progress bars
     // Create a custom environment with a modified default filter
     // This allows us to control the logger behavior more precisely
-    let env = env_logger::Env::default()
-        .filter_or("RUST_LOG", "warn");
-    
+    let env = env_logger::Env::default().filter_or("RUST_LOG", "warn");
+
     // Build the logger with our custom env settings
     let logger = env_logger::Builder::from_env(env)
         .format_timestamp(Some(env_logger::TimestampPrecision::Seconds))
         .format_module_path(false) // Make logs cleaner
         .build();
-    
+
     // Get the filter level to properly set max log level
     let level = logger.filter();
-    
+
     // Create a MultiProgress for use with the LogWrapper
     let multi = MultiProgress::new();
 
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Err(e) = LogWrapper::new(multi.clone(), logger).try_init() {
         eprintln!("Warning: Failed to initialize logger: {}", e);
     }
-    
+
     // Set the global max log level
     log::set_max_level(level);
 
@@ -131,7 +131,7 @@ fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>>
 
     // Create plots directory for visualizations
     fs::create_dir_all(base_path.join("plots"))?;
-    
+
     // Create report directory for HTML reports
     fs::create_dir_all(base_path.join("report"))?;
 
@@ -151,11 +151,11 @@ fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error
     // Use more restrictive logging in the console to reduce terminal noise
     // Only show warnings and errors in the console
     let log_level = log::LevelFilter::Warn;
-    
+
     // This will send logs to both console and file, but we're setting
     // the overall level to Warn to reduce console output
     configure_logging_with_level(Some(&log_path), log_level)?;
-    
+
     Ok(())
 }
 
@@ -457,25 +457,37 @@ fn handle_balance_check(
     let check_path_exists = |path: &str, path_type: &str| {
         let path_obj = Path::new(path);
         let exists = path_obj.exists();
-        let path_type_str = if path_obj.is_dir() { "directory" } else if path_obj.is_file() { "file" } else { "path" };
-        
+        let path_type_str = if path_obj.is_dir() {
+            "directory"
+        } else if path_obj.is_file() {
+            "file"
+        } else {
+            "path"
+        };
+
         if exists {
-            ConsoleOutput::info(&format!("Found {} at {} ({})", path_type, path, path_type_str));
+            ConsoleOutput::info(&format!(
+                "Found {} at {} ({})",
+                path_type, path, path_type_str
+            ));
             log::debug!("Found {} at {} ({})", path_type, path, path_type_str);
         } else {
-            ConsoleOutput::warning(&format!("{} not found at {} - will attempt to find alternative paths", path_type, path));
+            ConsoleOutput::warning(&format!(
+                "{} not found at {} - will attempt to find alternative paths",
+                path_type, path
+            ));
             log::warn!("{} not found at {}", path_type, path);
         }
         exists
     };
-    
+
     // Helper function to normalize paths with extensive debugging
     let normalize_path = |path: &str, register_type: &str| -> String {
         let path_obj = Path::new(path);
-        
+
         // Log the input path
         log::debug!("Normalizing {} path: {}", register_type, path);
-        
+
         if path_obj.is_absolute() {
             // If the path is absolute, use it as-is
             log::debug!("Using absolute path for {}: {}", register_type, path);
@@ -489,7 +501,12 @@ fn handle_balance_check(
                 path.to_string()
             } else {
                 let full_path = Path::new(base_dir).join(path).to_string_lossy().to_string();
-                log::debug!("Combining base_dir and path: {} + {} -> {}", base_dir, path, full_path);
+                log::debug!(
+                    "Combining base_dir and path: {} + {} -> {}",
+                    base_dir,
+                    path,
+                    full_path
+                );
                 check_path_exists(&full_path, &format!("{} (combined)", register_type));
                 full_path
             }
@@ -497,9 +514,14 @@ fn handle_balance_check(
             // If no covariate_dir was provided, assume relative to current directory
             let resolved_path = match path_obj.canonicalize() {
                 Ok(canonical) => {
-                    log::debug!("Canonicalized path for {}: {} -> {}", register_type, path, canonical.display());
+                    log::debug!(
+                        "Canonicalized path for {}: {} -> {}",
+                        register_type,
+                        path,
+                        canonical.display()
+                    );
                     canonical.to_string_lossy().to_string()
-                },
+                }
                 Err(e) => {
                     log::warn!("Failed to canonicalize path {}: {}", path, e);
                     path.to_string()
@@ -556,31 +578,40 @@ fn handle_balance_check(
             Some(dir) => {
                 ConsoleOutput::info(&format!("Using base directory: {}", dir));
                 log::debug!("Using base directory with custom paths: {}", dir);
-                
+
                 // Check if the directory exists
                 if !Path::new(dir).exists() {
-                    ConsoleOutput::warning(&format!("Base directory doesn't exist: {}. Will try to use custom paths directly.", dir));
+                    ConsoleOutput::warning(&format!(
+                        "Base directory doesn't exist: {}. Will try to use custom paths directly.",
+                        dir
+                    ));
                     log::warn!("Base directory doesn't exist: {}", dir);
                 }
-                
+
                 dir.to_string()
-            },
+            }
             None => {
                 // If no base directory is provided, use the current directory
                 let current_dir = std::env::current_dir()
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|_| ".".to_string());
-                
-                ConsoleOutput::info(&format!("No base directory provided, using current directory: {}", current_dir));
+
+                ConsoleOutput::info(&format!(
+                    "No base directory provided, using current directory: {}",
+                    current_dir
+                ));
                 log::debug!("Using current directory as base: {}", current_dir);
                 current_dir
             }
         };
-        
+
         // CRITICAL DEBUG: Check family file first specifically since it's the most important
         if let Some(family_path) = custom_paths.get("family") {
             let path_obj = Path::new(family_path);
-            ConsoleOutput::info(&format!("CRITICAL CHECK: Verifying family file at {}", path_obj.display()));
+            ConsoleOutput::info(&format!(
+                "CRITICAL CHECK: Verifying family file at {}",
+                path_obj.display()
+            ));
             if path_obj.exists() {
                 if path_obj.is_file() {
                     // Try to open the file directly to see if we can access it
@@ -591,16 +622,26 @@ fn handle_balance_check(
                             let mut buffer = [0; 16];
                             match std::io::Read::read(&mut file, &mut buffer) {
                                 Ok(bytes_read) => {
-                                    ConsoleOutput::info(&format!("Successfully read {} bytes from family file", bytes_read));
+                                    ConsoleOutput::info(&format!(
+                                        "Successfully read {} bytes from family file",
+                                        bytes_read
+                                    ));
                                     // Print the first few bytes in hex for debugging
-                                    let hex_bytes: Vec<String> = buffer.iter()
+                                    let hex_bytes: Vec<String> = buffer
+                                        .iter()
                                         .take(bytes_read)
                                         .map(|b| format!("{:02x}", b))
                                         .collect();
-                                    ConsoleOutput::info(&format!("First bytes: {}", hex_bytes.join(" ")));
+                                    ConsoleOutput::info(&format!(
+                                        "First bytes: {}",
+                                        hex_bytes.join(" ")
+                                    ));
                                 }
                                 Err(e) => {
-                                    ConsoleOutput::error(&format!("Failed to read bytes from family file: {}", e));
+                                    ConsoleOutput::error(&format!(
+                                        "Failed to read bytes from family file: {}",
+                                        e
+                                    ));
                                 }
                             }
                         }
@@ -608,15 +649,19 @@ fn handle_balance_check(
                             ConsoleOutput::error(&format!("Failed to open family file: {}", e));
                         }
                     }
-                    
+
                     // See if we can run pqrs on it
                     ConsoleOutput::info("Testing file with pqrs (shell command)");
                     if let Ok(output) = std::process::Command::new("pqrs")
                         .args(&["head", "-n", "1", family_path])
-                        .output() {
+                        .output()
+                    {
                         if output.status.success() {
                             let stdout = String::from_utf8_lossy(&output.stdout);
-                            ConsoleOutput::info(&format!("pqrs output: {}", stdout.trim().lines().next().unwrap_or("empty")));
+                            ConsoleOutput::info(&format!(
+                                "pqrs output: {}",
+                                stdout.trim().lines().next().unwrap_or("empty")
+                            ));
                         } else {
                             let stderr = String::from_utf8_lossy(&output.stderr);
                             ConsoleOutput::error(&format!("pqrs error: {}", stderr.trim()));
@@ -625,19 +670,25 @@ fn handle_balance_check(
                         ConsoleOutput::error("Failed to run pqrs command");
                     }
                 } else {
-                    ConsoleOutput::warning(&format!("Family path exists but is not a file: {}", path_obj.display()));
+                    ConsoleOutput::warning(&format!(
+                        "Family path exists but is not a file: {}",
+                        path_obj.display()
+                    ));
                 }
             } else {
-                ConsoleOutput::warning(&format!("Family file not found at: {}", path_obj.display()));
+                ConsoleOutput::warning(&format!(
+                    "Family file not found at: {}",
+                    path_obj.display()
+                ));
             }
         }
-        
+
         // Log all custom paths for debugging
         ConsoleOutput::info("Using the following custom register paths:");
         for (reg_type, path) in &custom_paths {
             ConsoleOutput::key_value(&format!("  - {}", reg_type), path);
             log::debug!("Custom path for {}: {}", reg_type, path);
-            
+
             // Additional checks to help with debugging
             let path_obj = Path::new(path);
             if path_obj.exists() {
@@ -656,8 +707,12 @@ fn handle_balance_check(
                                 }
                             }
                             log::debug!("Directory {} contains: {}", path, file_list.join(", "));
-                            ConsoleOutput::info(&format!("Directory {} contains: {}", path, file_list.join(", ")));
-                        },
+                            ConsoleOutput::info(&format!(
+                                "Directory {} contains: {}",
+                                path,
+                                file_list.join(", ")
+                            ));
+                        }
                         Err(e) => {
                             log::warn!("Failed to read directory {}: {}", path, e);
                         }
@@ -668,29 +723,37 @@ fn handle_balance_check(
                 log::warn!("Path doesn't exist: {}", path);
             }
         }
-        
+
         // Make a debugging copy of custom_paths for better error reporting
         let debug_custom_paths = custom_paths.clone();
-        
+
         let loader_result = loader.load_with_custom_paths_map(base_dir.clone(), custom_paths);
-        
+
         // Provide additional error context if loading fails
         if let Err(ref e) = loader_result {
             ConsoleOutput::error(&format!("Loading failed with error: {}", e));
             ConsoleOutput::info("Trying to diagnose the issue:");
-            
+
             // Check file access for each register directory
             for (reg_type, path) in &debug_custom_paths {
                 if reg_type == "family" {
                     // Family file should be a file, not a directory
                     let file_path = Path::new(path);
                     if file_path.exists() && file_path.is_file() {
-                        ConsoleOutput::info(&format!("Family file exists at {}", file_path.display()));
-                        
+                        ConsoleOutput::info(&format!(
+                            "Family file exists at {}",
+                            file_path.display()
+                        ));
+
                         // Try to open with standard Rust file API
                         match std::fs::File::open(file_path) {
-                            Ok(_) => ConsoleOutput::info("Family file can be opened with Rust std::fs::File"),
-                            Err(e) => ConsoleOutput::error(&format!("Failed to open family file with std::fs::File: {}", e)),
+                            Ok(_) => ConsoleOutput::info(
+                                "Family file can be opened with Rust std::fs::File",
+                            ),
+                            Err(e) => ConsoleOutput::error(&format!(
+                                "Failed to open family file with std::fs::File: {}",
+                                e
+                            )),
                         }
                     }
                 } else {
@@ -698,24 +761,34 @@ fn handle_balance_check(
                     let dir_path = Path::new(path);
                     if dir_path.exists() && dir_path.is_dir() {
                         ConsoleOutput::info(&format!("Register directory {} exists", reg_type));
-                        
+
                         // Try to list first parquet file in directory
                         if let Ok(entries) = std::fs::read_dir(dir_path) {
                             let parquet_files: Vec<_> = entries
                                 .filter_map(Result::ok)
-                                .filter(|e| e.path().extension().map_or(false, |ext| ext == "parquet"))
+                                .filter(|e| {
+                                    e.path().extension().map_or(false, |ext| ext == "parquet")
+                                })
                                 .take(1)
                                 .collect();
-                                
+
                             if let Some(first_file) = parquet_files.first() {
                                 let sample_path = first_file.path();
-                                ConsoleOutput::info(&format!("Checking sample {} file: {}", 
-                                                          reg_type, sample_path.display()));
-                                                          
+                                ConsoleOutput::info(&format!(
+                                    "Checking sample {} file: {}",
+                                    reg_type,
+                                    sample_path.display()
+                                ));
+
                                 // Try to open file
                                 match std::fs::File::open(&sample_path) {
-                                    Ok(_) => ConsoleOutput::info("Sample file can be opened with Rust std::fs::File"),
-                                    Err(e) => ConsoleOutput::error(&format!("Failed to open sample file with std::fs::File: {}", e)),
+                                    Ok(_) => ConsoleOutput::info(
+                                        "Sample file can be opened with Rust std::fs::File",
+                                    ),
+                                    Err(e) => ConsoleOutput::error(&format!(
+                                        "Failed to open sample file with std::fs::File: {}",
+                                        e
+                                    )),
                                 }
                             }
                         }
@@ -723,7 +796,7 @@ fn handle_balance_check(
                 }
             }
         }
-        
+
         loader_result
     } else if let Some(cov_dir) = covariate_dir {
         // Check if the directory exists and contains register data
@@ -742,20 +815,27 @@ fn handle_balance_check(
                         }
                     }
                     log::debug!("Covariate directory contents: {}", contents.join(", "));
-                    ConsoleOutput::info(&format!("Covariate directory contains: {}", contents.join(", ")));
-                },
+                    ConsoleOutput::info(&format!(
+                        "Covariate directory contains: {}",
+                        contents.join(", ")
+                    ));
+                }
                 Err(e) => {
                     log::error!("Failed to read covariate directory: {}", e);
                 }
             }
         }
-        
+
         ConsoleOutput::info(&format!("Checking register data in: {}", cov_dir));
         loader.load_from_path(cov_dir.to_string())
     } else {
         // Neither custom paths nor covariate_dir provided
-        ConsoleOutput::warning("No covariate directory or custom paths specified, using diagnostic mode");
-        Err(types::error::IdsError::missing_data("No data source specified"))
+        ConsoleOutput::warning(
+            "No covariate directory or custom paths specified, using diagnostic mode",
+        );
+        Err(types::error::IdsError::missing_data(
+            "No data source specified",
+        ))
     };
 
     // Determine if we need to use diagnostic mode and create the appropriate balance checker
@@ -894,26 +974,41 @@ fn handle_balance_check(
             report.save_to_files(Path::new(output_dir))?;
 
             ConsoleOutput::success(&format!("Saved balance results to {}", save_path.display()));
-            
+
             // If structured output is enabled, generate it
             if generate_structured_output {
                 // Load the original matched pair records for structured reports
-                let matched_pair_records = match load_matched_pair_records(Path::new(matches_file)) {
-                    Ok(records) => records,
-                    Err(e) => {
-                        ConsoleOutput::warning(&format!("Could not load matched pair records for structured reports: {}", e));
-                        Vec::new()
-                    }
-                };
-                
+                let matched_pair_records =
+                    match load_matched_pair_records(Path::new(
+                        matches_file,
+                    )) {
+                        Ok(records) => records,
+                        Err(e) => {
+                            ConsoleOutput::warning(&format!(
+                                "Could not load matched pair records for structured reports: {}",
+                                e
+                            ));
+                            Vec::new()
+                        }
+                    };
+
                 // Generate structured reports
-                use cli;
-                match cli::generate_structured_reports(&balance_results_copy, &matched_pair_records, output_dir) {
+                match cli::generate_structured_reports(
+                    &balance_results_copy,
+                    &matched_pair_records,
+                    output_dir,
+                ) {
                     Ok(_) => {
-                        ConsoleOutput::success(&format!("Generated structured reports in {}/report/", output_dir));
-                    },
+                        ConsoleOutput::success(&format!(
+                            "Generated structured reports in {}/report/",
+                            output_dir
+                        ));
+                    }
                     Err(e) => {
-                        ConsoleOutput::warning(&format!("Failed to generate structured reports: {}", e));
+                        ConsoleOutput::warning(&format!(
+                            "Failed to generate structured reports: {}",
+                            e
+                        ));
                     }
                 }
             }
@@ -979,4 +1074,140 @@ fn convert_to_case_control_pairs(
             )
         })
         .partition(|(pnr, _)| case_pnrs.contains(pnr))
+}
+
+#[allow(dead_code)]
+fn process_balance_results(
+    checker: &BalanceChecker,
+    cases: &[(String, NaiveDate)],
+    controls: &[(String, NaiveDate)],
+    output_dir: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use core::utils::console::{format_duration_short, ConsoleOutput};
+
+    ConsoleOutput::key_value("Processing cases", &format!("{}", cases.len()));
+    ConsoleOutput::key_value("Processing controls", &format!("{}", controls.len()));
+
+    // Sample data verification
+    ConsoleOutput::subsection("Data Verification");
+
+    // Sample a few cases to verify data
+    let mut sample_rows = Vec::new();
+    for (i, (pnr, date)) in cases.iter().take(3).enumerate() {
+        match checker.get_covariate(pnr, CovariateType::Demographics, *date) {
+            Ok(Some(covariate)) => {
+                let covariate_str = format!("{:?}", covariate);
+                // Truncate if too long for display
+                let display_str = if covariate_str.len() > 60 {
+                    format!("{}...", &covariate_str[0..57])
+                } else {
+                    covariate_str
+                };
+                sample_rows.push(vec![
+                    format!("Case {}", i + 1),
+                    pnr.clone(),
+                    date.to_string(),
+                    display_str,
+                ]);
+            }
+            Ok(None) => {
+                sample_rows.push(vec![
+                    format!("Case {}", i + 1),
+                    pnr.clone(),
+                    date.to_string(),
+                    "No demographics found".to_string(),
+                ]);
+                warn!("No demographics found for case {} (PNR: {})", i, pnr);
+            }
+            Err(e) => {
+                sample_rows.push(vec![
+                    format!("Case {}", i + 1),
+                    pnr.clone(),
+                    date.to_string(),
+                    format!("Error: {}", e),
+                ]);
+                warn!(
+                    "Failed to get demographics for case {} (PNR: {}): {}",
+                    i, pnr, e
+                );
+            }
+        }
+    }
+
+    if !sample_rows.is_empty() {
+        ConsoleOutput::table(&["ID", "PNR", "Date", "Demographics"], &sample_rows);
+    }
+
+    // Calculate balance
+    ConsoleOutput::subsection("Balance Calculation");
+    let calculation_start = Instant::now();
+    let balance_results = checker.calculate_balance(cases, controls)?;
+    let calculation_time = calculation_start.elapsed();
+
+    ConsoleOutput::key_value("Calculation time", &format_duration_short(calculation_time));
+    ConsoleOutput::key_value(
+        "Balance summaries",
+        &format!("{}", balance_results.summaries.len()),
+    );
+
+    // Display sample results
+    if !balance_results.summaries.is_empty() {
+        use colored::Colorize;
+        ConsoleOutput::subsection("Sample Balance Results");
+
+        let mut balance_rows = Vec::new();
+        for summary in balance_results.summaries.iter().take(5) {
+            let std_diff_str = format!("{:.3}", summary.std_diff);
+            let std_diff_colored = if summary.std_diff.abs() < 0.1 {
+                std_diff_str.green().to_string()
+            } else if summary.std_diff.abs() < 0.2 {
+                std_diff_str.yellow().to_string()
+            } else {
+                std_diff_str.red().to_string()
+            };
+
+            balance_rows.push(vec![
+                summary.variable.clone(),
+                format!("{:.2}", summary.mean_cases),
+                format!("{:.2}", summary.mean_controls),
+                std_diff_colored,
+            ]);
+        }
+
+        ConsoleOutput::table(
+            &["Variable", "Cases Mean", "Controls Mean", "Std Diff"],
+            &balance_rows,
+        );
+    }
+
+    // Save results
+    ConsoleOutput::subsection("Saving Results");
+    let save_start = Instant::now();
+
+    use covariates::reporting::ComprehensiveReport;
+    let report = ComprehensiveReport::new(balance_results);
+    report.save_to_files(Path::new(output_dir))?;
+
+    let save_time = save_start.elapsed();
+    ConsoleOutput::key_value("Save time", &format_duration_short(save_time));
+    ConsoleOutput::success(&format!("Balance results saved to {}", output_dir));
+
+    Ok(())
+}
+
+// Helper function to resolve a path - absolute or relative to base
+#[allow(dead_code)]
+fn resolve_path(base_path: &str, path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    if Path::new(path).is_absolute() {
+        Ok(path.to_string())
+    } else {
+        // Join relative path to base path
+        let full_path = Path::new(base_path).join(path);
+        Ok(full_path.to_string_lossy().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Tests would go here
 }

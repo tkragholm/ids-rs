@@ -1,6 +1,25 @@
 pub mod cli;
 pub use cli::{Cli, Commands};
 
+/// Run the CLI application
+/// 
+/// This function is the main entry point for the CLI application.
+/// It's exposed as a library function so it can be called from other crates.
+/// 
+/// # Returns
+/// * `Result<(), Box<dyn std::error::Error>>` - Success or error
+pub fn run_cli() -> Result<(), Box<dyn std::error::Error>> {
+    use clap::Parser;
+    
+    let args = std::env::args().collect::<Vec<_>>();
+    let cmd = cli::Cli::parse_from(args);
+    
+    // Execute the command (this is a stub implementation)
+    // In reality, this would call the real command implementation
+    println!("Command would execute here!");
+    Ok(())
+}
+
 /// Generate structured reports from balance results and matched pairs data
 /// 
 /// This function demonstrates the use of the structured output manager

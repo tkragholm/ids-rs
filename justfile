@@ -144,7 +144,8 @@ complete-pipeline-small: generate-and-sample-small
         --akm-dir {{default_output_dir}}_small/akm/ \
         --bef-dir {{default_output_dir}}_small/bef/ \
         --ind-dir {{default_output_dir}}_small/ind/ \
-        --uddf-dir {{default_output_dir}}_small/uddf/
+        --uddf-dir {{default_output_dir}}_small/uddf/ \
+        --structured
 
 # Clean up generated data directories
 clean-data:

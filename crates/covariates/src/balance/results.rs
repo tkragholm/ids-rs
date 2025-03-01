@@ -2,12 +2,14 @@ use crate::models::{CovariateSummary, MatchedPairDetail};
 use chrono::NaiveDate;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct BalanceResults {
     pub summaries: Vec<CovariateSummary>,
     pub missing_data_rates: HashMap<String, (f64, f64)>,
     pub matched_pair_details: Vec<MatchedPairDetail>,
 }
 
+#[derive(Clone)]
 pub struct MatchedPairSummary {
     pub case_pnr: String,
     pub control_pnrs: Vec<String>,
