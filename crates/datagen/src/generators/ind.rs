@@ -41,18 +41,18 @@ impl super::RegisterGenerator {
                 })?;
 
                 let base_income = income_dist.sample(&mut self.rng);
-                let wage_income = if self.rng.gen_bool(0.8) {
+                let wage_income = if self.rng.random_bool(0.8) {
                     Some(base_income)
                 } else {
                     None
                 };
 
-                let total_income = wage_income.map(|w| w * (1.0 + self.rng.gen_range(0.0..0.3))); // Add 0-30% other income
+                let total_income = wage_income.map(|w| w * (1.0 + self.rng.random_range(0.0..0.3))); // Add 0-30% other income
 
                 let employment_status = if wage_income.is_some() {
-                    Some(self.rng.gen_range(110..=320)) // Employment status codes
+                    Some(self.rng.random_range(110..=320)) // Employment status codes
                 } else {
-                    Some(self.rng.gen_range(321..=500)) // Unemployment/pension codes
+                    Some(self.rng.random_range(321..=500)) // Unemployment/pension codes
                 };
 
                 records.push(IndRecord {
@@ -60,7 +60,7 @@ impl super::RegisterGenerator {
                     beskst13: employment_status,
                     loenmv_13: wage_income,
                     perindkialt_13: total_income,
-                    pre_socio: Some(self.rng.gen_range(1..=5)),
+                    pre_socio: Some(self.rng.random_range(1..=5)),
                 });
             }
 

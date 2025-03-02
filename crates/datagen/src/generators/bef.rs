@@ -67,18 +67,18 @@ impl super::RegisterGenerator {
                     }
 
                     // Generate all random values upfront
-                    let gender = if self.rng.gen_bool(0.5) { "M" } else { "F" };
-                    let kommune = self.rng.gen_range(101..=851);
-                    let civil_status = match self.rng.gen_range(0..4) {
+                    let gender = if self.rng.random_bool(0.5) { "M" } else { "F" };
+                    let kommune = self.rng.random_range(101..=851);
+                    let civil_status = match self.rng.random_range(0..4) {
                         0 => "U",
                         1 => "G",
                         2 => "F",
                         _ => "E",
                     };
-                    let family_size = self.rng.gen_range(1..=6);
+                    let family_size = self.rng.random_range(1..=6);
                     let age = (current_date - birth_date).num_days() / 365;
                     let children = if age > 18 {
-                        self.rng.gen_range(0..4)
+                        self.rng.random_range(0..4)
                     } else {
                         0
                     };
@@ -105,7 +105,7 @@ impl super::RegisterGenerator {
                         bop_vfra: Some(birth_date),
                         civst: Some(civil_status.to_string()),
                         familie_id: Some(format!("F{:08}", i / (family_size as usize))),
-                        familie_type: Some(self.rng.gen_range(1..=10)),
+                        familie_type: Some(self.rng.random_range(1..=10)),
                         far_id: Some(father_pnr),
                         foed_dag: birth_date,
                         koen: gender.to_string(),
@@ -135,7 +135,7 @@ impl super::RegisterGenerator {
 
     fn get_random_statsb(&mut self) -> String {
         // Most people should be Danish (5100)
-        if self.rng.gen_ratio(9, 10) {
+        if self.rng.random_ratio(9, 10) {
             // 90% chance of being Danish
             return "5100".to_string(); // Denmark code
         }
@@ -156,14 +156,14 @@ impl super::RegisterGenerator {
             "5472", // Pakistan
         ];
 
-        if self.rng.gen_ratio(8, 10) {
+        if self.rng.random_ratio(8, 10) {
             // 80% of the remaining 10% (8% total)
-            common_codes[self.rng.gen_range(0..common_codes.len())].to_string()
+            common_codes[self.rng.random_range(0..common_codes.len())].to_string()
         } else {
             // For the remaining 2%, choose a completely random code
             // This is a simplified approach - in reality you might want to
             // filter out certain codes or apply other rules
-            let random_code = self.rng.gen_range(5100..=5999);
+            let random_code = self.rng.random_range(5100..=5999);
             random_code.to_string()
         }
     }

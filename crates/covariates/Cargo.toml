@@ -17,3 +17,9 @@ dashmap = { workspace = true }
 statrs = { workspace = true }
 indicatif = { workspace = true }
 rand = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam-channel = { workspace = true }
+crossbeam-utils = { workspace = true }
+crossbeam-deque = { workspace = true }
+num_cpus = "1.16.0"
+ahash = "0.8.11"

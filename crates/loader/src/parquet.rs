@@ -1,16 +1,23 @@
 use crate::LoaderProgress;
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
+use indicatif::ProgressBar;
 
+use crossbeam_channel::bounded;
+use crossbeam_deque::{Injector, Steal, Worker};
+use parking_lot::Mutex;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ProjectionMask;
+use rayon::prelude::*;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
+use std::thread;
 use types::arrow_utils::{ArrowAccess, ArrowUtils};
 use types::error::IdsError;
 
 /// Reads a Parquet file and returns its contents as a vector of `RecordBatches`.
+/// Uses a parallel processing pipeline with crossbeam channels and worker threads for better performance.
 ///
 /// # Arguments
 ///
@@ -126,6 +133,7 @@ pub fn read_parquet(
     // Increase batch size for better performance
     let batch_size = 16384; // Doubled from original 8192
 
+    // Create the reader
     let reader = match schema {
         Some(s) => {
             // Safety check to prevent index out of bounds error
@@ -188,14 +196,104 @@ pub fn read_parquet(
         })?,
     };
 
-    let mut batches = Vec::new();
-    let utils = ArrowUtils; // For using the validation functionality
+    // Determine optimal number of worker threads based on available CPUs
+    let num_workers = num_cpus::get().max(2).min(16); // At least 2, at most 16
+    log::debug!("Using {} worker threads for batch processing", num_workers);
 
-    for batch_result in reader {
-        // Get the batch
-        let mut batch = batch_result
-            .map_err(|e| IdsError::invalid_format(format!("Failed to read batch: {}", e)))?;
+    // Set up a parallel processing pipeline for batches
+    // Using a work-stealing queue for dynamic load balancing across workers
+    let (sender, receiver) = bounded::<Result<RecordBatch, String>>(num_workers * 4); 
+    let global_injector = Arc::new(Injector::new());
+    let batches_result = Arc::new(Mutex::new(Vec::new()));
+    let error_result = Arc::new(Mutex::new(None));
+    let pb_shared = pb.clone();
 
+    // Create a pool of worker threads to process batches in parallel
+    let worker_handles: Vec<_> = (0..num_workers)
+        .map(|worker_id| {
+            // Clone necessary resources for each worker
+            let receiver = receiver.clone();
+            let local_worker = Worker::new_fifo();
+            let global_injector = global_injector.clone();
+            let batches_result = batches_result.clone();
+            let error_result = error_result.clone();
+            let pb_clone = pb_shared.clone();
+
+            thread::spawn(move || {
+                log::debug!("Worker thread {} started", worker_id);
+                let utils = ArrowUtils;
+                
+                // Process tasks from the local worker queue, global injector, and other workers
+                'worker_loop: loop {
+                    // Check local queue first
+                    if let Some(batch) = local_worker.pop() {
+                        process_batch(batch, &utils, &pb_clone, &batches_result, &error_result);
+                        continue;
+                    }
+                    
+                    // Check global queue next
+                    match global_injector.steal() {
+                        Steal::Success(batch) => {
+                            process_batch(batch, &utils, &pb_clone, &batches_result, &error_result);
+                            continue;
+                        }
+                        Steal::Empty => {
+                            // If global queue is empty, check if we have new batches from the channel
+                            match receiver.try_recv() {
+                                Ok(batch_result) => match batch_result {
+                                    Ok(batch) => {
+                                        process_batch(batch, &utils, &pb_clone, &batches_result, &error_result);
+                                    }
+                                    Err(error_msg) => {
+                                        let mut error = error_result.lock();
+                                        *error = Some(error_msg);
+                                        break 'worker_loop;
+                                    }
+                                },
+                                Err(crossbeam_channel::TryRecvError::Empty) => {
+                                    // No tasks available right now, wait for a new batch
+                                    match receiver.recv() {
+                                        Ok(batch_result) => match batch_result {
+                                            Ok(batch) => {
+                                                process_batch(batch, &utils, &pb_clone, &batches_result, &error_result);
+                                            }
+                                            Err(error_msg) => {
+                                                let mut error = error_result.lock();
+                                                *error = Some(error_msg);
+                                                break 'worker_loop;
+                                            }
+                                        },
+                                        Err(_) => {
+                                            // Channel is closed, exit
+                                            break 'worker_loop;
+                                        }
+                                    }
+                                }
+                                Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                                    // Channel is closed, exit
+                                    break 'worker_loop;
+                                }
+                            }
+                        }
+                        Steal::Retry => {
+                            // Retry stealing from global queue
+                            continue;
+                        }
+                    }
+                }
+                log::debug!("Worker thread {} finished", worker_id);
+            })
+        })
+        .collect();
+
+    // Helper function to process a single batch
+    fn process_batch(
+        mut batch: RecordBatch,
+        utils: &ArrowUtils,
+        pb: &Option<ProgressBar>,
+        batches_result: &Arc<Mutex<Vec<RecordBatch>>>,
+        error_result: &Arc<Mutex<Option<String>>>,
+    ) {
         // Validate batch
         if let Err(e) = utils.validate_batch(&batch) {
             log::warn!("Parquet batch validation warning: {}", e);
@@ -203,23 +301,77 @@ pub fn read_parquet(
 
         // Optimize memory layout
         #[allow(clippy::unnecessary_mut_passed)]
-        ArrowUtils::align_batch_buffers(&mut batch);
+        let batch = ArrowUtils::align_batch_buffers(&batch);
 
-        if let Some(pb) = &pb {
+        if let Some(pb) = pb {
             pb.inc(batch.get_array_memory_size() as u64);
         }
 
+        // Add to results
+        let mut batches = batches_result.lock();
         batches.push(batch);
     }
+
+    // Create a thread to feed batches from the reader into the worker pool
+    let feeder = thread::spawn(move || {
+        for batch_result in reader {
+            match batch_result {
+                Ok(batch) => {
+                    // Send the batch for processing
+                    if sender.send(Ok(batch)).is_err() {
+                        log::error!("Failed to send batch to worker threads - channel closed");
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to read batch: {}", e);
+                    // Signal error to workers
+                    let _ = sender.send(Err(error_msg.clone()));
+                    break;
+                }
+            }
+        }
+        // Drop the sender to signal to the workers that we're done
+        drop(sender);
+    });
+
+    // Wait for feeder to finish
+    feeder.join().expect("Feeder thread panicked");
+    
+    // Wait for all workers to finish
+    for (i, handle) in worker_handles.into_iter().enumerate() {
+        if let Err(e) = handle.join() {
+            log::error!("Worker thread {} panicked: {:?}", i, e);
+        }
+    }
+
+    // Check for errors
+    {
+        let error_lock = error_result.lock();
+        if let Some(error_msg) = &*error_lock {
+            if let Some(pb) = pb {
+                pb.finish_with_message("Error");
+            }
+            return Err(IdsError::invalid_format(error_msg.clone()));
+        }
+    }
+
+    // Get the results
+    let batches = {
+        let batches_lock = batches_result.lock();
+        batches_lock.clone()
+    };
 
     if let Some(pb) = pb {
         pb.finish_with_message("Complete");
     }
+    
+    log::info!("Successfully read {} batches from {}", batches.len(), path.display());
     Ok(batches)
 }
 
 /// Filter a list of batches by a date range
-///
+/// 
 /// # Arguments
 ///
 /// * `batches` - The list of batches to filter
@@ -230,150 +382,61 @@ pub fn read_parquet(
 /// # Returns
 ///
 /// A Result containing filtered batches or an `IdsError`
-#[allow(dead_code)]
 pub fn filter_batches_by_date_range(
     batches: &[RecordBatch],
     date_column: &str,
     start_date: chrono::NaiveDate,
     end_date: Option<chrono::NaiveDate>,
 ) -> Result<Vec<RecordBatch>, IdsError> {
-    let utils = ArrowUtils; // Just for trait implementation
-
-    let mut filtered_batches = Vec::with_capacity(batches.len());
-
-    for batch in batches {
-        // Validate the batch first
-        if let Err(e) = utils.validate_batch(batch) {
-            log::warn!("Batch validation warning before filtering: {}", e);
-        }
-
-        if let Some(filtered) =
-            utils.filter_batch_by_date_range(batch, date_column, start_date, end_date)?
-        {
-            // Optimize memory layout of the filtered batch
-            let mut filtered_mut = filtered;
-            #[allow(clippy::unnecessary_mut_passed)]
-            ArrowUtils::align_batch_buffers(&mut filtered_mut);
-            filtered_batches.push(filtered_mut);
-        }
-    }
-
-    // If there are multiple small batches, consider combining them for better performance
-    if filtered_batches.len() > 1 {
-        let mut small_batches = Vec::new();
-        let mut large_batches = Vec::new();
-
-        // Separate small and large batches (arbitrary threshold of 1000 rows)
-        for batch in filtered_batches {
-            if batch.num_rows() < 1000 {
-                small_batches.push(batch);
-            } else {
-                large_batches.push(batch);
-            }
-        }
-
-        // Combine small batches if any
-        if !small_batches.is_empty() {
-            if let Some(combined) = combine_batches(&small_batches)? {
-                large_batches.push(combined);
-            }
-        }
-
-        return Ok(large_batches);
-    }
-
-    Ok(filtered_batches)
-}
-
-/// Combine multiple batches into one
-///
-/// # Arguments
-///
-/// * `batches` - The list of batches to combine
-///
-/// # Returns
-///
-/// A Result containing a single combined batch or an `IdsError`
-#[allow(dead_code)]
-pub fn combine_batches(batches: &[RecordBatch]) -> Result<Option<RecordBatch>, IdsError> {
+    // Early return for empty input
     if batches.is_empty() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
 
-    if batches.len() == 1 {
-        return Ok(Some(batches[0].clone()));
-    }
-
-    // Use schema pointer equality for faster checks when possible
-    if batches.len() > 1 {
-        let first_schema = batches[0].schema();
-        let all_same_schema = batches
-            .iter()
-            .skip(1)
-            .all(|b| Arc::ptr_eq(&b.schema(), &first_schema));
-
-        if all_same_schema {
-            // If schemas are identical by pointer, we can use a faster path
-            let combined = ArrowUtils::concat_batches(batches)?;
-
-            // Optimize the combined batch's memory layout
-            let mut combined_mut = combined;
-            #[allow(clippy::unnecessary_mut_passed)]
-            ArrowUtils::align_batch_buffers(&mut combined_mut);
-
-            return Ok(Some(combined_mut));
-        }
-    }
-
-    // Normal path for different schemas
-    let combined = ArrowUtils::concat_batches(batches)?;
-
-    // Optimize the combined batch's memory layout
-    let mut combined_mut = combined;
-    #[allow(clippy::unnecessary_mut_passed)]
-    ArrowUtils::align_batch_buffers(&mut combined_mut);
-
-    Ok(Some(combined_mut))
-}
-
-/// Split a batch into smaller chunks for parallel processing
-///
-/// # Arguments
-///
-/// * `batch` - The batch to split
-/// * `chunk_size` - The approximate size of each chunk
-///
-/// # Returns
-///
-/// A vector of smaller batches
-#[allow(dead_code)]
-pub fn split_batch_for_parallel(batch: &RecordBatch, chunk_size: usize) -> Vec<RecordBatch> {
-    if batch.num_rows() <= chunk_size {
-        return vec![batch.clone()];
-    }
-
-    let num_chunks = batch.num_rows().div_ceil(chunk_size);
-    let mut result = Vec::with_capacity(num_chunks);
-
-    for i in 0..num_chunks {
-        let start = i * chunk_size;
-        let length = std::cmp::min(chunk_size, batch.num_rows() - start);
-
-        let mut columns = Vec::with_capacity(batch.num_columns());
-        for j in 0..batch.num_columns() {
-            columns.push(ArrowUtils::slice_array(
-                batch.column(j).as_ref(),
-                start,
-                length,
-            ));
-        }
-
-        if let Ok(sliced_batch) = RecordBatch::try_new(batch.schema().clone(), columns) {
-            result.push(sliced_batch);
-        } else {
-            log::warn!("Failed to create sliced batch at index {}", i);
-        }
-    }
-
-    result
+    // Use rayon's parallel iterator for better performance and simpler code
+    // Process all batches in parallel with optimal thread utilization
+    let filtered_batches: Result<Vec<_>, IdsError> = batches
+        .par_iter()
+        .map(|batch| {
+            let utils = ArrowUtils;
+            
+            // Validate the batch
+            if let Err(e) = utils.validate_batch(batch) {
+                log::warn!("Batch validation warning before filtering: {}", e);
+            }
+            
+            // Apply the date filter
+            match utils.filter_batch_by_date_range(batch, date_column, start_date, end_date) {
+                Ok(Some(filtered)) => {
+                    // Optimize memory layout
+                    #[allow(clippy::unnecessary_mut_passed)]
+                    let optimized = ArrowUtils::align_batch_buffers(&filtered);
+                    Ok(Some(optimized))
+                }
+                Ok(None) => Ok(None), // No rows matched the filter
+                Err(e) => Err(e),
+            }
+        })
+        .try_fold(
+            || Vec::new(),              // Initialize an empty vector for each thread
+            |mut acc, batch_result| {   // Accumulate results within each thread
+                match batch_result {
+                    Ok(Some(batch)) => {
+                        acc.push(batch);
+                        Ok(acc)
+                    }
+                    Ok(None) => Ok(acc), // Skip empty batches
+                    Err(e) => Err(e),
+                }
+            },
+        )
+        .try_reduce(
+            || Vec::new(),            // Initialize an empty vector for the final reduction
+            |mut a, mut b| {          // Combine results from all threads
+                a.append(&mut b);
+                Ok(a)
+            },
+        );
+    
+    filtered_batches
 }

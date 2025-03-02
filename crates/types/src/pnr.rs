@@ -30,24 +30,24 @@ impl PnrPool {
         // Generate children first
         for i in 0..total_records {
             // Generate child's birth date within study period
-            let days_offset = rng.gen_range(0..=birth_range_days);
+            let days_offset = rng.random_range(0..=birth_range_days);
             let birth_date = earliest_birth + Duration::days(i64::from(days_offset));
 
-            let sequence = rng.gen_range(0..10000);
+            let sequence = rng.random_range(0..10000);
             let pnr = format!("{}-{:04}", birth_date.format("%d%m%y"), sequence);
 
             children.insert(i, (birth_date, pnr.clone()));
             pool.insert(i, (birth_date, pnr));
 
             // Generate parents based on child's birth date
-            let mother_age = rng.gen_range(20..46); // mothers aged 20-45 at birth
-            let father_age = rng.gen_range(20..50); // fathers aged 20-49 at birth
+            let mother_age = rng.random_range(20..46); // mothers aged 20-45 at birth
+            let father_age = rng.random_range(20..50); // fathers aged 20-49 at birth
 
             let mother_birth = birth_date - Duration::days(mother_age * 365);
             let father_birth = birth_date - Duration::days(father_age * 365);
 
-            let mother_sequence = rng.gen_range(0..10000);
-            let father_sequence = rng.gen_range(0..10000);
+            let mother_sequence = rng.random_range(0..10000);
+            let father_sequence = rng.random_range(0..10000);
 
             let mother_pnr = format!("{}-{:04}", mother_birth.format("%d%m%y"), mother_sequence);
             let father_pnr = format!("{}-{:04}", father_birth.format("%d%m%y"), father_sequence);

@@ -42,10 +42,10 @@ impl super::RegisterGenerator {
                 })?;
 
                 // Get all random values at once
-                let socio13 = self.rng.gen_range(1..=5);
-                let has_socio = self.rng.gen_bool(0.9);
-                let cprtjek = self.rng.gen_range(0..10);
-                let cprtype = self.rng.gen_range(0..5);
+                let socio13 = self.rng.random_range(1..=5);
+                let has_socio = self.rng.random_bool(0.9);
+                let cprtjek = self.rng.random_range(0..10);
+                let cprtype = self.rng.random_range(0..5);
 
                 records.push(AkmRecord {
                     pnr,

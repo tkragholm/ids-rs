@@ -1,15 +1,15 @@
 [package]
 name = "utils"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-chrono = "0.4"
-thiserror = "1.0"
-anyhow = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = { version = "0.4", features = ["std"] }
-csv = "1.2"
-colored = "2.0"
-tempfile = "3.8.0"  # For tests
+chrono.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+log = { workspace = true, features = ["std"] }
+csv.workspace = true
+colored.workspace = true
+anyhow.workspace = true
+tempfile.workspace = true

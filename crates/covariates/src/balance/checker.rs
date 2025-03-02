@@ -185,7 +185,7 @@ impl BalanceChecker {
     fn populate_diagnostic_cache_with_pnrs(&self, pnrs: Vec<String>) {
         use chrono::{Datelike, NaiveDate};
         use log::{debug, info};
-        use rand::{thread_rng, Rng};
+        use rand::{Rng, rngs::StdRng, SeedableRng};
         use types::models::{Covariate, CovariateType};
 
         info!(
@@ -203,7 +203,7 @@ impl BalanceChecker {
             NaiveDate::from_ymd_opt(2023, 9, 15).unwrap(), // More recent
         ];
 
-        let mut rng = thread_rng();
+        let mut rng = StdRng::from_os_rng();
 
         // Show the first few PNRs we're using
         if !pnrs.is_empty() {
@@ -276,24 +276,24 @@ impl BalanceChecker {
             for id in &all_ids {
                 // Create demographic covariates - non-zero values
                 let demographic = Covariate::demographics(
-                    2 + rng.gen_range(1..=5),                // Family size 3-7
-                    100 + rng.gen_range(1..=100),            // Municipality
-                    format!("{}", 1 + rng.gen_range(1..=9)), // Family type
+                    2 + rng.random_range(1..=5),                // Family size 3-7
+                    100 + rng.random_range(1..=100),            // Municipality
+                    format!("{}", 1 + rng.random_range(1..=9)), // Family type
                 );
 
                 // Create income covariates - realistic values
                 let income = Covariate::income(
-                    200000.0 + rng.gen_range(0..800000) as f64,
+                    200000.0 + rng.random_range(0..800000) as f64,
                     "DKK".to_string(),
                     "PERINDKIALT_13".to_string(),
                 );
 
                 // Create education covariates with level between 10-30
-                let education_level = rng.gen_range(10..=30);
+                let education_level = rng.random_range(10..=30);
                 let education = Covariate::education(
                     format!("{}", education_level),
-                    Some(format!("Education field {}", rng.gen_range(1..=10))),
-                    Some(3.5 + (rng.gen_range(0..10) as f32 / 2.0)),
+                    Some(format!("Education field {}", rng.random_range(1..=10))),
+                    Some(3.5 + (rng.random_range(0..10) as f32 / 2.0)),
                 );
 
                 // Add to cache for different dates including treatment dates
@@ -527,6 +527,7 @@ impl BalanceChecker {
 
         Ok(())
     }
+    
 
     fn add_demographic_balance(
         &self,
@@ -627,64 +628,145 @@ impl BalanceChecker {
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
     ) -> Result<(), IdsError> {
+        use rayon::prelude::*;
+        use parking_lot::Mutex;
+        use std::sync::Arc;
+        
+        // Group cases by date for better batch processing
+        let mut cases_by_date: HashMap<NaiveDate, Vec<&str>> = HashMap::new();
         for (case_pnr, case_date) in cases {
-            let matching_controls: Vec<_> = controls
-                .iter()
-                .filter(|(_, ctrl_date)| ctrl_date == case_date)
-                .collect();
+            cases_by_date.entry(*case_date).or_default().push(case_pnr);
+        }
+        
+        // Do the same for controls
+        let mut controls_by_date: HashMap<NaiveDate, Vec<&str>> = HashMap::new();
+        for (control_pnr, control_date) in controls {
+            controls_by_date.entry(*control_date).or_default().push(control_pnr);
+        }
+        
+        // Determine optimal chunk size based on number of pairs
+        let total_pairs: usize = cases_by_date.iter()
+            .map(|(date, case_pnrs)| {
+                let control_count = controls_by_date.get(date).map_or(0, |c| c.len());
+                case_pnrs.len() * control_count
+            })
+            .sum();
+            
+        let num_threads = rayon::current_num_threads();
+        let chunk_size = (total_pairs / num_threads).max(100).min(5000);
+        
+        log::debug!(
+            "Processing {} matched pairs for {} cases and {} controls using chunk size {}", 
+            total_pairs, cases.len(), controls.len(), chunk_size
+        );
+        
+        // Use a thread-safe container for collecting results
+        let pair_details = Arc::new(Mutex::new(Vec::with_capacity(total_pairs * 4)));
+        
+        // Define the variables we'll use for prefetching
+        let covariate_types = [
+            CovariateType::Demographics,
+            CovariateType::Income, 
+            CovariateType::Education
+        ];
+        
+        // Process each date group in parallel
+        cases_by_date.par_iter().for_each(|(date, case_pnrs)| {
+            // Get matching controls for this date
+            let control_pnrs = match controls_by_date.get(date) {
+                Some(pnrs) => pnrs,
+                None => return, // No controls for this date
+            };
+            
+            // For large enough groups, prefetch all the data we'll need
+            if case_pnrs.len() * control_pnrs.len() > 100 {
+                // Collect all PNRs for prefetching (both cases and controls)
+                let mut all_pnrs = Vec::with_capacity(case_pnrs.len() + control_pnrs.len());
+                all_pnrs.extend(case_pnrs.iter().map(|p| p.to_string()));
+                all_pnrs.extend(control_pnrs.iter().map(|p| p.to_string()));
+                
+                // Prefetch all data for this date group
+                self.prefetch_data(&all_pnrs, &covariate_types, &[*date]);
+            }
+            
+            // Process each case-control pair
+            for case_pnr in case_pnrs {
+                for control_pnr in control_pnrs {
+                    let mut batch_details = Vec::new();
+                    
+                    // Family Size
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Demographics,
+                        "Family Size",
+                        |cov| cov.get_family_size().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
 
-            for (control_pnr, _) in &matching_controls {
-                // Family Size
-                if let Some(detail) = self.process_matched_pair(
-                    case_pnr,
-                    control_pnr,
-                    *case_date,
-                    CovariateType::Demographics,
-                    "Family Size",
-                    |cov| cov.get_family_size().map(|val| val as f64),
-                )? {
-                    results.add_pair_detail(detail);
-                }
+                    // Municipality
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Demographics,
+                        "Municipality",
+                        |cov| cov.get_municipality().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
 
-                // Municipality
-                if let Some(detail) = self.process_matched_pair(
-                    case_pnr,
-                    control_pnr,
-                    *case_date,
-                    CovariateType::Demographics,
-                    "Municipality",
-                    |cov| cov.get_municipality().map(|val| val as f64),
-                )? {
-                    results.add_pair_detail(detail);
-                }
+                    // Income
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Income,
+                        "Income",
+                        |cov| cov.get_income_amount(),
+                    ) {
+                        batch_details.push(detail);
+                    }
 
-                // Income
-                if let Some(detail) = self.process_matched_pair(
-                    case_pnr,
-                    control_pnr,
-                    *case_date,
-                    CovariateType::Income,
-                    "Income",
-                    |cov| cov.get_income_amount(),
-                )? {
-                    results.add_pair_detail(detail);
-                }
-
-                // Education Level
-                if let Some(detail) = self.process_matched_pair(
-                    case_pnr,
-                    control_pnr,
-                    *case_date,
-                    CovariateType::Education,
-                    "Education Level",
-                    |cov| {
-                        cov.get_education_level()
-                            .and_then(|level| level.parse::<f64>().ok())
-                    },
-                )? {
-                    results.add_pair_detail(detail);
+                    // Education Level
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Education,
+                        "Education Level",
+                        |cov| {
+                            cov.get_education_level()
+                                .and_then(|level| level.parse::<f64>().ok())
+                        },
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // Add all details at once to minimize lock contention
+                    if !batch_details.is_empty() {
+                        let mut details = pair_details.lock();
+                        details.extend(batch_details);
+                    }
                 }
             }
+        });
+        
+        // Add all collected pair details to the results
+        let collected_details = match Arc::try_unwrap(pair_details) {
+            Ok(mutex) => mutex.into_inner(),
+            Err(arc) => {
+                let guard = arc.lock();
+                guard.clone()
+            }
+        };
+            
+        log::debug!("Collected {} matched pair details", collected_details.len());
+        
+        for detail in collected_details {
+            results.add_pair_detail(detail);
         }
 
         Ok(())

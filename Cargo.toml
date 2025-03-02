@@ -41,9 +41,31 @@ clap = { version = "4.5", features = ["derive"] }
 log4rs = { version = "1.2", features = ["console_appender"] }
 dashmap = "6.1.0"
 statrs = "0.18"
-rand = "0.8.5"
+rand = { version = "0.9.0", features = ["os_rng"] }  # Added os_rng feature
+rand_distr = "0.5.0"  # Updated to match core crate version
 smallvec = "1.13.2"
 serde_json = "1.0.139"
+colored = "3.0.0"  # Updated to match core crate version
+anyhow = "1.0"
+tempfile = "3.8.0"
+
+# Add all other dependencies used in at least one crate
+bit-vec = "0.8.0"
+crossbeam = "0.8.4"
+crossbeam-channel = "0.5.12"
+crossbeam-deque = "0.8.5"
+crossbeam-queue = "0.3.11"
+crossbeam-utils = "0.8.19"
+fastrand = "2.3.0"
+hashbrown = "0.15.2"
+humantime = "2.1.0"
+mimalloc = "0.1.43"
+ndarray = { version = "0.16.1", features = ["rayon"] }
+parking_lot = "0.12.3"
+plotters = "0.3.7"
+rustc-hash = "2.1.1"
+
+# Local crates
 utils = { path = "crates/utils" }
 
 [profile.release]

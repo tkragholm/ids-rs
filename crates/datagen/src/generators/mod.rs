@@ -10,7 +10,6 @@ use chrono::NaiveDate;
 use indicatif::MultiProgress;
 
 use rand::rngs::StdRng;
-
 use rand::SeedableRng;
 
 use std::path::Path;
@@ -43,10 +42,10 @@ impl RegisterGenerator {
         // Validate configuration settings
         config.validate().map_err(DataGenError::Config)?;
 
-        // Initialize random number generator with seed or entropy
+        // Initialize random number generator with seed or from OS entropy
         let mut rng = match config.seed {
             Some(seed) => StdRng::seed_from_u64(seed),
-            None => StdRng::from_entropy(),
+            None => StdRng::from_os_rng(),
         };
 
         // Initialize the generator

@@ -5,7 +5,7 @@ use arrow::record_batch::RecordBatch;
 use chrono::Datelike;
 use chrono::NaiveDate;
 use indicatif::ProgressBar;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
@@ -50,15 +50,15 @@ impl super::RegisterGenerator {
                 let age = year - birth_date.year();
 
                 // Only generate education records for people old enough
-                let has_education = age >= 18 && self.rng.gen_bool(0.9); // 90% of adults have education records
+                let has_education = age >= 18 && self.rng.random_bool(0.9); // 90% of adults have education records
 
                 if has_education {
                     let education = education_levels.choose(&mut self.rng).unwrap();
 
                     // Generate completion year between age 18 and current age
                     let min_completion_year = birth_date.year() + 18;
-                    let completion_year = self.rng.gen_range(min_completion_year..=year);
-                    let completion_month = self.rng.gen_range(1..=12);
+                    let completion_year = self.rng.random_range(min_completion_year..=year);
+                    let completion_month = self.rng.random_range(1..=12);
 
                     let completion_date =
                         NaiveDate::from_ymd_opt(completion_year, completion_month, 1).unwrap();
@@ -68,7 +68,7 @@ impl super::RegisterGenerator {
                         hfaudd: Some((*education).to_string()),
                         hf_vfra: Some(completion_date),
                         hf_vtil: Some(completion_date + chrono::Duration::days(30)),
-                        instnr: Some(self.rng.gen_range(100000..=999999)),
+                        instnr: Some(self.rng.random_range(100000..=999999)),
                     });
                 } else {
                     records.push(UddfRecord {

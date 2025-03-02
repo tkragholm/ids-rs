@@ -16,7 +16,7 @@ env_logger.workspace = true
 chrono = { workspace = true }
 indicatif.workspace = true
 indicatif-log-bridge.workspace = true
-colored = "2.0"
+colored.workspace = true
 
 [[bin]]
 name = "ids-py"

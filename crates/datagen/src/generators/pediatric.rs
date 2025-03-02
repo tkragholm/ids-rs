@@ -99,7 +99,7 @@ impl super::RegisterGenerator {
         if treatment_start <= treatment_end {
             let treatment_days = self
                 .rng
-                .gen_range(0..=(treatment_end - treatment_start).num_days());
+                .random_range(0..=(treatment_end - treatment_start).num_days());
             let date = treatment_start + Duration::days(treatment_days);
             date.format("%Y-%m-%d").to_string()
         } else {
