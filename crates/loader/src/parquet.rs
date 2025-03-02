@@ -152,7 +152,7 @@ pub fn read_parquet(
 
             // Create a thread-local counter for schema mismatch warnings
             thread_local! {
-                static SCHEMA_MISMATCH_WARNING_COUNT: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
+                static SCHEMA_MISMATCH_WARNING_COUNT: std::cell::RefCell<usize> = const { std::cell::RefCell::new(0) };
             }
 
             // Check for schema mismatch

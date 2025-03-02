@@ -100,7 +100,7 @@ impl CustomPathReader {
                     register_type,
                     custom_path
                 );
-                return custom_path.clone();
+                custom_path.clone()
             } else if custom_path.contains(&self.base_path) {
                 // Path already contains base_path, use as-is to avoid duplication
                 log::debug!(
@@ -249,7 +249,7 @@ impl DataReader for CustomPathReader {
         // Use external command to validate parquet file
         log::debug!(" Running external validation with pqrs");
         if let Ok(output) = std::process::Command::new("pqrs")
-            .args(&["head", "-n", "1", path.to_str().unwrap_or("")])
+            .args(["head", "-n", "1", path.to_str().unwrap_or("")])
             .output()
         {
             if output.status.success() {
@@ -302,7 +302,7 @@ impl DataReader for CustomPathReader {
                             .filter_map(Result::ok)
                             .filter(|e| {
                                 let path = e.path();
-                                path.extension().map_or(false, |ext| ext == "parquet")
+                                path.extension().is_some_and(|ext| ext == "parquet")
                             })
                             .collect();
 
@@ -362,7 +362,7 @@ impl DataReader for CustomPathReader {
                             .filter_map(Result::ok)
                             .filter(|e| {
                                 let path = e.path();
-                                path.extension().map_or(false, |ext| ext == "parquet")
+                                path.extension().is_some_and(|ext| ext == "parquet")
                             })
                             .collect();
 
@@ -422,7 +422,7 @@ impl DataReader for CustomPathReader {
                             .filter_map(Result::ok)
                             .filter(|e| {
                                 let path = e.path();
-                                path.extension().map_or(false, |ext| ext == "parquet")
+                                path.extension().is_some_and(|ext| ext == "parquet")
                             })
                             .collect();
 
@@ -481,7 +481,7 @@ impl DataReader for CustomPathReader {
                             .filter_map(Result::ok)
                             .filter(|e| {
                                 let path = e.path();
-                                path.extension().map_or(false, |ext| ext == "parquet")
+                                path.extension().is_some_and(|ext| ext == "parquet")
                             })
                             .collect();
 

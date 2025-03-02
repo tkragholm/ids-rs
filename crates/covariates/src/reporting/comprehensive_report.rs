@@ -73,7 +73,7 @@ impl ComprehensiveReport {
             let mut histogram = [0; 11]; // -0.5 to 0.5 in 0.1 increments
             
             for &diff in &std_diffs {
-                if diff >= -0.5 && diff <= 0.5 {
+                if (-0.5..=0.5).contains(&diff) {
                     let bin = ((diff + 0.5) / 0.1).floor() as usize;
                     let bin = bin.min(10); // Ensure we don't go out of bounds
                     histogram[bin] += 1;

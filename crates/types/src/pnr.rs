@@ -52,11 +52,11 @@ impl PnrPool {
             let mother_pnr = format!("{}-{:04}", mother_birth.format("%d%m%y"), mother_sequence);
             let father_pnr = format!("{}-{:04}", father_birth.format("%d%m%y"), father_sequence);
 
-            parents.insert(i + 1000000, (father_birth, father_pnr.clone())); // Father
-            parents.insert(i + 2000000, (mother_birth, mother_pnr.clone())); // Mother
+            parents.insert(i + 1_000_000, (father_birth, father_pnr.clone())); // Father
+            parents.insert(i + 2_000_000, (mother_birth, mother_pnr.clone())); // Mother
 
-            pool.insert(i + 1000000, (father_birth, father_pnr));
-            pool.insert(i + 2000000, (mother_birth, mother_pnr));
+            pool.insert(i + 1_000_000, (father_birth, father_pnr));
+            pool.insert(i + 2_000_000, (mother_birth, mother_pnr));
         }
 
         Self {
@@ -80,8 +80,8 @@ impl PnrPool {
 
     #[must_use]
     pub fn get_parents(&self, index: &usize) -> Option<ParentPair> {
-        let father = self.parents.get(&(index + 1000000))?;
-        let mother = self.parents.get(&(index + 2000000))?;
+        let father = self.parents.get(&(index + 1_000_000))?;
+        let mother = self.parents.get(&(index + 2_000_000))?;
         Some(((father.0, father.1.clone()), (mother.0, mother.1.clone())))
     }
 

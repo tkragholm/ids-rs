@@ -25,6 +25,7 @@ impl CacheKey {
     
     // Fast equality check for common case of matching PNRs
     #[inline]
+    #[allow(dead_code)]
     pub fn matches(&self, pnr: &str, covariate_type: CovariateType, date: NaiveDate) -> bool {
         self.pnr == pnr && self.covariate_type == covariate_type && self.date == date
     }
@@ -41,6 +42,7 @@ impl CovariateCache {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get(&self, key: &CacheKey) -> Option<Option<Covariate>> {
         self.cache.get(key).map(|v| v.clone())
     }
@@ -123,7 +125,7 @@ impl CovariateCache {
             
             // Then load and cache missing values
             for (key, pnr, cov_type, date) in missing_keys {
-                if let Ok(value) = store.get_covariate(&pnr, *cov_type, *date) {
+                if let Ok(value) = store.get_covariate(pnr, *cov_type, *date) {
                     self.cache.insert(key.clone(), value);
                     loaded += 1;
                 }

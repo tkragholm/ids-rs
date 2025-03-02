@@ -395,7 +395,9 @@ impl BalanceChecker {
         );
 
         let start = std::time::Instant::now();
-        let result = match self
+        
+
+        match self
             .cache
             .bulk_load(&*self.store, pnrs, covariate_types, dates)
         {
@@ -413,9 +415,7 @@ impl BalanceChecker {
                 log::warn!("Error during data prefetching: {}", e);
                 0
             }
-        };
-
-        result
+        }
     }
 
     pub fn calculate_balance(

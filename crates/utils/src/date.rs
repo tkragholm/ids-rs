@@ -2,6 +2,7 @@ use chrono::{Datelike, NaiveDate};
 use crate::error::UtilsError;
 
 /// Get the quarter (1-4) from a date
+#[must_use]
 pub fn quarter_from_date(date: NaiveDate) -> u32 {
     ((date.month() - 1) / 3) + 1
 }
@@ -50,7 +51,7 @@ impl DateUtils for DateUtilsImpl {
             }
         }
         
-        Err(UtilsError::DateParse(format!("Could not parse date: {}", date_str)))
+        Err(UtilsError::DateParse(format!("Could not parse date: {date_str}")))
     }
     
     fn to_period_string(date: NaiveDate) -> String {
@@ -105,7 +106,7 @@ impl DateUtils for DateUtilsImpl {
 }
 
 /// Check if a year is a leap year
-fn is_leap_year(year: i32) -> bool {
+const fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 

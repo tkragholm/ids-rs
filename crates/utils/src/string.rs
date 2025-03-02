@@ -32,10 +32,10 @@ impl StringUtils for StringUtilsImpl {
                     word.to_string()
                 } else {
                     let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
+                    chars.next().map_or_else(
+                        String::new,
+                        |first| first.to_uppercase().collect::<String>() + chars.as_str()
+                    )
                 }
             })
             .collect::<Vec<String>>()
@@ -88,12 +88,12 @@ impl StringUtils for StringUtilsImpl {
     
     fn parse_i32(s: &str, error_msg: &str) -> Result<i32, UtilsError> {
         s.trim().parse::<i32>()
-            .map_err(|_| UtilsError::Validation(format!("{}: '{}'", error_msg, s)))
+            .map_err(|_| UtilsError::Validation(format!("{error_msg}: '{s}'")))
     }
     
     fn parse_f64(s: &str, error_msg: &str) -> Result<f64, UtilsError> {
         s.trim().parse::<f64>()
-            .map_err(|_| UtilsError::Validation(format!("{}: '{}'", error_msg, s)))
+            .map_err(|_| UtilsError::Validation(format!("{error_msg}: '{s}'")))
     }
     
     fn truncate(s: &str, max_length: usize) -> String {

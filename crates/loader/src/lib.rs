@@ -118,8 +118,8 @@ impl ParquetLoader {
     ///
     /// * `base_path` - Base directory for relative paths
     /// * `custom_paths` - Map of register type to custom path (family, akm, bef, ind, uddf)
-    ///                  Custom paths can be absolute or relative. If relative and containing 
-    ///                  the base_path prefix, the path is used as-is. Otherwise, base_path is prepended.
+    ///   Custom paths can be absolute or relative. If relative and containing 
+    ///   the base_path prefix, the path is used as-is. Otherwise, base_path is prepended.
     pub fn load_with_custom_paths_map(
         &self,
         base_path: String,
@@ -156,7 +156,7 @@ impl ParquetLoader {
             }
             
             // Special handling for register directories that might be individual files
-            if key == "family" && path_obj.extension().map_or(false, |ext| ext == "parquet") {
+            if key == "family" && path_obj.extension().is_some_and(|ext| ext == "parquet") {
                 // If a specific parquet file is specified, use it directly
                 let full_path = if path_obj.is_absolute() {
                     path
@@ -545,7 +545,7 @@ impl StoreLoader for ParquetLoader {
                         Ok(entries) => {
                             let parquet_files: Vec<_> = entries
                                 .filter_map(Result::ok)
-                                .filter(|e| e.path().extension().map_or(false, |ext| ext == "parquet"))
+                                .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
                                 .collect();
                                 
                             if !parquet_files.is_empty() {
@@ -566,7 +566,7 @@ impl StoreLoader for ParquetLoader {
                         Ok(entries) => {
                             let parquet_files: Vec<_> = entries
                                 .filter_map(Result::ok)
-                                .filter(|e| e.path().extension().map_or(false, |ext| ext == "parquet"))
+                                .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
                                 .collect();
                                 
                             if !parquet_files.is_empty() {
@@ -639,10 +639,8 @@ impl StoreLoader for ParquetLoader {
                                 
                                 match std::fs::read_dir(&mappings_dir) {
                                     Ok(entries) => {
-                                        for entry in entries {
-                                            if let Ok(entry) = entry {
-                                                log::debug!("Found mapping file: {}", entry.path().display());
-                                            }
+                                        for entry in entries.flatten() {
+                                            log::debug!("Found mapping file: {}", entry.path().display());
                                         }
                                     },
                                     Err(e) => {
@@ -731,27 +729,25 @@ impl StoreLoader for ParquetLoader {
                     // Try to find any parquet files in the family path to help diagnose
                     if let Some(family_path) = config.custom_paths.get("family") {
                         let path_obj = Path::new(family_path);
-                        if path_obj.exists() {
-                            if path_obj.is_dir() {
-                                match std::fs::read_dir(path_obj) {
-                                    Ok(entries) => {
-                                        let files: Vec<_> = entries
-                                            .filter_map(Result::ok)
-                                            .filter(|e| e.path().extension().map_or(false, |ext| ext == "parquet"))
-                                            .collect();
-                                        
-                                        if files.is_empty() {
-                                            log::error!("No parquet files found in family directory: {}", family_path);
-                                        } else {
-                                            log::info!("Found these parquet files in family directory that could be used:");
-                                            for file in files {
-                                                log::info!("  - {}", file.path().display());
-                                            }
+                        if path_obj.exists() && path_obj.is_dir() {
+                            match std::fs::read_dir(path_obj) {
+                                Ok(entries) => {
+                                    let files: Vec<_> = entries
+                                        .filter_map(Result::ok)
+                                        .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
+                                        .collect();
+                                    
+                                    if files.is_empty() {
+                                        log::error!("No parquet files found in family directory: {}", family_path);
+                                    } else {
+                                        log::info!("Found these parquet files in family directory that could be used:");
+                                        for file in files {
+                                            log::info!("  - {}", file.path().display());
                                         }
                                     }
-                                    Err(e) => {
-                                        log::error!("Failed to read family directory: {}", e);
-                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to read family directory: {}", e);
                                 }
                             }
                         }
@@ -814,7 +810,7 @@ impl StoreLoader for ParquetLoader {
                                         Ok(entries) => {
                                             let files: Vec<_> = entries
                                                 .filter_map(Result::ok)
-                                                .filter(|e| e.path().extension().map_or(false, |ext| ext == "parquet"))
+                                                .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
                                                 .take(3)
                                                 .collect();
                                                 

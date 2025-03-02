@@ -1,4 +1,3 @@
-use cli;
 use chrono::NaiveDate;
 use clap::Parser;
 use core::{
@@ -19,7 +18,7 @@ use cli_internal::{Cli, Commands};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check for the most common command line mistake - missing space after --family-file
-    for (_i, arg) in std::env::args().enumerate() {
+    for arg in std::env::args() {
         if arg.starts_with("--family-file") && arg != "--family-file" {
             eprintln!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
             eprintln!("       Did you mean to write: --family-file {}", &arg[13..]);
@@ -107,17 +106,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ind_dir,
             uddf_dir,
             structured,
-        } => handle_balance_check(
+        } => handle_balance_check(BalanceCheckConfig {
             matches_file,
-            covariate_dir.as_deref(),
-            &cli.output_dir,
-            family_file.as_deref(),
-            akm_dir.as_deref(),
-            bef_dir.as_deref(),
-            ind_dir.as_deref(),
-            uddf_dir.as_deref(),
-            *structured,
-        ),
+            covariate_dir: covariate_dir.as_deref(),
+            output_dir: &cli.output_dir,
+            family_file: family_file.as_deref(),
+            akm_dir: akm_dir.as_deref(),
+            bef_dir: bef_dir.as_deref(),
+            ind_dir: ind_dir.as_deref(),
+            uddf_dir: uddf_dir.as_deref(),
+            generate_structured_output: *structured,
+        }),
     }
 }
 
@@ -390,20 +389,34 @@ fn process_sampling_results(
     Ok(())
 }
 
-fn handle_balance_check(
-    matches_file: &str,
-    covariate_dir: Option<&str>,
-    output_dir: &str,
-    family_file: Option<&str>,
-    akm_dir: Option<&str>,
-    bef_dir: Option<&str>,
-    ind_dir: Option<&str>,
-    uddf_dir: Option<&str>,
+/// Configuration for balance check operation
+struct BalanceCheckConfig<'a> {
+    matches_file: &'a str,
+    covariate_dir: Option<&'a str>,
+    output_dir: &'a str,
+    family_file: Option<&'a str>,
+    akm_dir: Option<&'a str>,
+    bef_dir: Option<&'a str>,
+    ind_dir: Option<&'a str>,
+    uddf_dir: Option<&'a str>,
     generate_structured_output: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+}
+
+fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::error::Error>> {
     use core::utils::console::{format_duration_short, ConsoleOutput};
     use covariates::balance::BalanceChecker;
     use loader::ParquetLoader;
+    
+    // Extract config fields for easier access
+    let matches_file = config.matches_file;
+    let covariate_dir = config.covariate_dir;
+    let output_dir = config.output_dir;
+    let family_file = config.family_file;
+    let akm_dir = config.akm_dir;
+    let bef_dir = config.bef_dir;
+    let ind_dir = config.ind_dir;
+    let uddf_dir = config.uddf_dir;
+    let generate_structured_output = config.generate_structured_output;
 
     ConsoleOutput::section("Covariate Balance Analysis");
 
@@ -611,7 +624,7 @@ fn handle_balance_check(
                     // See if we can run pqrs on it
                     ConsoleOutput::info("Testing file with pqrs (shell command)");
                     if let Ok(output) = std::process::Command::new("pqrs")
-                        .args(&["head", "-n", "1", family_path])
+                        .args(["head", "-n", "1", family_path])
                         .output() {
                         if output.status.success() {
                             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -702,7 +715,7 @@ fn handle_balance_check(
                         if let Ok(entries) = std::fs::read_dir(dir_path) {
                             let parquet_files: Vec<_> = entries
                                 .filter_map(Result::ok)
-                                .filter(|e| e.path().extension().map_or(false, |ext| ext == "parquet"))
+                                .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
                                 .take(1)
                                 .collect();
                                 
@@ -735,10 +748,8 @@ fn handle_balance_check(
             match std::fs::read_dir(cov_dir_path) {
                 Ok(entries) => {
                     let mut contents = Vec::new();
-                    for entry in entries.take(10) {
-                        if let Ok(entry) = entry {
-                            contents.push(entry.file_name().to_string_lossy().to_string());
-                        }
+                    for entry in entries.take(10).flatten() {
+                        contents.push(entry.file_name().to_string_lossy().to_string());
                     }
                     log::debug!("Covariate directory contents: {}", contents.join(", "));
                     ConsoleOutput::info(&format!("Covariate directory contains: {}", contents.join(", ")));

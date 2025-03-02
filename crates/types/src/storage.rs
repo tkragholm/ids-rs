@@ -331,19 +331,19 @@ impl ArrowBackend {
 
             // Get a birth date based on the index
             let birth_date = chrono::NaiveDate::from_ymd_opt(
-                1990 + (i % 30) as i32,
+                1990 + (i % 30),
                 1 + (i % 12) as u32,
                 1 + (i % 28) as u32,
             )
             .unwrap();
             let father_birth_date = chrono::NaiveDate::from_ymd_opt(
-                1950 + (i % 30) as i32,
+                1950 + (i % 30),
                 1 + (i % 12) as u32,
                 1 + (i % 28) as u32,
             )
             .unwrap();
             let mother_birth_date = chrono::NaiveDate::from_ymd_opt(
-                1955 + (i % 30) as i32,
+                1955 + (i % 30),
                 1 + (i % 12) as u32,
                 1 + (i % 28) as u32,
             )

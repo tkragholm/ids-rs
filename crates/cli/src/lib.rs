@@ -12,7 +12,7 @@ pub fn run_cli() -> Result<(), Box<dyn std::error::Error>> {
     use clap::Parser;
     
     let args = std::env::args().collect::<Vec<_>>();
-    let cmd = cli::Cli::parse_from(args);
+    let _cmd = cli::Cli::parse_from(args);
     
     // Execute the command (this is a stub implementation)
     // In reality, this would call the real command implementation
@@ -47,7 +47,7 @@ pub fn generate_structured_reports(
     
     let output_manager = StructuredOutputManager::new(output_dir)?
         .with_runtime_info("command", "generate-structured-reports")
-        .with_runtime_info("timestamp", &chrono::Local::now().to_string());
+        .with_runtime_info("timestamp", chrono::Local::now().to_string());
     
     // Output balance results
     output_manager.output_balance_results(balance_results, None)?;
