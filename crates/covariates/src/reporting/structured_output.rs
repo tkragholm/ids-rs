@@ -1,7 +1,7 @@
 use crate::balance::results::BalanceResults;
 use crate::matched_pairs::record::{CaseWithControls, MatchedPairRecord};
 use chrono::Local;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use types::error::IdsError;
@@ -453,8 +453,48 @@ impl StructuredOutputManager {
         let prefix = filename_prefix.unwrap_or("balance");
         let report_path = report_dir.join(format!("{}_report.html", prefix));
         
-        // Create HTML template with basic structure
-        let mut variable_rows = String::new();
+        // Group variables by category
+        let mut demographic_rows = String::new();
+        let mut income_rows = String::new();
+        let mut education_rows = String::new(); 
+        let mut occupation_rows = String::new();
+        let mut other_rows = String::new();
+        
+        // Variable tooltips for better explanation
+        let variable_tooltips: HashMap<&str, &str> = [
+            // Demographics
+            ("Family Size", "Number of people in the family unit (ANTPERSF/ANTPERSH)"),
+            ("Municipality", "Municipality code (KOM)"),
+            ("Family Type", "Type of family unit (FAMILIE_TYPE)"),
+            ("Civil Status", "Civil/marital status (CIVST)"),
+            ("Gender", "Gender of the individual (KOEN)"),
+            ("Citizenship", "Citizenship/nationality (STATSB)"),
+            ("Age", "Age of the individual (ALDER)"),
+            ("Children Count", "Number of children in the family (ANTBOERNF/ANTBOERNH)"),
+            
+            // Income
+            ("Income", "Total personal income (PERINDKIALT_13)"),
+            ("Wage Income", "Income from wages (LOENMV_13)"),
+            ("Employment Status", "Employment status code (BESKST13)"),
+            ("Employment Status Category", "Employment status category (BESKST13)"),
+            
+            // Education
+            ("Education Level", "Highest education level attained"),
+            ("ISCED Level", "International Standard Classification of Education level"),
+            ("Education Years", "Years of education completed"),
+            
+            // Occupation
+            ("SOCIO13 Code", "Socioeconomic classification code (SOCIO13)"),
+            ("SOCIO13 Value", "Socioeconomic classification numeric value (SOCIO13)"),
+            ("Classification System", "Classification system used for occupational coding"),
+            ("SOCIO", "Previous socioeconomic classification code"),
+            ("SOCIO Category", "Previous socioeconomic classification category"),
+            ("SOCIO02", "Alternative socioeconomic classification from 2002"),
+            ("SOCIO02 Category", "Alternative socioeconomic classification category from 2002"),
+            ("Previous Socioeconomic Status", "Previous socioeconomic status (PRE_SOCIO)"),
+            ("Previous Socioeconomic Category", "Previous socioeconomic status category (PRE_SOCIO)"),
+        ].iter().cloned().collect();
+        
         for summary in &results.summaries {
             // Determine if there's an imbalance (std_diff > 0.1)
             let row_class = if summary.std_diff.abs() > 0.1 {
@@ -463,21 +503,77 @@ impl StructuredOutputManager {
                 ""
             };
             
-            variable_rows.push_str(&format!(
+            // Get tooltip for this variable
+            let tooltip = variable_tooltips.get(summary.variable.as_str())
+                .map_or("", |&s| s);
+            
+            let row_html = format!(
                 r#"<tr class="{}">
-                    <td>{}</td>
+                    <td title="{}">{}</td>
                     <td>{:.4}</td>
                     <td>{:.4}</td>
                     <td>{:.4}</td>
                     <td>{:.4}</td>
                 </tr>"#,
                 row_class,
+                tooltip,
                 summary.variable,
                 summary.mean_cases,
                 summary.mean_controls,
                 summary.std_diff,
                 summary.variance_ratio
-            ));
+            );
+            
+            // Categorize the row based on variable name
+            if summary.variable.contains("Family") || 
+               summary.variable.contains("Municipality") ||
+               summary.variable.contains("Civil Status") ||
+               summary.variable.contains("Gender") ||
+               summary.variable.contains("Citizenship") ||
+               summary.variable.contains("Age") ||
+               summary.variable.contains("Children") {
+                demographic_rows.push_str(&row_html);
+            } else if summary.variable.contains("Income") ||
+                     summary.variable.contains("Employment") {
+                income_rows.push_str(&row_html);
+            } else if summary.variable.contains("Education") ||
+                     summary.variable.contains("ISCED") {
+                education_rows.push_str(&row_html);
+            } else if summary.variable.contains("SOCIO") ||
+                     summary.variable.contains("Classification") ||
+                     summary.variable.contains("Socioeconomic") {
+                occupation_rows.push_str(&row_html);
+            } else {
+                other_rows.push_str(&row_html);
+            }
+        }
+        
+        // Combine all rows with section headers
+        let mut variable_rows = String::new();
+        
+        if !demographic_rows.is_empty() {
+            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Demographics Variables</th></tr>");
+            variable_rows.push_str(&demographic_rows);
+        }
+        
+        if !income_rows.is_empty() {
+            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Income Variables</th></tr>");
+            variable_rows.push_str(&income_rows);
+        }
+        
+        if !education_rows.is_empty() {
+            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Education Variables</th></tr>");
+            variable_rows.push_str(&education_rows);
+        }
+        
+        if !occupation_rows.is_empty() {
+            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Occupation Variables</th></tr>");
+            variable_rows.push_str(&occupation_rows);
+        }
+        
+        if !other_rows.is_empty() {
+            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Other Variables</th></tr>");
+            variable_rows.push_str(&other_rows);
         }
         
         // Calculate missing data for report
@@ -607,6 +703,15 @@ impl StructuredOutputManager {
             <div class="summary-box">
                 <p><strong>Analysis Overview:</strong> This report shows the balance of covariates between case and control groups.</p>
                 <p><strong>Imbalance Threshold:</strong> Variables with standardized difference > 0.1 are highlighted as potentially imbalanced.</p>
+                <p><strong>Register Variables:</strong> The report includes variables from BEF (demographics), IND (income), and AKM (occupation) registers.</p>
+            </div>
+            
+            <div style="background-color: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px;">
+                <h3 style="margin-top: 0;">Register Variables Legend</h3>
+                <p><strong>Demographics (BEF):</strong> Family Size (ANTPERSF/ANTPERSH), Municipality (KOM), Family Type (FAMILIE_TYPE), Civil Status (CIVST), Gender (KOEN), Citizenship (STATSB), Age (ALDER), Children Count (ANTBOERNF/ANTBOERNH)</p>
+                <p><strong>Income (IND):</strong> Total Income (PERINDKIALT_13), Wage Income (LOENMV_13), Employment Status (BESKST13)</p>
+                <p><strong>Occupation (AKM):</strong> SOCIO13, SOCIO, SOCIO02, PRE_SOCIO</p>
+                <p><em>Hover over variable names in the table below to see details about the register variables they represent.</em></p>
             </div>
             
             <table>

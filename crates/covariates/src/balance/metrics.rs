@@ -3,7 +3,7 @@ use super::processor::ValueProcessor;
 use super::stats::StatisticalCalculations;
 use crate::models::CovariateSummary;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use types::{
     error::IdsError,
     models::{Covariate, CovariateType},

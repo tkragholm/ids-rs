@@ -20,3 +20,4 @@ crossbeam-channel.workspace = true
 crossbeam-deque.workspace = true
 parking_lot.workspace = true
 num_cpus = "1.16.0"
+hashbrown.workspace = true

@@ -72,7 +72,7 @@ impl FileReader {
 /// This reader allows overriding default file locations
 pub struct CustomPathReader {
     base_path: String,
-    custom_paths: std::collections::HashMap<String, String>,
+    custom_paths: hashbrown::HashMap<String, String>,
 }
 
 impl CustomPathReader {
@@ -82,7 +82,7 @@ impl CustomPathReader {
     /// * `base_path` - Default base directory path
     /// * `custom_paths` - Map of register types to custom paths
     #[must_use]
-    pub fn new(base_path: String, custom_paths: std::collections::HashMap<String, String>) -> Self {
+    pub fn new(base_path: String, custom_paths: hashbrown::HashMap<String, String>) -> Self {
         Self {
             base_path,
             custom_paths,

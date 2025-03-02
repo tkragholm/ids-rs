@@ -18,6 +18,9 @@ pub enum IdsError {
     
     #[error("Parquet error: {0}")]
     Parquet(#[from] parquet::errors::ParquetError),
+    
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 
     // Data validation errors
     #[error("Invalid date: {0}")]
@@ -53,6 +56,12 @@ pub enum IdsError {
     
     #[error("Configuration error: {0}")]
     Config(String),
+    
+    #[error("Validation error: {0}")]
+    Validation(String),
+    
+    #[error("Logging error: {0}")]
+    Logging(String),
 }
 
 impl IdsError {
@@ -116,3 +125,72 @@ impl IdsError {
 pub type SamplingError = IdsError;
 pub type PlottingError = IdsError;
 pub type DataGenError = IdsError;
+pub type Result<T> = std::result::Result<T, IdsError>;
+
+/// Context trait for enhancing error handling with contextual information
+/// 
+/// This trait adds methods to Result types to simplify adding context to errors,
+/// making error messages more informative.
+pub trait Context<T, E> {
+    /// Add context to an error, explaining what was happening when the error occurred
+    /// 
+    /// # Example
+    /// ```
+    /// use types::error::Context;
+    /// 
+    /// let result = std::fs::read_to_string("missing_file.txt")
+    ///     .with_context(|| "Failed to read configuration file");
+    /// ```
+    fn with_context<C, F>(self, context: F) -> std::result::Result<T, IdsError>
+    where
+        F: FnOnce() -> C,
+        C: std::fmt::Display;
+
+    /// Add context with details to an error, allowing for formatted messages
+    ///
+    /// # Example
+    /// ```
+    /// use types::error::Context;
+    /// 
+    /// let file_path = "data/config.json";
+    /// let result = std::fs::read_to_string(file_path)
+    ///     .with_context_details(|| format!("Failed to read file at {}", file_path));
+    /// ```
+    fn with_context_details<C, F>(self, context: F) -> std::result::Result<T, IdsError>
+    where
+        F: FnOnce() -> C,
+        C: std::fmt::Display;
+}
+
+// Implement Context for any Result where the error implements Display
+impl<T, E: std::fmt::Display + 'static> Context<T, E> for std::result::Result<T, E> {
+    fn with_context<C, F>(self, context: F) -> std::result::Result<T, IdsError>
+    where
+        F: FnOnce() -> C,
+        C: std::fmt::Display,
+    {
+        self.map_err(|e| {
+            // Special case for io::Error to preserve its type information
+            if let Some(io_err) = (&e as &dyn std::any::Any).downcast_ref::<std::io::Error>() {
+                IdsError::Io(std::io::Error::new(io_err.kind(), format!("{}: {}", context(), e)))
+            } else {
+                IdsError::Validation(format!("{}: {}", context(), e))
+            }
+        })
+    }
+
+    fn with_context_details<C, F>(self, context: F) -> std::result::Result<T, IdsError>
+    where
+        F: FnOnce() -> C,
+        C: std::fmt::Display,
+    {
+        self.map_err(|e| {
+            // Special case for io::Error to preserve its type information
+            if let Some(io_err) = (&e as &dyn std::any::Any).downcast_ref::<std::io::Error>() {
+                IdsError::Io(std::io::Error::new(io_err.kind(), format!("{}", context())))
+            } else {
+                IdsError::Validation(format!("{}", context()))
+            }
+        })
+    }
+}

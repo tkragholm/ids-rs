@@ -8,7 +8,7 @@ use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::sync::Arc;
 
 mod arrow_backend;

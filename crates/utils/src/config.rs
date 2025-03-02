@@ -1,4 +1,4 @@
-use crate::error::{IntoResult, Result, UtilsError};
+use crate::error::{config_error, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
@@ -10,16 +10,16 @@ where
     T: for<'de> Deserialize<'de>,
 {
     let file = File::open(path.as_ref())
-        .with_context(&format!("Failed to open config file: {:?}", path.as_ref()))?;
+        .with_context(|| format!("Failed to open config file: {:?}", path.as_ref()))?;
 
     let reader = BufReader::new(file);
 
     if path.as_ref().extension().is_some_and(|ext| ext == "json") {
         serde_json::from_reader(reader)
-            .with_context(&format!("Failed to parse JSON config: {:?}", path.as_ref()))
+            .with_context(|| format!("Failed to parse JSON config: {:?}", path.as_ref()))
     } else {
         // Default to JSON, but you can add support for other formats like YAML or TOML
-        Err(UtilsError::Config(format!(
+        Err(config_error(format!(
             "Unsupported config format: {:?}",
             path.as_ref().extension().unwrap_or_default()
         )))
@@ -31,17 +31,17 @@ pub fn save_config<T>(config: &T, path: impl AsRef<Path>) -> Result<()>
 where
     T: Serialize,
 {
-    let file = File::create(path.as_ref()).with_context(&format!(
+    let file = File::create(path.as_ref()).with_context(|| format!(
         "Failed to create config file: {:?}",
         path.as_ref()
     ))?;
 
     if path.as_ref().extension().is_some_and(|ext| ext == "json") {
         serde_json::to_writer_pretty(file, config)
-            .with_context(&format!("Failed to write JSON config: {:?}", path.as_ref()))
+            .with_context(|| format!("Failed to write JSON config: {:?}", path.as_ref()))
     } else {
         // Default to JSON, but you can add support for other formats
-        Err(UtilsError::Config(format!(
+        Err(config_error(format!(
             "Unsupported config format: {:?}",
             path.as_ref().extension().unwrap_or_default()
         )))

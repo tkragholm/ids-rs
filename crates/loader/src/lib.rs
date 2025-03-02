@@ -99,7 +99,7 @@ impl Default for ParquetLoader {
 /// Configuration for customizing register file paths
 pub struct RegisterPathConfig {
     pub base_path: String,
-    pub custom_paths: std::collections::HashMap<String, String>,
+    pub custom_paths: hashbrown::HashMap<String, String>,
 }
 
 impl ParquetLoader {
@@ -123,10 +123,10 @@ impl ParquetLoader {
     pub fn load_with_custom_paths_map(
         &self,
         base_path: String,
-        custom_paths: std::collections::HashMap<String, String>,
+        custom_paths: hashbrown::HashMap<String, String>,
     ) -> Result<ArrowStore, IdsError> {
         // Create a new map with properly resolved paths
-        let mut resolved_paths = std::collections::HashMap::new();
+        let mut resolved_paths = hashbrown::HashMap::new();
         
         // Normalize base_path for easier comparison
         let base_path_obj = std::path::Path::new(&base_path);
@@ -513,7 +513,7 @@ impl StoreLoader for ParquetLoader {
         let registers_path = base_path_obj.join("registers");
         let has_registers_subdir = registers_path.exists() && registers_path.is_dir();
         
-        let mut custom_paths = std::collections::HashMap::new();
+        let mut custom_paths = hashbrown::HashMap::new();
         
         // Logic to auto-detect structure and create appropriate custom_paths
         if has_registers_subdir {
@@ -605,7 +605,7 @@ impl StoreLoader for ParquetLoader {
             log::info!("No custom paths determined - using standard path structure");
             let config = RegisterPathConfig {
                 base_path,
-                custom_paths: std::collections::HashMap::new(),
+                custom_paths: hashbrown::HashMap::new(),
             };
             
             Self::load_with_custom_paths(config)

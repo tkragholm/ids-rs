@@ -1,5 +1,5 @@
 use super::{MatchedPairRecord, MatchedPairsResult};
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::path::Path;
 use types::error::IdsError;
 

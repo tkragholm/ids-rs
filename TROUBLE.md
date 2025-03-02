@@ -1,52 +1,35 @@
-# IDS-RS Optimization Summary
+BEF:
+Field::new("PNR", DataType::Utf8, false),
+Field::new("AEGTE_ID", DataType::Utf8, true),
+Field::new("ALDER", DataType::Utf8, false),  // ✓ Added to balance calculation
+Field::new("ANTBOERNF", DataType::Int32, true),  // ✓ Added to balance calculation as children_count
+Field::new("ANTBOERNH", DataType::Int32, true),  // ✓ Added to balance calculation as children_count
+Field::new("ANTPERSF", DataType::Int32, true),  // ✓ Already in balance calculation as family_size
+Field::new("ANTPERSH", DataType::Int32, true),  // ✓ Already in balance calculation as family_size
+Field::new("BOP_VFRA", DataType::Date32, true),
+Field::new("CIVST", DataType::Utf8, true),  // ✓ Added to balance calculation as civil_status
+Field::new("FAMILIE_ID", DataType::Utf8, true),
+Field::new("FAMILIE_TYPE", DataType::Int32, true),  // ✓ Already in balance calculation as family_type
+Field::new("FAR_ID", DataType::Utf8, true),
+Field::new("FOED_DAG", DataType::Date32, false),
+Field::new("KOEN", DataType::Utf8, false),  // ✓ Added to balance calculation as gender
+Field::new("KOM", DataType::Int32, true),  // ✓ Already in balance calculation as municipality
+Field::new("MOR_ID", DataType::Utf8, true),
+Field::new("STATSB", DataType::Utf8, true),  // ✓ Added to balance calculation as citizenship
 
-## Previously Implemented Optimizations (in completed PRs)
+IND:
+Field::new("PNR", DataType::Utf8, false),
+Field::new("BESKST13", DataType::Int32, true),  // ✓ Added to balance calculation as employment_status
+Field::new("LOENMV_13", DataType::Float64, true),  // ✓ Added to balance calculation as wage_income
+Field::new("PERINDKIALT_13", DataType::Float64, true),  // ✓ Already in balance calculation as income
+Field::new("PRE_SOCIO", DataType::Int32, true),  // ✓ Added to balance calculation as pre_socio
 
-1. **Enhanced Parquet File Reading**
-   - Added a multi-threaded work-stealing pool using `crossbeam-deque`
-   - Implemented configurable thread count with `num_cpus`
-   - Applied `rayon` parallel iterators for date range filtering
-
-2. **Improved Balance Cache**
-   - Created a 32-shard cache architecture to reduce lock contention
-   - Used `parking_lot::RwLock` for more efficient synchronization
-   - Implemented batch operations for fewer lock acquisitions
-
-3. **Optimized Value Processor**
-   - Added adaptive chunk sizing based on workload
-   - Implemented date-based data grouping for improved cache locality
-   - Refactored to support parallel processing with inlined helper functions
-
-4. **Parallelized Matched Pair Processing**
-   - Restructured `add_matched_pair_details` to use `rayon::par_iter`
-   - Added batch prefetching based on date grouping
-   - Used thread-safe collections with minimal lock contention
-
-## New Core Optimizations
-
-5. **Optimized Sampler Construction**
-   - Used parallel processing to collect and analyze record data
-   - Implemented thread-safe approach for building birth date indices
-   - Used local aggregation with minimal lock contention
-   - Utilized `par_sort_unstable` for faster parallel sorting
-
-6. **Improved Control Sampling Performance**
-   - Optimized control selection with pre-collection of candidate controls
-   - Reduced nested loops with flattened data structures
-   - Improved locality for parent matching checks
-
-7. **Enhanced Metric Calculations**
-   - Added adaptive parallelism based on dataset size
-   - Used parallel reduction for large datasets
-   - Avoided parallel overhead for small datasets
-
-8. **CSV Export Optimization**
-   - Parallelized data preparation before file I/O
-   - Used batched processing with minimal lock contention
-   - Separated computation from I/O for better throughput
-
-## Next Steps
-- Explore additional thread-pool tuning for optimal performance
-- Consider memory optimizations for extremely large datasets
-- Add benchmarking capabilities to measure optimization impact
-- Review performance in other computation-heavy parts of the codebase
+AKM:
+Field::new("PNR", DataType::Utf8, false),
+Field::new("SOCIO", DataType::Int32, true),  // ✓ Added to balance calculation
+Field::new("SOCIO02", DataType::Int32, true),  // ✓ Added to balance calculation
+Field::new("SOCIO13", DataType::Int32, false),  // ✓ Already in balance calculation
+Field::new("CPRTJEK", DataType::Int32, true),
+Field::new("CPRTYPE", DataType::Int32, true),
+Field::new("VERSION", DataType::Utf8, true),
+Field::new("SENR", DataType::Utf8, true),

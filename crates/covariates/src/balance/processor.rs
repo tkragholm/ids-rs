@@ -174,8 +174,8 @@ impl ValueProcessor {
             }
         } else {
             // For larger chunks, batch items by date for better cache locality
-            let mut date_groups: std::collections::HashMap<NaiveDate, Vec<&str>> = 
-                std::collections::HashMap::new();
+            let mut date_groups: hashbrown::HashMap<NaiveDate, Vec<&str>> = 
+                hashbrown::HashMap::new();
                 
             // Group by date first
             for (pnr, date) in chunk {
@@ -366,8 +366,8 @@ impl ValueProcessor {
             }
         } else {
             // For larger chunks, group by date for better locality
-            let mut date_groups: std::collections::HashMap<NaiveDate, Vec<&str>> = 
-                std::collections::HashMap::new();
+            let mut date_groups: hashbrown::HashMap<NaiveDate, Vec<&str>> = 
+                hashbrown::HashMap::new();
                 
             // Group by date first for better cache locality
             for (pnr, date) in chunk {

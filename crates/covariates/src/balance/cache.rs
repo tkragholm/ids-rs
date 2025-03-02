@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
 use types::models::{Covariate, CovariateType};

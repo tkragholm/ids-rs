@@ -7,7 +7,7 @@ use chrono::NaiveDate;
 use indicatif::ProgressBar;
 use rand::prelude::IndexedRandom;
 use rand::Rng;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;

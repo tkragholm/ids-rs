@@ -1,4 +1,4 @@
-use crate::error::UtilsError;
+use crate::error::{Result, validation_error};
 
 /// Utility trait for string operations
 pub trait StringUtils {
@@ -12,10 +12,10 @@ pub trait StringUtils {
     fn to_camel_case(s: &str) -> String;
     
     /// Parse a string as an i32, with a custom error message
-    fn parse_i32(s: &str, error_msg: &str) -> Result<i32, UtilsError>;
+    fn parse_i32(s: &str, error_msg: &str) -> Result<i32>;
     
     /// Parse a string as an f64, with a custom error message
-    fn parse_f64(s: &str, error_msg: &str) -> Result<f64, UtilsError>;
+    fn parse_f64(s: &str, error_msg: &str) -> Result<f64>;
     
     /// Truncate a string to a maximum length with ellipsis
     fn truncate(s: &str, max_length: usize) -> String;
@@ -86,14 +86,14 @@ impl StringUtils for StringUtilsImpl {
         result
     }
     
-    fn parse_i32(s: &str, error_msg: &str) -> Result<i32, UtilsError> {
+    fn parse_i32(s: &str, error_msg: &str) -> Result<i32> {
         s.trim().parse::<i32>()
-            .map_err(|_| UtilsError::Validation(format!("{error_msg}: '{s}'")))
+            .map_err(|_| validation_error(format!("{error_msg}: '{s}'")))
     }
     
-    fn parse_f64(s: &str, error_msg: &str) -> Result<f64, UtilsError> {
+    fn parse_f64(s: &str, error_msg: &str) -> Result<f64> {
         s.trim().parse::<f64>()
-            .map_err(|_| UtilsError::Validation(format!("{error_msg}: '{s}'")))
+            .map_err(|_| validation_error(format!("{error_msg}: '{s}'")))
     }
     
     fn truncate(s: &str, max_length: usize) -> String {

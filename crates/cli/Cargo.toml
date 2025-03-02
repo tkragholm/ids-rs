@@ -18,6 +18,7 @@ chrono.workspace = true
 indicatif-log-bridge.workspace = true
 indicatif.workspace = true
 colored.workspace = true
+hashbrown.workspace = true
 
 [[bin]]
 name = "ids"

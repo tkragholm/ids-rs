@@ -1,16 +1,22 @@
-pub use types::error::{DataGenError, IdsError};
+// Re-export from the types crate
+pub use types::error::{Context, DataGenError, IdsError, Result};
 
-// Re-export the main IdsError to make it easier to use in this crate
+// Simple alias for easier use within this crate
 pub type Error = IdsError;
+
+// Helper function for data generation errors
+pub fn generation_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::Generation(msg.to_string())
+}
 
 // For backwards compatibility with existing code
 pub trait IntoDataGenError<T> {
-    fn into_datagen_error(self, msg: &str) -> Result<T, DataGenError>;
+    fn into_datagen_error(self, msg: &str) -> Result<T>;
 }
 
 // Implement for any Result that can be converted to a String
-impl<T, E: std::fmt::Display> IntoDataGenError<T> for Result<T, E> {
-    fn into_datagen_error(self, msg: &str) -> Result<T, DataGenError> {
-        self.map_err(|e| DataGenError::generation(format!("{msg}: {e}")))
+impl<T, E: std::fmt::Display + 'static> IntoDataGenError<T> for std::result::Result<T, E> {
+    fn into_datagen_error(self, msg: &str) -> Result<T> {
+        self.with_context(|| format!("Data generation error: {}", msg))
     }
 }

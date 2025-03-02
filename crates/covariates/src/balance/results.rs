@@ -1,6 +1,6 @@
 use crate::models::{CovariateSummary, MatchedPairDetail};
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[derive(Clone)]
 pub struct BalanceResults {

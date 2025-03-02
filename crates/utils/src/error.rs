@@ -1,54 +1,29 @@
-use thiserror::Error;
+// Re-export IdsError from the types crate
+pub use types::error::{Context, IdsError, Result};
 
-/// Main error type for utility functions
-#[derive(Error, Debug)]
-pub enum UtilsError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    
-    #[error("CSV error: {0}")]
-    Csv(#[from] csv::Error),
-    
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
-    
-    #[error("Date parsing error: {0}")]
-    DateParse(String),
-    
-    #[error("Configuration error: {0}")]
-    Config(String),
-    
-    #[error("Validation error: {0}")]
-    Validation(String),
-    
-    #[error("Logging error: {0}")]
-    Logging(String),
+// Helper functions for specific error types
+pub fn date_parse_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::InvalidDate(msg.to_string())
 }
 
-/// Type alias for Result with UtilsError as error type
-pub type Result<T> = std::result::Result<T, UtilsError>;
+pub fn config_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::Config(msg.to_string())
+}
 
-/// Convert any error type that implements Display into a UtilsError
-/// with a custom context message
-pub fn into_error<E>(error: E, context: &str) -> UtilsError
+pub fn validation_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::Validation(msg.to_string())
+}
+
+pub fn logging_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::Logging(msg.to_string())
+}
+
+// Simplified helper for converting errors with context
+pub fn with_context<T, E>(result: std::result::Result<T, E>, context: &str) -> Result<T>
 where
-    E: std::fmt::Display,
+    E: std::fmt::Display + 'static,
 {
-    // Create a validation error with the message
-    UtilsError::Validation(format!("{}: {}", context, error))
-}
-
-/// Trait to facilitate converting Result types to Result<T, UtilsError>
-pub trait IntoResult<T> {
-    /// Convert a result to Result<T, UtilsError> with a custom context message
-    fn with_context(self, context: &str) -> Result<T>;
-}
-
-/// Implement IntoResult for any Result where the error implements Display
-impl<T, E: std::fmt::Display + 'static> IntoResult<T> for std::result::Result<T, E> {
-    fn with_context(self, context: &str) -> Result<T> {
-        self.map_err(|e| into_error(e, context))
-    }
+    result.with_context(|| context)
 }
 
 #[cfg(test)]
@@ -56,25 +31,33 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_into_error_with_io_error() {
+    fn test_with_context_for_io_error() {
         let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
-        let utils_error = into_error(io_error, "Failed to read file");
-        assert!(matches!(utils_error, UtilsError::Io(_)));
+        let result: std::result::Result<(), _> = Err(io_error);
+        let ids_result = result.with_context(|| "Failed to read file");
+        assert!(matches!(ids_result, Err(IdsError::Io(_))));
     }
     
     #[test]
-    fn test_into_error_with_generic_error() {
-        let utils_error = into_error("custom error", "Operation failed");
-        assert!(matches!(utils_error, UtilsError::Validation(_)));
-        if let UtilsError::Validation(msg) = utils_error {
-            assert_eq!(msg, "Operation failed: custom error");
+    fn test_with_context_for_generic_error() {
+        let result: std::result::Result<(), &str> = Err("custom error");
+        let ids_result = result.with_context(|| "Operation failed");
+        assert!(matches!(ids_result, Err(IdsError::Validation(_))));
+        if let Err(IdsError::Validation(msg)) = ids_result {
+            assert!(msg.contains("Operation failed"));
+            assert!(msg.contains("custom error"));
         }
     }
     
     #[test]
-    fn test_with_context() {
-        let result: std::result::Result<(), &str> = Err("Something went wrong");
-        let utils_result = result.with_context("Operation failed");
-        assert!(matches!(utils_result, Err(UtilsError::Validation(_))));
+    fn test_helper_functions() {
+        let error = validation_error("Invalid input");
+        assert!(matches!(error, IdsError::Validation(_)));
+        
+        let error = config_error("Missing configuration");
+        assert!(matches!(error, IdsError::Config(_)));
+        
+        let error = date_parse_error("Invalid date format");
+        assert!(matches!(error, IdsError::InvalidDate(_)));
     }
 }

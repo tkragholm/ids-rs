@@ -5,7 +5,7 @@ use crate::{
 };
 use chrono::NaiveDate;
 use dashmap::DashMap;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[derive(Debug)]
 pub struct TimeVaryingStore {

@@ -8,7 +8,7 @@ use crate::{
 };
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ArrowStore {

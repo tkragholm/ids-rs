@@ -1,5 +1,5 @@
 use chrono::{Datelike, NaiveDate};
-use crate::error::UtilsError;
+use crate::error::{date_parse_error, Result};
 
 /// Get the quarter (1-4) from a date
 #[must_use]
@@ -10,7 +10,7 @@ pub fn quarter_from_date(date: NaiveDate) -> u32 {
 /// Utility trait for date operations
 pub trait DateUtils {
     /// Parse a date string in various formats (YMD, DMY, etc.)
-    fn parse_flexible(date_str: &str) -> Result<NaiveDate, UtilsError>;
+    fn parse_flexible(date_str: &str) -> Result<NaiveDate>;
     
     /// Convert a date to a period string (YYYYMM format)
     fn to_period_string(date: NaiveDate) -> String;
@@ -35,7 +35,7 @@ pub trait DateUtils {
 pub struct DateUtilsImpl;
 
 impl DateUtils for DateUtilsImpl {
-    fn parse_flexible(date_str: &str) -> Result<NaiveDate, UtilsError> {
+    fn parse_flexible(date_str: &str) -> Result<NaiveDate> {
         // Try different date formats
         let formats = [
             "%Y-%m-%d",  // ISO format (2023-01-31)
@@ -51,7 +51,7 @@ impl DateUtils for DateUtilsImpl {
             }
         }
         
-        Err(UtilsError::DateParse(format!("Could not parse date: {date_str}")))
+        Err(date_parse_error(format!("Could not parse date: {date_str}")))
     }
     
     fn to_period_string(date: NaiveDate) -> String {

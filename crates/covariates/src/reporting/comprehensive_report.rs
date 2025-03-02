@@ -1,5 +1,5 @@
 use crate::balance::BalanceResults;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::path::Path;
 
 pub struct ComprehensiveReport {
@@ -134,17 +134,28 @@ impl ComprehensiveReport {
         let path = base_path.join("covariate_balance.csv");
         let mut wtr = csv::Writer::from_path(path)?;
 
+        // Enhanced CSV with category information
         wtr.write_record([
             "Variable",
+            "Category", 
+            "Register",
+            "Register Variable",
             "Mean (Cases)",
             "Mean (Controls)",
             "Standardized Difference",
             "Variance Ratio",
         ])?;
 
+        // Map variables to their categories and register details
         for summary in &self.results.summaries {
+            // Determine variable category and register info
+            let (category, register, register_variable) = super::csv_report::categorize_variable(&summary.variable);
+            
             wtr.write_record([
                 &summary.variable,
+                category,
+                register,
+                register_variable,
                 &summary.mean_cases.to_string(),
                 &summary.mean_controls.to_string(),
                 &summary.std_diff.to_string(),
@@ -155,6 +166,8 @@ impl ComprehensiveReport {
         wtr.flush()?;
         Ok(())
     }
+    
+    // Using the categorize_variable in csv_report instead
 
     fn save_missing_rates(&self, base_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let path = base_path.join("missing_data_rates.csv");

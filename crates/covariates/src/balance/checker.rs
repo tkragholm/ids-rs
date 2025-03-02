@@ -77,7 +77,7 @@ impl BalanceChecker {
     fn populate_diagnostic_cache(&self) {
         use chrono::NaiveDate;
         use log::debug;
-        use types::models::{Covariate, CovariateType};
+        use types::models::{Covariate, CovariateType, DemographicExtras};
 
         // Get real treatment dates to use
         let treatment_dates = [
@@ -130,18 +130,29 @@ impl BalanceChecker {
 
             // Use all ID formats to provide maximum coverage
             for id in &all_ids {
-                // Create demographic covariates - non-zero values
-                let demographic = Covariate::demographics(
-                    3 + (i % 5),                // Family size 3-7
-                    101 + (i % 100),            // Municipality
-                    format!("{}", 1 + (i % 9)), // Family type
+                // Create demographic covariates with additional fields
+                let demographic_extras = DemographicExtras {
+                    civil_status: Some(format!("{}", "G".chars().nth(i % 4).unwrap_or('G'))),
+                    gender: Some(if i % 2 == 0 { "M".to_string() } else { "K".to_string() }),
+                    citizenship: Some("DK".to_string()),
+                    age: Some(20 + (i % 80) as i32),
+                    children_count: Some((i % 4) as i32),
+                };
+                
+                let demographic = Covariate::demographics_with_extras(
+                    3 + (i % 5) as i32,                // Family size 3-7
+                    101 + (i % 100) as i32,            // Municipality
+                    format!("{}", 1 + (i % 9)),        // Family type
+                    demographic_extras,
                 );
 
-                // Create income covariates - realistic values
-                let income = Covariate::income(
+                // Create income covariates with additional fields
+                let income = Covariate::income_extended(
                     250000.0 + (i as f64 * 1000.0),
                     "DKK".to_string(),
                     "PERINDKIALT_13".to_string(),
+                    Some(200000.0 + (i as f64 * 800.0)), // LOENMV_13
+                    Some(1 + (i % 5) as i32),            // BESKST13
                 );
 
                 // Create education covariates with ISCED codes
@@ -153,8 +164,7 @@ impl BalanceChecker {
                     Some(3.5 + (i % 10) as f32 / 2.0),
                 );
                 
-                // Create occupation covariates with SOCIO13 codes
-                // Use values from the socio13.json mapping
+                // Create occupation covariates with all fields
                 // Common SOCIO13 codes: 131-135 (various types of employment)
                 //                      110-114 (self-employment categories)
                 //                      310-330 (education, pension, etc.)
@@ -163,10 +173,13 @@ impl BalanceChecker {
                     "131", "132", "133", "134", "135", "139", 
                     "210", "220", "310", "321", "322", "323", "330"
                 ];
-                let socio13_code = socio13_codes[(i as usize) % socio13_codes.len()];
-                let occupation = Covariate::occupation(
+                let socio13_code = socio13_codes[i % socio13_codes.len()];
+                let occupation = Covariate::occupation_extended(
                     socio13_code.to_string(),
                     "SOCIO13".to_string(),
+                    Some(100 + (i % 50) as i32), // SOCIO
+                    Some(200 + (i % 30) as i32), // SOCIO02
+                    Some(10 + (i % 20) as i32),  // PRE_SOCIO
                 );
 
                 // Add to cache for different dates including treatment dates
@@ -629,6 +642,7 @@ impl BalanceChecker {
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
     ) -> Result<(), IdsError> {
+        // Original variables
         let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
             self,
             cases,
@@ -665,6 +679,77 @@ impl BalanceChecker {
         }
         results.add_missing_rate("Family Type".to_string(), missing_rates.0, missing_rates.1);
 
+        // New variables from TROUBLE.md (BEF register)
+        
+        // Civil status (CIVST) - Categorical
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Civil Status",
+            |covariate| covariate.get_civil_status(),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate("Civil Status".to_string(), missing_rates.0, missing_rates.1);
+        
+        // Gender (KOEN) - Categorical
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Gender",
+            |covariate| covariate.get_gender(),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate("Gender".to_string(), missing_rates.0, missing_rates.1);
+        
+        // Citizenship (STATSB) - Categorical
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Citizenship",
+            |covariate| covariate.get_citizenship(),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate("Citizenship".to_string(), missing_rates.0, missing_rates.1);
+        
+        // Age (ALDER) - Numeric
+        let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Age",
+            |covariate| covariate.get_age().map(|val| val as f64),
+        )?;
+        results.add_summary(summary);
+        results.add_missing_rate("Age".to_string(), missing_rates.0, missing_rates.1);
+        
+        // Children count (ANTBOERNF/ANTBOERNH) - Numeric
+        let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Demographics,
+            "Children Count",
+            |covariate| covariate.get_children_count().map(|val| val as f64),
+        )?;
+        results.add_summary(summary);
+        results.add_missing_rate("Children Count".to_string(), missing_rates.0, missing_rates.1);
+
         Ok(())
     }
 
@@ -674,6 +759,7 @@ impl BalanceChecker {
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
     ) -> Result<(), IdsError> {
+        // Original income variable
         let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
             self,
             cases,
@@ -685,6 +771,49 @@ impl BalanceChecker {
 
         results.add_summary(summary);
         results.add_missing_rate("Income".to_string(), missing_rates.0, missing_rates.1);
+
+        // New variables from TROUBLE.md (IND register)
+        
+        // Wage income (LOENMV_13) - Numeric
+        let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Income,
+            "Wage Income",
+            |covariate| covariate.get_wage_income(),
+        )?;
+
+        results.add_summary(summary);
+        results.add_missing_rate("Wage Income".to_string(), missing_rates.0, missing_rates.1);
+        
+        // Employment status (BESKST13) - Numeric categorical
+        let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Income,
+            "Employment Status",
+            |covariate| covariate.get_employment_status().map(|val| val as f64),
+        )?;
+
+        results.add_summary(summary);
+        results.add_missing_rate("Employment Status".to_string(), missing_rates.0, missing_rates.1);
+        
+        // Also add as categorical for better representation
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Income,
+            "Employment Status Category",
+            |covariate| covariate.get_employment_status().map(|val| val.to_string()),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate("Employment Status Category".to_string(), missing_rates.0, missing_rates.1);
 
         Ok(())
     }
@@ -818,6 +947,116 @@ impl BalanceChecker {
             class_missing_rates.0,
             class_missing_rates.1,
         );
+        
+        // New variables from TROUBLE.md (AKM register)
+        
+        // SOCIO - older socioeconomic classification
+        let (socio_summary, socio_missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "SOCIO",
+            |covariate| covariate.get_socio().map(|val| val as f64),
+        )?;
+        
+        results.add_summary(socio_summary);
+        results.add_missing_rate(
+            "SOCIO".to_string(),
+            socio_missing_rates.0,
+            socio_missing_rates.1,
+        );
+        
+        // Also as categorical
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "SOCIO Category",
+            |covariate| covariate.get_socio().map(|val| val.to_string()),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate(
+            "SOCIO Category".to_string(),
+            missing_rates.0,
+            missing_rates.1,
+        );
+        
+        // SOCIO02 - another socioeconomic classification
+        let (socio02_summary, socio02_missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "SOCIO02",
+            |covariate| covariate.get_socio02().map(|val| val as f64),
+        )?;
+        
+        results.add_summary(socio02_summary);
+        results.add_missing_rate(
+            "SOCIO02".to_string(),
+            socio02_missing_rates.0,
+            socio02_missing_rates.1,
+        );
+        
+        // Also as categorical
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "SOCIO02 Category",
+            |covariate| covariate.get_socio02().map(|val| val.to_string()),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate(
+            "SOCIO02 Category".to_string(),
+            missing_rates.0,
+            missing_rates.1,
+        );
+        
+        // PRE_SOCIO - previous socioeconomic status
+        let (pre_socio_summary, pre_socio_missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "Previous Socioeconomic Status",
+            |covariate| covariate.get_pre_socio().map(|val| val as f64),
+        )?;
+        
+        results.add_summary(pre_socio_summary);
+        results.add_missing_rate(
+            "Previous Socioeconomic Status".to_string(),
+            pre_socio_missing_rates.0,
+            pre_socio_missing_rates.1,
+        );
+        
+        // Also as categorical
+        let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "Previous Socioeconomic Category",
+            |covariate| covariate.get_pre_socio().map(|val| val.to_string()),
+        )?;
+
+        for summary in summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate(
+            "Previous Socioeconomic Category".to_string(),
+            missing_rates.0,
+            missing_rates.1,
+        );
 
         Ok(())
     }
@@ -863,11 +1102,12 @@ impl BalanceChecker {
         // Use a thread-safe container for collecting results
         let pair_details = Arc::new(Mutex::new(Vec::with_capacity(total_pairs * 4)));
         
-        // Define the variables we'll use for prefetching
+        // Define the variables we'll use for prefetching - include Occupation
         let covariate_types = [
             CovariateType::Demographics,
             CovariateType::Income, 
-            CovariateType::Education
+            CovariateType::Education,
+            CovariateType::Occupation,
         ];
         
         // Process each date group in parallel
@@ -894,6 +1134,10 @@ impl BalanceChecker {
                 for control_pnr in control_pnrs {
                     let mut batch_details = Vec::new();
                     
+                    // --- DEMOGRAPHICS ---
+                    
+                    // Original variables
+                    
                     // Family Size
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -917,8 +1161,36 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-
-                    // Income
+                    
+                    // New demographics variables
+                    
+                    // Age
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Demographics,
+                        "Age",
+                        |cov| cov.get_age().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // Children Count
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Demographics,
+                        "Children Count",
+                        |cov| cov.get_children_count().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // --- INCOME ---
+                    
+                    // Original income variable
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
                         control_pnr,
@@ -929,7 +1201,35 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
+                    
+                    // New income variables
+                    
+                    // Wage Income
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Income,
+                        "Wage Income",
+                        |cov| cov.get_wage_income(),
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // Employment Status
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Income,
+                        "Employment Status",
+                        |cov| cov.get_employment_status().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
 
+                    // --- EDUCATION ---
+                    
                     // Education Level - treated as a numeric value 
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -979,6 +1279,10 @@ impl BalanceChecker {
                         batch_details.push(detail);
                     }
                     
+                    // --- OCCUPATION ---
+                    
+                    // Original occupation variables
+                    
                     // SOCIO13 Occupation Code - convert directly to numeric 
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -1012,6 +1316,44 @@ impl BalanceChecker {
                                 hash
                             })
                         },
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // New occupation variables
+                    
+                    // SOCIO
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Occupation,
+                        "SOCIO",
+                        |cov| cov.get_socio().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // SOCIO02
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Occupation,
+                        "SOCIO02",
+                        |cov| cov.get_socio02().map(|val| val as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // PRE_SOCIO
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Occupation,
+                        "Previous Socioeconomic Status",
+                        |cov| cov.get_pre_socio().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }

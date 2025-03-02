@@ -53,7 +53,7 @@ impl CaseWithControls {
     /// Convert a list of MatchedPairRecords into a list of CaseWithControls,
     /// grouping by case_id
     pub fn from_matched_pair_records(records: &[MatchedPairRecord]) -> Vec<Self> {
-        let mut case_map: std::collections::HashMap<String, CaseWithControls> = std::collections::HashMap::new();
+        let mut case_map: hashbrown::HashMap<String, CaseWithControls> = hashbrown::HashMap::new();
         
         for record in records {
             let case_id = record.case_id.clone();

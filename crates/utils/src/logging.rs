@@ -4,7 +4,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::time::{Duration, Instant};
-use crate::error::{UtilsError, IntoResult, Result};
+use crate::error::{Context, Result, logging_error};
 
 /// Simple logger that writes to both console and a file
 pub struct SimpleLogger {
@@ -24,7 +24,7 @@ impl SimpleLogger {
             // Create the directory structure if it doesn't exist
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
-                    .with_context(&format!("Failed to create log directory: {:?}", parent))?;
+                    .with_context(|| format!("Failed to create log directory: {:?}", parent))?;
             }
             
             Some(
@@ -32,7 +32,7 @@ impl SimpleLogger {
                     .create(true)
                     .append(true)
                     .open(path)
-                    .with_context(&format!("Failed to open log file: {:?}", path))?,
+                    .with_context(|| format!("Failed to open log file: {:?}", path))?,
             )
         } else {
             None
@@ -126,7 +126,7 @@ pub fn setup_logger(
             log::info!("Logger initialized with console level: {:?}, file level: {:?}", console_level, file_level);
             Ok(())
         }
-        Err(_) => Err(UtilsError::Logging("Failed to initialize logger: logger already set".to_string())),
+        Err(_) => Err(logging_error("Failed to initialize logger: logger already set")),
     }
 }
 

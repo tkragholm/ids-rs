@@ -1,6 +1,6 @@
 use chrono::{Duration, NaiveDate};
 use rand::Rng;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 pub type PersonInfo = (NaiveDate, String);
 pub type ParentPair = (PersonInfo, PersonInfo);

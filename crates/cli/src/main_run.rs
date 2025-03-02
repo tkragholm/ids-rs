@@ -433,7 +433,7 @@ fn handle_balance_check(
     ConsoleOutput::key_value("Loading time", &format_duration_short(loading_time));
 
     // Step 2: Set up custom paths with proper resolution
-    let mut custom_paths = std::collections::HashMap::new();
+    let mut custom_paths = hashbrown::HashMap::new();
     let mut has_custom_paths = false;
 
     // Helper function to check if a path exists and log its status

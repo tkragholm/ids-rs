@@ -7,7 +7,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use chrono::NaiveDate; // Add Days type from chrono
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FamilyRelations {

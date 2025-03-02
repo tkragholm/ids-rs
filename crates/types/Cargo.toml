@@ -20,3 +20,4 @@ rand.workspace = true
 log.workspace = true
 serde_json.workspace = true
 parking_lot.workspace = true
+hashbrown.workspace = true

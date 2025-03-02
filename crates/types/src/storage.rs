@@ -2,7 +2,7 @@ use arrow::array::{Array, StringArray};
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use dashmap::DashMap;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 

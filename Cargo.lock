@@ -512,6 +512,7 @@ dependencies = [
  "covariates",
  "datagen",
  "env_logger",
+ "hashbrown 0.15.2",
  "indicatif",
  "indicatif-log-bridge",
  "loader",
@@ -678,6 +679,7 @@ dependencies = [
  "crossbeam-utils",
  "csv",
  "dashmap",
+ "hashbrown 0.15.2",
  "indicatif",
  "loader",
  "log",
@@ -784,6 +786,7 @@ dependencies = [
  "arrow-schema",
  "chrono",
  "csv",
+ "hashbrown 0.15.2",
  "indicatif",
  "parquet",
  "rand 0.9.0",
@@ -1069,6 +1072,7 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+ "serde",
 ]
 
 [[package]]
@@ -1349,6 +1353,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "crossbeam-deque",
+ "hashbrown 0.15.2",
  "indicatif",
  "indicatif-log-bridge",
  "log",
@@ -2320,6 +2325,7 @@ dependencies = [
  "chrono",
  "csv",
  "dashmap",
+ "hashbrown 0.15.2",
  "log",
  "parking_lot",
  "parquet",
@@ -2381,6 +2387,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.11",
+ "types",
 ]
 
 [[package]]
