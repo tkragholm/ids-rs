@@ -18,6 +18,7 @@ impl ValueProcessor {
     }
 
     /// Create a new ValueProcessor with custom configuration
+    #[allow(dead_code)]
     pub fn with_config(thread_count: Option<usize>, chunk_size_multiplier: Option<usize>) -> Self {
         Self {
             thread_count: thread_count.unwrap_or_else(num_cpus::get),
@@ -216,6 +217,7 @@ impl ValueProcessor {
     
     /// Process a single item for numeric values - extracted for better inlining
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     fn process_single_numeric_item<F>(
         &self,
         pnr: &str,
@@ -402,6 +404,7 @@ impl ValueProcessor {
     
     /// Process a single item for categorical values - extracted for better inlining
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     fn process_single_categorical_item<F>(
         &self,
         pnr: &str,

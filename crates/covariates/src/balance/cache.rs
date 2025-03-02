@@ -3,7 +3,7 @@ use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::Hash;
 use std::sync::Arc;
 use types::models::{Covariate, CovariateType};
 use types::storage::Storage as Store;
@@ -67,9 +67,7 @@ where
     /// Get the shard index for a key
     #[inline]
     fn shard_idx<Q: Hash>(&self, key: &Q) -> usize {
-        let mut hasher = self.hasher.build_hasher();
-        key.hash(&mut hasher);
-        (hasher.finish() as usize) % NUM_SHARDS
+        (self.hasher.hash_one(key) as usize) % NUM_SHARDS
     }
     
     /// Get a reference to the shard for a key
@@ -156,6 +154,7 @@ impl CovariateCache {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get(&self, key: &CacheKey) -> Option<Option<Covariate>> {
         // First check the primary sharded cache (faster for reads)
         if let Some(value) = self.primary_cache.get(key) {
@@ -235,8 +234,6 @@ impl CovariateCache {
         // which could cause duplicate work and contention
         let _bulk_guard = self.bulk_lock.lock();
         
-        let mut loaded = 0;
-        
         // Create all cache keys first to reduce allocations
         let total_keys = pnrs.len() * covariate_types.len() * dates.len();
         let mut keys = Vec::with_capacity(total_keys);
@@ -282,7 +279,7 @@ impl CovariateCache {
             })
             .collect();
         
-        loaded = loaded_entries.len();
+        let entry_count = loaded_entries.len();
         
         // Bulk insert into the primary cache with minimal lock contention
         if !loaded_entries.is_empty() {
@@ -290,16 +287,17 @@ impl CovariateCache {
             self.primary_cache.insert_batch(loaded_entries.clone());
             
             // Also update the secondary cache
-            for (key, value) in loaded_entries {
-                self.secondary_cache.insert(key, value);
+            for (key, value) in &loaded_entries {
+                self.secondary_cache.insert(key.clone(), value.clone());
             }
         }
         
-        Ok(loaded)
+        Ok(entry_count)
     }
     
     /// Prefetch all covariates for a set of subjects on specific dates
     /// Optimized for parallel fetching with minimal lock contention
+    #[allow(dead_code)]
     pub fn prefetch_for_subjects(
         &self,
         store: &impl Store,

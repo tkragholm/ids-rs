@@ -197,7 +197,7 @@ pub fn read_parquet(
     };
 
     // Determine optimal number of worker threads based on available CPUs
-    let num_workers = num_cpus::get().max(2).min(16); // At least 2, at most 16
+    let num_workers = num_cpus::get().clamp(2, 16); // At least 2, at most 16
     log::debug!("Using {} worker threads for batch processing", num_workers);
 
     // Set up a parallel processing pipeline for batches
@@ -288,11 +288,11 @@ pub fn read_parquet(
 
     // Helper function to process a single batch
     fn process_batch(
-        mut batch: RecordBatch,
+        batch: RecordBatch,
         utils: &ArrowUtils,
         pb: &Option<ProgressBar>,
         batches_result: &Arc<Mutex<Vec<RecordBatch>>>,
-        error_result: &Arc<Mutex<Option<String>>>,
+        _error_result: &Arc<Mutex<Option<String>>>,
     ) {
         // Validate batch
         if let Err(e) = utils.validate_batch(&batch) {
@@ -382,6 +382,7 @@ pub fn read_parquet(
 /// # Returns
 ///
 /// A Result containing filtered batches or an `IdsError`
+#[allow(dead_code)]
 pub fn filter_batches_by_date_range(
     batches: &[RecordBatch],
     date_column: &str,
@@ -418,7 +419,7 @@ pub fn filter_batches_by_date_range(
             }
         })
         .try_fold(
-            || Vec::new(),              // Initialize an empty vector for each thread
+            Vec::new,                   // Initialize an empty vector for each thread
             |mut acc, batch_result| {   // Accumulate results within each thread
                 match batch_result {
                     Ok(Some(batch)) => {
@@ -431,7 +432,7 @@ pub fn filter_batches_by_date_range(
             },
         )
         .try_reduce(
-            || Vec::new(),            // Initialize an empty vector for the final reduction
+            Vec::new,                 // Initialize an empty vector for the final reduction
             |mut a, mut b| {          // Combine results from all threads
                 a.append(&mut b);
                 Ok(a)

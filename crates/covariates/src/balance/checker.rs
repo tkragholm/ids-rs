@@ -144,11 +144,29 @@ impl BalanceChecker {
                     "PERINDKIALT_13".to_string(),
                 );
 
-                // Create education covariates
+                // Create education covariates with ISCED codes
+                // Use realistic ISCED levels (1-8)
+                let isced_level = 1 + (i % 8);
                 let education = Covariate::education(
                     format!("{}", 10 + (i % 20)),
-                    Some(format!("Education field {}", i % 10)),
+                    Some(format!("{}", isced_level)), // ISCED code (1-8)
                     Some(3.5 + (i % 10) as f32 / 2.0),
+                );
+                
+                // Create occupation covariates with SOCIO13 codes
+                // Use values from the socio13.json mapping
+                // Common SOCIO13 codes: 131-135 (various types of employment)
+                //                      110-114 (self-employment categories)
+                //                      310-330 (education, pension, etc.)
+                let socio13_codes = [
+                    "110", "111", "112", "113", "114", "120", 
+                    "131", "132", "133", "134", "135", "139", 
+                    "210", "220", "310", "321", "322", "323", "330"
+                ];
+                let socio13_code = socio13_codes[(i as usize) % socio13_codes.len()];
+                let occupation = Covariate::occupation(
+                    socio13_code.to_string(),
+                    "SOCIO13".to_string(),
                 );
 
                 // Add to cache for different dates including treatment dates
@@ -164,6 +182,10 @@ impl BalanceChecker {
                     // Education
                     let key = CacheKey::new(id, CovariateType::Education, *date);
                     self.cache.insert(key, Some(education.clone()));
+                    
+                    // Occupation (SOCIO13)
+                    let key = CacheKey::new(id, CovariateType::Occupation, *date);
+                    self.cache.insert(key, Some(occupation.clone()));
                 }
             }
         }
@@ -290,10 +312,66 @@ impl BalanceChecker {
 
                 // Create education covariates with level between 10-30
                 let education_level = rng.random_range(10..=30);
+                
+                // Generate ISCED level (1-8), with higher levels less common
+                let isced_distribution: [(i32, f64); 8] = [
+                    (1, 0.05),  // 5% at ISCED level 1
+                    (2, 0.10),  // 10% at ISCED level 2
+                    (3, 0.35),  // 35% at ISCED level 3
+                    (4, 0.10),  // 10% at ISCED level 4
+                    (5, 0.15),  // 15% at ISCED level 5
+                    (6, 0.15),  // 15% at ISCED level 6
+                    (7, 0.08),  // 8% at ISCED level 7
+                    (8, 0.02),  // 2% at ISCED level 8
+                ];
+                
+                // Weighted random selection for ISCED level
+                let mut cdf = 0.0;
+                let roll: f64 = rng.random();
+                let mut isced = 3; // Default to level 3 if selection fails
+                
+                for (level, weight) in &isced_distribution {
+                    cdf += weight;
+                    if roll <= cdf {
+                        isced = *level;
+                        break;
+                    }
+                }
+                
                 let education = Covariate::education(
                     format!("{}", education_level),
-                    Some(format!("Education field {}", rng.random_range(1..=10))),
+                    Some(format!("{}", isced)), // ISCED code as string
                     Some(3.5 + (rng.random_range(0..10) as f32 / 2.0)),
+                );
+                
+                // Create occupation covariates with SOCIO13 codes
+                // Use values from the socio13.json mapping with weighted distribution
+                let socio13_codes = [
+                    ("110", 0.05), ("111", 0.02), ("112", 0.02), ("113", 0.03), ("114", 0.08), 
+                    ("120", 0.01), ("131", 0.10), ("132", 0.15), ("133", 0.15), 
+                    ("134", 0.20), ("135", 0.05), ("139", 0.02), 
+                    ("210", 0.03), ("220", 0.02), ("310", 0.03), 
+                    ("321", 0.01), ("322", 0.01), ("323", 0.01), ("330", 0.01)
+                ];
+                
+                // Weighted random selection for SOCIO13 code
+                let mut socio_cdf = 0.0;
+                let socio_roll: f64 = rng.random();
+                let socio13_code = {
+                    let mut selected = "134"; // Default to employment at basic level
+                    for (code, weight) in &socio13_codes {
+                        socio_cdf += weight;
+                        if socio_roll <= socio_cdf {
+                            selected = code;
+                            break;
+                        }
+                    }
+                    selected
+                };
+                
+                let occupation = Covariate::occupation(
+                    socio13_code.to_string(),
+                    "SOCIO13".to_string(),
                 );
 
                 // Add to cache for different dates including treatment dates
@@ -309,6 +387,10 @@ impl BalanceChecker {
                     // Education
                     let key = CacheKey::new(id, CovariateType::Education, *date);
                     self.cache.insert(key, Some(education.clone()));
+                    
+                    // Occupation (SOCIO13)
+                    let key = CacheKey::new(id, CovariateType::Occupation, *date);
+                    self.cache.insert(key, Some(occupation.clone()));
 
                     // Add more date coverage to increase chance of hits
                     // Generate data for each quarter of each year from 2008 to 2023
@@ -327,6 +409,10 @@ impl BalanceChecker {
                                     let key =
                                         CacheKey::new(id, CovariateType::Education, extra_date);
                                     self.cache.insert(key, Some(education.clone()));
+                                    
+                                    let key =
+                                        CacheKey::new(id, CovariateType::Occupation, extra_date);
+                                    self.cache.insert(key, Some(occupation.clone()));
                                 }
                             }
                         }
@@ -513,6 +599,10 @@ impl BalanceChecker {
         controls: &[(String, NaiveDate)],
         overall_pb: &ProgressBar,
     ) -> Result<(), IdsError> {
+        // Update progress bar to account for occupation processing
+        let total_steps = 4; // demographics, income, education, occupation
+        overall_pb.set_length(total_steps);
+        
         overall_pb.set_message("Processing demographics...");
         self.add_demographic_balance(results, cases, controls)?;
         overall_pb.inc(1);
@@ -523,6 +613,10 @@ impl BalanceChecker {
 
         overall_pb.set_message("Processing education...");
         self.add_education_balance(results, cases, controls)?;
+        overall_pb.inc(1);
+        
+        overall_pb.set_message("Processing occupation...");
+        self.add_occupation_balance(results, cases, controls)?;
         overall_pb.inc(1);
 
         Ok(())
@@ -601,6 +695,7 @@ impl BalanceChecker {
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
     ) -> Result<(), IdsError> {
+        // 1. Process education levels as categorical variables
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
             cases,
@@ -617,6 +712,111 @@ impl BalanceChecker {
             "Education Level".to_string(),
             missing_rates.0,
             missing_rates.1,
+        );
+        
+        // 2. Process ISCED codes as a separate categorical variable
+        // Only if ISCED codes are available in the data
+        let (isced_summaries, isced_missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Education,
+            "ISCED Level",
+            |covariate| covariate.get_isced_code(),
+        )?;
+
+        for summary in isced_summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate(
+            "ISCED Level".to_string(),
+            isced_missing_rates.0,
+            isced_missing_rates.1,
+        );
+        
+        // 3. Process education years as a numeric variable (if available)
+        let (years_summary, years_missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Education,
+            "Education Years",
+            |covariate| covariate.get_education_years().map(|y| y as f64),
+        )?;
+        
+        results.add_summary(years_summary);
+        results.add_missing_rate(
+            "Education Years".to_string(),
+            years_missing_rates.0,
+            years_missing_rates.1,
+        );
+
+        Ok(())
+    }
+    
+    fn add_occupation_balance(
+        &self,
+        results: &mut BalanceResults,
+        cases: &[(String, NaiveDate)],
+        controls: &[(String, NaiveDate)],
+    ) -> Result<(), IdsError> {
+        // 1. Process SOCIO13 codes as categorical variables
+        let (code_summaries, code_missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "SOCIO13 Code",
+            |covariate| covariate.get_occupation_code(),
+        )?;
+
+        for summary in code_summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate(
+            "SOCIO13 Code".to_string(),
+            code_missing_rates.0,
+            code_missing_rates.1,
+        );
+        
+        // 2. Process SOCIO13 codes as a numeric variable for standardized difference calculation
+        let (socio_summary, socio_missing_rates) = self.metrics.calculate_numeric_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "SOCIO13 Value",
+            |covariate| {
+                covariate.get_occupation_code()
+                    .and_then(|code| code.parse::<f64>().ok())
+            },
+        )?;
+        
+        results.add_summary(socio_summary);
+        results.add_missing_rate(
+            "SOCIO13 Value".to_string(),
+            socio_missing_rates.0,
+            socio_missing_rates.1,
+        );
+        
+        // 3. Process occupation classification system as a separate categorical variable
+        // This might be used for different versions or systems (DISCO, ISCO, etc.)
+        let (class_summaries, class_missing_rates) = self.metrics.calculate_categorical_balance(
+            self,
+            cases,
+            controls,
+            CovariateType::Occupation,
+            "Classification System",
+            |covariate| covariate.get_classification(),
+        )?;
+
+        for summary in class_summaries {
+            results.add_summary(summary);
+        }
+        results.add_missing_rate(
+            "Classification System".to_string(),
+            class_missing_rates.0,
+            class_missing_rates.1,
         );
 
         Ok(())
@@ -653,7 +853,7 @@ impl BalanceChecker {
             .sum();
             
         let num_threads = rayon::current_num_threads();
-        let chunk_size = (total_pairs / num_threads).max(100).min(5000);
+        let chunk_size = (total_pairs / num_threads).clamp(100, 5000);
         
         log::debug!(
             "Processing {} matched pairs for {} cases and {} controls using chunk size {}", 
@@ -730,7 +930,7 @@ impl BalanceChecker {
                         batch_details.push(detail);
                     }
 
-                    // Education Level
+                    // Education Level - treated as a numeric value 
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
                         control_pnr,
@@ -740,6 +940,77 @@ impl BalanceChecker {
                         |cov| {
                             cov.get_education_level()
                                 .and_then(|level| level.parse::<f64>().ok())
+                        },
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // ISCED Level - convert from string code to numeric value for comparison
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Education,
+                        "ISCED Level",
+                        |cov| {
+                            cov.get_isced_code()
+                                .and_then(|code| {
+                                    // Extract the first character which should be the ISCED level
+                                    if !code.is_empty() {
+                                        code[0..1].parse::<f64>().ok()
+                                    } else {
+                                        None
+                                    }
+                                })
+                        },
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // Education Years - already a numeric value
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Education,
+                        "Education Years",
+                        |cov| cov.get_education_years().map(|y| y as f64),
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // SOCIO13 Occupation Code - convert directly to numeric 
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Occupation,
+                        "SOCIO13 Value",
+                        |cov| {
+                            cov.get_occupation_code()
+                                .and_then(|code| code.parse::<f64>().ok())
+                        },
+                    ) {
+                        batch_details.push(detail);
+                    }
+                    
+                    // Classification System - treat as categorical but convert to numeric
+                    // This is retained for compatibility with any non-SOCIO13 classification systems
+                    if let Ok(Some(detail)) = self.process_matched_pair(
+                        case_pnr,
+                        control_pnr,
+                        *date,
+                        CovariateType::Occupation,
+                        "Classification System",
+                        |cov| {
+                            cov.get_classification().map(|class| {
+                                // Simple hash to create a numeric value for comparison
+                                let mut hash = 0.0;
+                                for (i, c) in class.chars().enumerate() {
+                                    hash += (c as u32 as f64) * (i + 1) as f64;
+                                }
+                                hash
+                            })
                         },
                     ) {
                         batch_details.push(detail);
