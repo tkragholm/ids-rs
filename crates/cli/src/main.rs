@@ -6,14 +6,13 @@ use core::{
     utils::{configure_logging_with_level, load_records, validate_csv_format, MatchingCriteria},
 };
 use covariates::matched_pairs::load_matched_pair_records;
-use covariates::{balance::BalanceChecker, matched_pairs::load_matched_pairs};
+use covariates::matched_pairs::load_matched_pairs;
 use datagen::{GeneratorConfig, RegisterGenerator};
 use indicatif::MultiProgress;
 use indicatif_log_bridge::LogWrapper;
-use log::{error, info, warn};
+use log::{error, info};
 use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
-use types::models::CovariateType;
 
 mod cli_internal;
 use cli_internal::{Cli, Commands};
