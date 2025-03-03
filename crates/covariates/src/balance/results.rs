@@ -45,4 +45,18 @@ impl BalanceResults {
     pub fn add_pair_detail(&mut self, detail: MatchedPairDetail) {
         self.matched_pair_details.push(detail);
     }
+    
+    /// Combine another BalanceResults into this one
+    pub fn combine(&mut self, other: BalanceResults) {
+        // Add all summaries
+        self.summaries.extend(other.summaries);
+        
+        // Merge missing data rates
+        for (variable, rates) in other.missing_data_rates {
+            self.missing_data_rates.insert(variable, rates);
+        }
+        
+        // Add all matched pair details
+        self.matched_pair_details.extend(other.matched_pair_details);
+    }
 }

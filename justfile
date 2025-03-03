@@ -1,5 +1,5 @@
 # Define default variables
-ids_binary := "target/debug/ids"  # Changed from release to debug
+ids_binary := "target/release/ids"  # Changed from release to debug
 default_rust_log := "info"
 default_matched_pairs := "output/matched_pairs.csv"
 default_family_file := "data/registers/family.parquet"
@@ -18,13 +18,13 @@ default_year_range := default_start_year + "-" + default_end_year
 default:
     @just --list
 
-# Build the debug version
+# Build the release version (now the primary build target)
 build:
-    cargo build
-
-# Build the release version (kept for when needed)
-build-release:
     cargo build --release
+
+# Build the debug version (kept for when needed)
+build-debug:
+    cargo build
 
 # Run the check-balance command with default settings
 check-balance: build
@@ -59,6 +59,66 @@ check-balance-verbose: build
 # Run check-balance with minimal logging
 check-balance-quiet: build
     RUST_LOG=info {{ids_binary}} check-balance \
+        -m {{default_matched_pairs}} \
+        --family-file {{default_family_file}} \
+        --akm-dir {{default_akm_dir}} \
+        --bef-dir {{default_bef_dir}} \
+        --ind-dir {{default_ind_dir}} \
+        --uddf-dir {{default_uddf_dir}}
+
+# Run check-balance with LRU cache for better memory management
+check-balance-lru: build
+    RUST_LOG=info IDS_CACHE_TYPE=lru {{ids_binary}} check-balance \
+        -m {{default_matched_pairs}} \
+        --family-file {{default_family_file}} \
+        --akm-dir {{default_akm_dir}} \
+        --bef-dir {{default_bef_dir}} \
+        --ind-dir {{default_ind_dir}} \
+        --uddf-dir {{default_uddf_dir}}
+
+# Run check-balance with adaptive cache
+check-balance-adaptive: build
+    RUST_LOG=info IDS_CACHE_TYPE=adaptive {{ids_binary}} check-balance \
+        -m {{default_matched_pairs}} \
+        --family-file {{default_family_file}} \
+        --akm-dir {{default_akm_dir}} \
+        --bef-dir {{default_bef_dir}} \
+        --ind-dir {{default_ind_dir}} \
+        --uddf-dir {{default_uddf_dir}}
+
+# Run check-balance with legacy cache
+check-balance-legacy: build
+    RUST_LOG=info IDS_CACHE_TYPE=legacy {{ids_binary}} check-balance \
+        -m {{default_matched_pairs}} \
+        --family-file {{default_family_file}} \
+        --akm-dir {{default_akm_dir}} \
+        --bef-dir {{default_bef_dir}} \
+        --ind-dir {{default_ind_dir}} \
+        --uddf-dir {{default_uddf_dir}}
+        
+# Run check-balance with LRU cache but skip matched pairs processing (for debugging)
+check-balance-lru-skip-pairs: build
+    RUST_LOG=info IDS_CACHE_TYPE=lru IDS_SKIP_PAIRS=true {{ids_binary}} check-balance \
+        -m {{default_matched_pairs}} \
+        --family-file {{default_family_file}} \
+        --akm-dir {{default_akm_dir}} \
+        --bef-dir {{default_bef_dir}} \
+        --ind-dir {{default_ind_dir}} \
+        --uddf-dir {{default_uddf_dir}}
+
+# Run check-balance with adaptive cache but skip matched pairs processing (for debugging)
+check-balance-adaptive-skip-pairs: build
+    RUST_LOG=info IDS_CACHE_TYPE=adaptive IDS_SKIP_PAIRS=true {{ids_binary}} check-balance \
+        -m {{default_matched_pairs}} \
+        --family-file {{default_family_file}} \
+        --akm-dir {{default_akm_dir}} \
+        --bef-dir {{default_bef_dir}} \
+        --ind-dir {{default_ind_dir}} \
+        --uddf-dir {{default_uddf_dir}}
+
+# Run check-balance with legacy cache but skip matched pairs processing (for debugging)
+check-balance-legacy-skip-pairs: build
+    RUST_LOG=info IDS_CACHE_TYPE=legacy IDS_SKIP_PAIRS=true {{ids_binary}} check-balance \
         -m {{default_matched_pairs}} \
         --family-file {{default_family_file}} \
         --akm-dir {{default_akm_dir}} \
@@ -139,6 +199,28 @@ complete-pipeline-tiny: generate-and-sample-tiny
 # Run the complete pipeline with small datasets
 complete-pipeline-small: generate-and-sample-small
     RUST_LOG=warn {{ids_binary}} check-balance \
+        -m output/matched_pairs.csv \
+        --family-file {{default_output_dir}}_small/family.parquet \
+        --akm-dir {{default_output_dir}}_small/akm/ \
+        --bef-dir {{default_output_dir}}_small/bef/ \
+        --ind-dir {{default_output_dir}}_small/ind/ \
+        --uddf-dir {{default_output_dir}}_small/uddf/ \
+        --structured
+
+# Run the complete pipeline with small datasets using legacy cache (working version from TROUBLE.md)
+complete-pipeline-small-legacy: generate-and-sample-small
+    RUST_LOG=warn IDS_CACHE_TYPE=legacy {{ids_binary}} check-balance \
+        -m output/matched_pairs.csv \
+        --family-file {{default_output_dir}}_small/family.parquet \
+        --akm-dir {{default_output_dir}}_small/akm/ \
+        --bef-dir {{default_output_dir}}_small/bef/ \
+        --ind-dir {{default_output_dir}}_small/ind/ \
+        --uddf-dir {{default_output_dir}}_small/uddf/ \
+        --structured
+
+# Run the complete pipeline with small datasets using legacy cache but skip matched pairs
+complete-pipeline-small-legacy-skip-pairs: generate-and-sample-small
+    RUST_LOG=warn IDS_CACHE_TYPE=legacy IDS_SKIP_PAIRS=true {{ids_binary}} check-balance \
         -m output/matched_pairs.csv \
         --family-file {{default_output_dir}}_small/family.parquet \
         --akm-dir {{default_output_dir}}_small/akm/ \

@@ -1,4 +1,6 @@
-use crate::translation::TranslationMaps;
+use types::translation::TranslationMaps;
+use chrono::NaiveDate;
+use types::models::{CovariateType, CovariateValue};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -37,9 +39,12 @@ impl CovariateStorage {
     pub fn add_covariate(&mut self, mut covariate: CovariateData) {
         // Translate values based on covariate type
         covariate.translated_value = match &covariate.value {
-            CovariateValue::Demographics { statsb, .. } => self
-                .translations
-                .translate_statsb(&statsb.to_string())
+            CovariateValue::Demographics { citizenship, .. } => citizenship
+                .as_ref()
+                .and_then(|code| self.translations.translate(
+                    types::translation::TranslationType::Statsb, 
+                    code
+                ))
                 .map(String::from),
             // Add more translations as needed
             _ => None,
@@ -51,7 +56,7 @@ impl CovariateStorage {
     pub fn save_to_csv(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let mut writer = csv::Writer::from_path(path)?;
 
-        writer.write_record(&[
+        writer.write_record([
             "PNR",
             "Date",
             "Covariate Type",
@@ -60,7 +65,7 @@ impl CovariateStorage {
         ])?;
 
         for covariate in &self.data {
-            writer.write_record(&[
+            writer.write_record([
                 &covariate.pnr,
                 &covariate.date.to_string(),
                 &format!("{:?}", covariate.covariate_type),

@@ -10,7 +10,7 @@ use types::storage::Storage as Store;
 use types::IdsError;
 
 #[derive(Hash, Eq, PartialEq, Clone)]
-pub(crate) struct CacheKey {
+pub struct CacheKey {
     pub pnr: String,
     pub covariate_type: CovariateType,
     pub date: NaiveDate,
@@ -27,7 +27,7 @@ impl CacheKey {
             date,
         }
     }
-    
+
     // Fast equality check for common case of matching PNRs
     #[inline]
     #[allow(dead_code)]
@@ -136,7 +136,7 @@ where
     }
 }
 
-pub(crate) struct CovariateCache {
+pub struct CovariateCache {
     // Primary cache: sharded RwLock for better concurrent read/write performance
     primary_cache: Arc<ShardedCache<CacheKey, Option<Covariate>>>,
     // Secondary cache: DashMap for operations that need lock-free concurrent access
@@ -154,7 +154,6 @@ impl CovariateCache {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get(&self, key: &CacheKey) -> Option<Option<Covariate>> {
         // First check the primary sharded cache (faster for reads)
         if let Some(value) = self.primary_cache.get(key) {
@@ -297,7 +296,6 @@ impl CovariateCache {
     
     /// Prefetch all covariates for a set of subjects on specific dates
     /// Optimized for parallel fetching with minimal lock contention
-    #[allow(dead_code)]
     pub fn prefetch_for_subjects(
         &self,
         store: &impl Store,

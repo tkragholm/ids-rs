@@ -1,5 +1,20 @@
 use clap::{Parser, Subcommand};
 
+/// Subcommands for the Config command
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// Generate a default configuration file for covariates
+    GenerateCovariates {
+        /// Output file path
+        #[arg(short = 'o', long, help = "Path to save the generated configuration file")]
+        output: String,
+        
+        /// Force overwrite of existing file
+        #[arg(short = 'f', long, help = "Force overwrite if the output file already exists")]
+        force: bool,
+    }
+}
+
 #[derive(Parser)]
 #[command(
     author,
@@ -43,6 +58,12 @@ pub enum Commands {
         /// Random seed for reproducibility
         #[arg(short = 'r', long, help = "Seed for random number generation to ensure reproducible results")]
         seed: Option<u64>,
+    },
+    
+    /// Configuration utilities for the system
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
     },
 
     /// Sample controls using incidence density sampling for case-control studies

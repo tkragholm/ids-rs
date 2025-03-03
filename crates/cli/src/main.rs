@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
 
 mod cli_internal;
-use cli_internal::{Cli, Commands};
+use cli_internal::{Cli, Commands, ConfigCommands};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check for the most common command line mistake - missing space after --family-file
@@ -85,6 +85,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             *end_year,
             *seed,
         ),
+        Commands::Config { command } => match command {
+            ConfigCommands::GenerateCovariates { output, force } => handle_generate_covariates_config(output, *force),
+        },
         Commands::Sample {
             input,
             controls,
@@ -989,4 +992,63 @@ fn convert_to_case_control_pairs(
             )
         })
         .partition(|(pnr, _)| case_pnrs.contains(pnr))
+}
+
+/// Handle the generation of the covariates configuration file
+fn handle_generate_covariates_config(output: &str, force: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use core::utils::console::{format_duration_short, ConsoleOutput};
+    use covariates::config::generate_default_config;
+    use std::time::Instant;
+    
+    ConsoleOutput::section("Covariate Configuration Generator");
+    
+    let start = Instant::now();
+    
+    // Check if file exists and we're not forcing overwrite
+    let output_path = Path::new(output);
+    if output_path.exists() && !force {
+        ConsoleOutput::error(&format!(
+            "Output file {} already exists. Use -f/--force to overwrite.",
+            output_path.display()
+        ));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!("Output file already exists: {}", output_path.display()),
+        )
+        .into());
+    }
+    
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = output_path.parent() {
+        if !parent.exists() {
+            ConsoleOutput::info(&format!("Creating directory: {}", parent.display()));
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    
+    // Generate the configuration file
+    ConsoleOutput::subsection("Generating Configuration");
+    ConsoleOutput::key_value("Output file", output);
+    
+    match generate_default_config(output) {
+        Ok(_) => {
+            let total_time = start.elapsed();
+            ConsoleOutput::success(&format!(
+                "Configuration file generated successfully in {}",
+                format_duration_short(total_time)
+            ));
+            
+            // Print some helpful instructions
+            ConsoleOutput::info("\nTo use this configuration file:");
+            ConsoleOutput::info("1. Edit the file to customize your covariates");
+            ConsoleOutput::info("2. Load it in your code with CovariatesConfig::from_file()");
+            ConsoleOutput::info("3. Create processors with CovariateProcessorRegistry::from_config()");
+            
+            Ok(())
+        }
+        Err(e) => {
+            ConsoleOutput::error(&format!("Failed to generate configuration file: {}", e));
+            Err(e)
+        }
+    }
 }

@@ -1,7 +1,6 @@
 use super::{
-    cache::{CacheKey, CovariateCache},
+    legacy_cache::{CacheKey, CovariateCache},
     metrics::BalanceMetrics,
-    // processor::ValueProcessor,
     results::BalanceResults,
 };
 use crate::models::{CovariateSummary, MatchedPairDetail};
