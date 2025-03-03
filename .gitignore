@@ -7,3 +7,4 @@ Cargo.lock
 /output
 STUDY.md
 CLAUDE.md
+.DS_Store
