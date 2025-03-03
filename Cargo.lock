@@ -503,7 +503,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "cli"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "clap",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "core"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "bit-vec",
  "chrono",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "covariates"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ahash",
  "chrono",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "datagen"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -1347,7 +1347,7 @@ checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
 
 [[package]]
 name = "loader"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -1791,21 +1791,10 @@ dependencies = [
 
 [[package]]
 name = "py"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
- "chrono",
  "clap",
- "colored",
- "core",
- "covariates",
- "datagen",
- "env_logger",
- "indicatif",
- "indicatif-log-bridge",
- "loader",
- "log",
- "log4rs",
- "types",
+ "fastrand",
 ]
 
 [[package]]
@@ -2319,7 +2308,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "types"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -2379,7 +2368,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",

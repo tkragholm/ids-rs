@@ -24,7 +24,7 @@ pub enum ConfigCommands {
 #[derive(Parser)]
 #[command(
     author,
-    version = "0.2.1",
+    version = "0.3.0",
     about = "Incidence Density Sampling (IDS) CLI tool for epidemiological research",
     long_about = "A comprehensive toolkit for generating synthetic register data, performing incidence density sampling, and analyzing covariate balance in epidemiological studies."
 )]

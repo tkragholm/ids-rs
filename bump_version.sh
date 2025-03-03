@@ -1,8 +1,8 @@
 #!/bin/bash
 # Script to bump version across the project
 
-OLD_VERSION="0.2.0"
-NEW_VERSION="0.2.1"
+OLD_VERSION="0.2.1"
+NEW_VERSION="0.3.0"
 
 echo "Bumping version from $OLD_VERSION to $NEW_VERSION"
 
