@@ -15,7 +15,7 @@ resolver = "2"
 
 # Set workspace-wide configuration
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Tobias Kragholm <tkragholm@gmail.com>"]
 description = "Incidence Density Sampling implementation in Rust"
