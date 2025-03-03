@@ -1,6 +1,6 @@
 # IDS-RS: Incidence Density Sampling Tool
 
-This Python package provides access to the IDS-RS tool, a Rust implementation for performing incidence density sampling in epidemiological research.
+This Python package provides access to the IDS-RS tool, a Rust implementation for performing incidence density sampling in epidemiological research. The package includes both the binary executable and all necessary mapping and schema files.
 
 ## Installation
 
