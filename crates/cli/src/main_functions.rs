@@ -21,10 +21,10 @@ use crate::generate_structured_reports;
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Check for the most common command line mistake - missing space after --family-file
     for (_i, arg) in std::env::args().enumerate() {
-        if arg.starts_with("--family-file") && arg \!= "--family-file" {
-            eprintln\!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
-            eprintln\!("       Did you mean to write: --family-file {}", &arg[13..]);
-            eprintln\!("       Check other parameters too. Put a space between each flag and its value.");
+        if arg.starts_with("--family-file") && arg != "--family-file" {
+            eprintln!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
+            eprintln!("       Did you mean to write: --family-file {}", &arg[13..]);
+            eprintln!("       Check other parameters too. Put a space between each flag and its value.");
             std::process::exit(1);
         }
     }
@@ -49,7 +49,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Connect logger with progress bars to prevent progress bars from being interrupted by logs
     if let Err(e) = LogWrapper::new(multi.clone(), logger).try_init() {
-        eprintln\!("Warning: Failed to initialize logger: {}", e);
+        eprintln!("Warning: Failed to initialize logger: {}", e);
     }
     
     // Set the global max log level
@@ -59,9 +59,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = match Cli::try_parse() {
         Ok(c) => c,
         Err(e) => {
-            eprintln\!("{}", e);
-            eprintln\!("\nNOTE: Make sure there is a space between each flag and its value\!");
-            eprintln\!("Example: --family-file data/registers/family.parquet");
+            eprintln!("{}", e);
+            eprintln!("\nNOTE: Make sure there is a space between each flag and its value!");
+            eprintln!("Example: --family-file data/registers/family.parquet");
             std::process::exit(1);
         }
     };
@@ -141,12 +141,12 @@ fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>>
         fs::create_dir_all(base_path.join(dir))?;
     }
 
-    info\!("Created output directories in {}", output_dir);
+    info!("Created output directories in {}", output_dir);
     Ok(())
 }
 
 fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let log_path = format\!("{}/log/cli.log", output_dir);
+    let log_path = format!("{}/log/cli.log", output_dir);
 
     // Use more restrictive logging in the console to reduce terminal noise
     // Only show warnings and errors in the console

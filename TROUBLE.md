@@ -1,206 +1,132 @@
-## [Project Layout](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#project-layout)
+diagnostics
+ids-rs/crates/cli/src/main_run.rs
 
-Maturin expects a particular project layout depending on the contents of the package.
+```rust
+        ),
+    }
+}
+// error: unexpected closing delimiter: `}`
+//        unexpected closing delimiter
 
-## [Pure Rust project](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#pure-rust-project)
-
-For a pure Rust project, the structure is as expected and what you get from `cargo new`:
-
-```
-my-rust-project/
-├── Cargo.toml
-├── pyproject.toml  # required for maturin configuration
-└── src
-    ├── lib.rs  # default for library crates
-    └── main.rs  # default for binary crates
+fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
 ```
 
-Maturin will add a necessary `__init__.py` to the package when building the wheel. For convenience, this file includes the following:
+ids-rs/crates/cli/src/main.rs
 
-```python
-from .my_project import * __doc__ = my_project.__doc__ if hasattr(my_project, "__all__"): __all__ = my_project.__all__
+```rust
+    // Execute the requested command
+    match &cli.command {
+// error: missing match arm: `&Config { .. }` not covered
+        Commands::GenerateRegisters {
+            output_dir,
 ```
 
-such that the module functions may be called directly with:
+ids-rs/crates/py/src/bin/main.rs
 
-```python
-import my_project my_project.foo()
+```rust
+// Generate sample matched pairs and statistics
+fn generate_sample_matches(output_dir: &str, input_file: &str, controls_per_case: usize) {
+// warning: unused variable: `input_file`
+//          `#[warn(unused_variables)]` on by default
+    let dir_path = Path::new(output_dir);
 ```
 
-rather than:
+ids-rs/crates/cli/src/main_functions.rs
 
-```python
-from my_project import my_project
+```rust
+    // Check for the most common command line mistake - missing space after --family-file
+    for (_i, arg) in std::env::args().enumerate() {
+        if arg.starts_with("--family-file") && arg \!= "--family-file" {
+// error: unknown start of token: \
+            eprintln\!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
+            eprintln\!("       Did you mean to write: --family-file {}", &arg[13..]);
 ```
 
-> **Note**: there is currently no way to tell maturin to include extra data (e.g. `package_data` in setuptools) for a pure Rust project. Instead, consider using the layout described below for the mixed Rust/Python project.
-
-## [Mixed Rust/Python project](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#mixed-rustpython-project)
-
-To create a mixed Rust/Python project, add a directory with your package name (i.e. matching `lib.name` in your `Cargo.toml`) to contain the Python source:
-
-```
-my-rust-and-python-project
-├── Cargo.toml
-├── my_project  # &lt;&lt;&lt; add this directory and put Python code in here
-│   ├── __init__.py
-│   └── bar.py
-├── pyproject.toml
-├── README.md
-└── src
-    └── lib.rs
+```rust
+    for (_i, arg) in std::env::args().enumerate() {
+        if arg.starts_with("--family-file") && arg \!= "--family-file" {
+            eprintln\!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
+// error: unknown start of token: \
+            eprintln\!("       Did you mean to write: --family-file {}", &arg[13..]);
+            eprintln\!("       Check other parameters too. Put a space between each flag and its value.");
 ```
 
-Note that in a mixed Rust/Python project, maturin _does not_ modify the existing `__init__.py` in the root package, so now to import the rust module in Python you must use:
-
-```python
-from my_project import my_project
+```rust
+        if arg.starts_with("--family-file") && arg \!= "--family-file" {
+            eprintln\!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
+            eprintln\!("       Did you mean to write: --family-file {}", &arg[13..]);
+// error: unknown start of token: \
+            eprintln\!("       Check other parameters too. Put a space between each flag and its value.");
+            std::process::exit(1);
 ```
 
-You can modify `__init__.py` yourself (see above) if you would like to import Rust functions from a higher-level namespace.
-
-You can specify a different python source directory in `pyproject.toml` by setting `tool.maturin.python-source`, for example
-
-**pyproject.toml**
-
-```toml
-[tool.maturin] python-source = "python"
+```rust
+            eprintln\!("ERROR: Detected possible command line issue. You provided '{}' without a space.", arg);
+            eprintln\!("       Did you mean to write: --family-file {}", &arg[13..]);
+            eprintln\!("       Check other parameters too. Put a space between each flag and its value.");
+// error: unknown start of token: \
+            std::process::exit(1);
+        }
 ```
 
-then the project structure would look like this:
-
-```
-my-rust-and-python-project
-├── Cargo.toml
-├── python
-│   └── my_project
-│       ├── __init__.py
-│       └── bar.py
-├── pyproject.toml
-├── README.md
-└── src
- &nbsp;&nbsp; └── lib.rs
+```rust
+    // Connect logger with progress bars to prevent progress bars from being interrupted by logs
+    if let Err(e) = LogWrapper::new(multi.clone(), logger).try_init() {
+        eprintln\!("Warning: Failed to initialize logger: {}", e);
+// error: unknown start of token: \
+    }
 ```
 
-> **Note**
->
-> This structure is recommended to avoid [a common `ImportError` pitfall](https://github.com/PyO3/maturin/issues/490)
-
-### [Alternate Python source directory (src layout)](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#alternate-python-source-directory-src-layout)
-
-Having a directory with `package_name` in the root of the project can occasionally cause confusion as Python allows importing local packages and modules. A popular way to avoid this is with the `src`\-layout, where the Python package is nested within a `src` directory. Unfortunately this interferes with the structure of a typical Rust project. Fortunately, Python is not particular about the name of the parent source directory.
-
-maturin will detect the following src layout automatically:
-
-```
-my-rust-and-python-project
-├── src  # put python code in src folder
-│   └── my_project
-│       ├── __init__.py
-│       └── bar.py
-├── pyproject.toml
-├── README.md
-└── rust # put rust code in rust folder
-    |── Cargo.toml
-    └── src
-        └── lib.rs
+```rust
+        Ok(c) => c,
+        Err(e) => {
+            eprintln\!("{}", e);
+// error: unknown start of token: \
+            eprintln\!("\nNOTE: Make sure there is a space between each flag and its value\!");
+            eprintln\!("Example: --family-file data/registers/family.parquet");
 ```
 
-#### [Import Rust as a submodule of your project](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#import-rust-as-a-submodule-of-your-project)
-
-If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused. You might also want to discourage end users from using the Rust functions directly by giving it a different name, say '\_my\_project'. This can be done by adding `module-name = <package name>.<rust pymodule name>` to the `[tool.maturin]` in your `pyproject.toml`. For example:
-
-```toml
-[tool.maturin] module-name = "my_project._my_project"
+```rust
+        Err(e) => {
+            eprintln\!("{}", e);
+            eprintln\!("\nNOTE: Make sure there is a space between each flag and its value\!");
+// error: unknown start of token: \
+            eprintln\!("Example: --family-file data/registers/family.parquet");
+            std::process::exit(1);
 ```
 
-You can then import your Rust module inside your Python source as follows:
-
-```python
-from my_project import _my_project
+```rust
+        Err(e) => {
+            eprintln\!("{}", e);
+            eprintln\!("\nNOTE: Make sure there is a space between each flag and its value\!");
+// error: unknown character escape: `!`
+//        for more information, visit <https://doc.rust-lang.org/reference/tokens.html#literals>
+            eprintln\!("Example: --family-file data/registers/family.parquet");
+            std::process::exit(1);
 ```
 
-IDEs can then recognize the `_my_project` module as separate from your main Python source module. This allows for code completion of the types inside your Rust Python module for certain IDEs.
-
-## [Adding Python type information](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#adding-python-type-information)
-
-To distribute typing information, you need to add:
-
-- an empty marker file called `py.typed` in the root of the Python package
-- inline types in Python files and/or `.pyi` "stub" files
-
-In a pure Rust project, add type stubs in a `<module_name>.pyi` file in the project root. Maturin will automatically include this file along with the required `py.typed` file for you.
-
-```
-my-rust-project/
-├── Cargo.toml
-├── my_project.pyi  # &lt;&lt;&lt; add type stubs for Rust functions in the my_project module here
-├── pyproject.toml
-└── src
-    └── lib.rs
+```rust
+            eprintln\!("{}", e);
+            eprintln\!("\nNOTE: Make sure there is a space between each flag and its value\!");
+            eprintln\!("Example: --family-file data/registers/family.parquet");
+// error: unknown start of token: \
+            std::process::exit(1);
+        }
 ```
 
-In a mixed Rust/Python project, additional files in the Python source dir (but not in `.gitignore`) will be automatically included in the build outputs (source distribution and/or wheel). Type information can be therefore added to the root Python package directory as you might do in a pure Python package. This requires you to add the `py.typed` marker file yourself.
+```rust
+    }
 
-```
-my-project
-├── Cargo.toml
-├── python
-│   └── my_project
-│       ├── __init__.py
-│       ├── py.typed  # &lt;&lt;&lt; add this empty file
-│       ├── my_project.pyi  # &lt;&lt;&lt; add type stubs for Rust functions in the my_project module here
-│       ├── bar.pyi  # &lt;&lt;&lt; add type stubs for bar.py here OR type bar.py inline
-│       └── bar.py
-├── pyproject.toml
-├── README.md
-└── src
-    └── lib.rs
+    info\!("Created output directories in {}", output_dir);
+// error: unknown start of token: \
+    Ok(())
+}
 ```
 
-## [Data](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/_generated_background_page.html#data)
+```rust
+fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let log_path = format\!("{}/log/cli.log", output_dir);
+// error: unknown start of token: \
 
-You can add wheel data by creating a `<module_name>.data` folder or setting its location as `data` in pyproject.toml under `[tool.maturin]` or in Cargo.toml under `[project.metadata.maturin]`.
-
-The data folder may have the following subfolder:
-
-- `data`: The contents of this folder will simply be unpacked into the virtualenv
-- `scripts`: Treated similar to entry points, files in there are installed as standalone executable
-- `headers`: For `.h` C header files
-- `purelib`: This also exists, but seems to be barely used
-- `platlib`: This also exists, but seems to be barely used
-
-If you add a symlink in the data directory, we'll include the actual file so you have more flexibility.
-
-[](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/tutorial "Previous chapter") [](chrome-extension://pcmpcfapbekmbjjkdalcgopdkipoggdi/bindings "Next chapter")
-
-## GitHub Actions Workflow Troubleshooting
-
-When using GitHub Actions with maturin for Python wheel building, consider these potential issues:
-
-1. **Working Directory Path**: Ensure the `working-directory` in the GitHub workflow matches the actual directory structure in the repository. For this project:
-   ```yaml
-   - name: Build wheels
-     uses: PyO3/maturin-action@v1
-     with:
-       command: build
-       args: --release --out dist -b bin
-       working-directory: ./crates/py
-   ```
-
-2. **Module Naming**: If you encounter "directory does not exist" errors, check that the module name in `pyproject.toml` matches what GitHub Actions expects:
-   ```toml
-   [tool.maturin]
-   bindings = "bin"
-   module-name = "ids_rs"
-   ```
-
-3. **Manifest Path**: For workspace projects, specify the manifest path to help maturin find all dependencies:
-   ```toml
-   [tool.maturin]
-   manifest-path = "../.."
-   ```
-
-4. **Directory Structure**: Ensure your repository's directory structure on GitHub matches your local setup. Discrepancies like `crates/ids-py` vs `crates/py` can cause errors.
-
-5. **Build Context**: Check if the GitHub Actions environment might have different Rust or Python versions that affect the build process.
+    // Use more restrictive logging in the console to reduce terminal noise
+```

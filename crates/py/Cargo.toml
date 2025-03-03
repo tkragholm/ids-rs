@@ -5,8 +5,7 @@ edition.workspace = true
 
 [dependencies]
 clap = { workspace = true }
-fastrand = { workspace = true }
 
 [[bin]]
-name = "ids"
+name = "ids-cli"
 path = "src/bin/main.rs"

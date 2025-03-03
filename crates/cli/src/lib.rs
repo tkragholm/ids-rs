@@ -1,22 +1,50 @@
 pub mod cli;
-pub use cli::{Cli, Commands};
+pub mod main_run;
 
-/// Run the CLI application
-/// 
-/// This function is the main entry point for the CLI application.
-/// It's exposed as a library function so it can be called from other crates.
-/// 
-/// # Returns
-/// * `Result<(), Box<dyn std::error::Error>>` - Success or error
-pub fn run_cli() -> Result<(), Box<dyn std::error::Error>> {
-    use clap::Parser;
+// Export CLI types that may be used by other crates
+pub use cli::{Cli, Commands, ConfigCommands};
+
+use std::path::Path;
+use std::fs;
+use log::info;
+use core::utils::configure_logging_with_level;
+
+// Create output directories
+pub fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let base_path = Path::new(output_dir);
+
+    // Create main output directory and log directory
+    fs::create_dir_all(base_path)?;
+    fs::create_dir_all(base_path.join("log"))?;
+
+    // Create plots directory for visualizations
+    fs::create_dir_all(base_path.join("plots"))?;
     
-    let args = std::env::args().collect::<Vec<_>>();
-    let _cmd = cli::Cli::parse_from(args);
+    // Create report directory for HTML reports
+    fs::create_dir_all(base_path.join("report"))?;
+
+    // Create register subdirectories for data storage
+    let register_dirs = ["akm", "bef", "ind", "uddf"];
+    for dir in &register_dirs {
+        fs::create_dir_all(base_path.join(dir))?;
+    }
+
+    info!("Created output directories in {}", output_dir);
+    Ok(())
+}
+
+// Configure logging with directory
+pub fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let log_path = format!("{}/log/cli.log", output_dir);
+
+    // Use more restrictive logging in the console to reduce terminal noise
+    // Only show warnings and errors in the console
+    let log_level = log::LevelFilter::Warn;
     
-    // Execute the command (this is a stub implementation)
-    // In reality, this would call the real command implementation
-    println!("Command would execute here!");
+    // This will send logs to both console and file, but we're setting
+    // the overall level to Warn to reduce console output
+    configure_logging_with_level(Some(&log_path), log_level)?;
+    
     Ok(())
 }
 
