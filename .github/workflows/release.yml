@@ -60,7 +60,8 @@ jobs:
           brew install fontconfig freetype
 
       # Add debugging step to check directories
-      - name: Debug directory structure
+      - name: Debug directory structure - Unix
+        if: runner.os != 'Windows'
         run: |
           echo "Current directory: $(pwd)"
           echo "Contents of crates directory:"
@@ -69,6 +70,18 @@ jobs:
           ls -la crates/ids/
           echo "Contents of crates/ids/src directory:"
           ls -la crates/ids/src/
+          
+      # Add debugging step for Windows
+      - name: Debug directory structure - Windows
+        if: runner.os == 'Windows'
+        run: |
+          echo "Current directory: $PWD"
+          echo "Contents of crates directory:"
+          dir crates
+          echo "Contents of crates/ids directory:"
+          dir crates\ids
+          echo "Contents of crates/ids/src directory:"
+          dir crates\ids\src
 
       # Set up macOS ARM64 cross-compilation
       - name: Set up macOS ARM64 cross-compile
