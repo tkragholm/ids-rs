@@ -7,7 +7,7 @@ fn main() {
     
     // This is a simple wrapper that just calls the sys command
     // to run the main CLI with the same arguments
-    println!("Version 0.1.0");
+    println!("Version 0.2.0");
     println!("This is a placeholder for the Python wrapper");
 
     // Exit with success

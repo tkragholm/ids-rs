@@ -16,3 +16,5 @@ classifiers = [
 
 [tool.maturin]
 bindings = "bin"
+# Explicitly set module name to match what GitHub Actions might be expecting
+module-name = "ids_rs"
