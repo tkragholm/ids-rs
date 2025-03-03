@@ -32,9 +32,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       # Install Rust toolchain
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        if: matrix.target != ''
+        uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target || 'default' }}
+          targets: ${{ matrix.target }}
+          
+      # Install default Rust toolchain for non-cross-compile builds
+      - name: Install default Rust toolchain
+        if: matrix.target == ''
+        uses: dtolnay/rust-toolchain@stable
 
       # Install Linux dependencies
       - name: Install Linux dependencies
