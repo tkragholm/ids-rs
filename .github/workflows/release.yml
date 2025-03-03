@@ -52,6 +52,17 @@ jobs:
         run: |
           brew install fontconfig freetype
 
+      # Add debugging step to check directories
+      - name: Debug directory structure
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Contents of crates directory:"
+          ls -la crates/
+          echo "Contents of crates/ids directory:"
+          ls -la crates/ids/
+          echo "Contents of crates/ids/src directory:"
+          ls -la crates/ids/src/
+
       # Set up macOS ARM64 cross-compilation
       - name: Set up macOS ARM64 cross-compile
         if: matrix.target == 'aarch64-apple-darwin'
