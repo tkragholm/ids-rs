@@ -19,5 +19,5 @@ indicatif-log-bridge.workspace = true
 colored.workspace = true
 
 [[bin]]
-name = "ids-py"
+name = "ids"
 path = "src/bin/main.rs"

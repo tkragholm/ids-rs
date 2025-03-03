@@ -1,6 +1,6 @@
 # ids-rs Python Package
 
-A Python wrapper for the IDS (Incidence Density Sampling) CLI tool.
+A complete Python distribution of the IDS (Incidence Density Sampling) CLI tool.
 
 ## Installation
 
@@ -8,23 +8,23 @@ A Python wrapper for the IDS (Incidence Density Sampling) CLI tool.
 pip install ids-rs
 ```
 
-## Prerequisites
+## Overview
 
-This package is a wrapper around the IDS CLI tool. You need to have the `ids` binary installed and available in your PATH for this package to work.
+This package provides a complete, standalone implementation of the IDS CLI tool. After installation, the `ids` command will be available in your PATH and ready to use without any additional dependencies.
 
 ## Usage
 
-After installation, you can access the IDS functionality through the `ids-py` command, which forwards all commands to the main `ids` CLI:
+After installation, you can access the IDS functionality through the `ids` command:
 
 ```bash
 # Check balance between matched cases and controls
-ids-py CheckBalance --matches-file matched_pairs.csv --covariate-dir data --structured
+ids CheckBalance --matches-file matched_pairs.csv --covariate-dir data --structured
 
 # Generate synthetic register data
-ids-py GenerateRegisters --output-dir data/registers --num-records 1000000
+ids GenerateRegisters --output-dir data/registers --num-records 1000000
 
 # Sample controls for cases
-ids-py Sample --input data/pediatric.csv --controls 4
+ids Sample --input data/pediatric.csv --controls 4
 ```
 
 ## From Python Code
@@ -36,7 +36,7 @@ import subprocess
 
 # Run a command
 result = subprocess.run([
-    "ids-py", 
+    "ids", 
     "CheckBalance", 
     "--matches-file", "matched_pairs.csv", 
     "--covariate-dir", "data", 
@@ -53,7 +53,7 @@ if result.returncode != 0:
 
 ## Available Commands
 
-The following commands are available through the `ids-py` wrapper:
+The following commands are available:
 
 - `GenerateRegisters`: Create synthetic register data
 - `Sample`: Perform incidence density sampling
@@ -63,12 +63,5 @@ The following commands are available through the `ids-py` wrapper:
 For detailed usage of each command, use:
 
 ```bash
-ids-py <command> --help
+ids <command> --help
 ```
-
-## Troubleshooting
-
-If you get an error like "Failed to execute the IDS CLI binary", ensure that:
-1. The main `ids` binary is installed
-2. The `ids` binary is in your PATH
-3. You have proper permissions to execute the binary
