@@ -7,51 +7,28 @@ use chrono::NaiveDate;
 use indicatif::ProgressBar;
 use rand::prelude::IndexedRandom;
 use rand::Rng;
-use hashbrown::HashMap;
-use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
+use types;
 
 impl super::RegisterGenerator {
-    /// Load the HFAUDD to ISCED mapping from the hfaudd.json file
-    fn load_hfaudd_mapping() -> Result<HashMap<String, String>, DataGenError> {
-        let mapping_path = Path::new("mappings/hfaudd.json");
-        
-        let mut file = File::open(mapping_path).map_err(|e| {
-            DataGenError::Generation(format!("Failed to open hfaudd.json: {}", e))
-        })?;
-        
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).map_err(|e| {
-            DataGenError::Generation(format!("Failed to read hfaudd.json: {}", e))
-        })?;
-        
-        let mapping: HashMap<String, String> = serde_json::from_str(&contents).map_err(|e| {
-            DataGenError::Generation(format!("Failed to parse hfaudd.json: {}", e))
-        })?;
-        
-        Ok(mapping)
-    }
-    
-    /// Get a random HFAUDD code for a given ISCED level
+    /// Get a random HFAUDD code for a given ISCED level using the central translation system
     fn get_random_hfaudd_for_isced_level(
-        mapping: &HashMap<String, String>,
+        translation_maps: &types::translation::TranslationMaps,
         isced_level: &str,
         rng: &mut rand::rngs::StdRng,
     ) -> Option<String> {
-        // Collect all HFAUDD codes that map to the given ISCED level
-        let valid_codes: Vec<String> = mapping
-            .iter()
-            .filter(|(_, v)| v == &isced_level)
-            .map(|(k, _)| k.clone())
-            .collect();
+        // Get all HFAUDD codes that map to the given ISCED level
+        let valid_codes = translation_maps.get_codes_for_value(
+            types::translation::TranslationType::Hfaudd, 
+            isced_level
+        );
             
         if valid_codes.is_empty() {
             None
         } else {
             // Choose a random code from the valid ones
-            Some(valid_codes.choose(rng).unwrap().clone())
+            valid_codes.choose(rng).cloned()
         }
     }
     
@@ -64,8 +41,9 @@ impl super::RegisterGenerator {
         );
         pb.set_message("Generating UDDF records...");
 
-        // Load the HFAUDD mapping
-        let hfaudd_mapping = Self::load_hfaudd_mapping()?;
+        // Load the translation maps using the central system
+        let translation_maps = types::translation::TranslationMaps::new()
+            .map_err(|e| DataGenError::Generation(format!("Failed to load translation maps: {}", e)))?;
         
         let schema = Arc::new(Schema::new(vec![
             Field::new("PNR", DataType::Utf8, false),
@@ -138,9 +116,9 @@ impl super::RegisterGenerator {
                         }
                     }
                     
-                    // Get actual HFAUDD code from the mapping
+                    // Get actual HFAUDD code from the translation system
                     if let Some(hfaudd_code) = Self::get_random_hfaudd_for_isced_level(
-                        &hfaudd_mapping, 
+                        &translation_maps, 
                         selected_level,
                         &mut self.rng
                     ) {

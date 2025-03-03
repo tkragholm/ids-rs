@@ -561,6 +561,19 @@ impl DataReader for CustomPathReader {
             log::info!("Attempting to find family relations at: {}", path.display());
             if path.exists() && path.is_file() {
                 log::info!("Found family relations file at: {}", path.display());
+                
+                // Look for schemas in the IDS_SCHEMAS_DIR environment variable
+                if let Ok(schemas_dir) = std::env::var("IDS_SCHEMAS_DIR") {
+                    let schema_path = Path::new(&schemas_dir).join("family.json");
+                    log::info!("Checking for family schema at: {}", schema_path.display());
+                    
+                    if schema_path.exists() {
+                        log::info!("Found family schema at: {}", schema_path.display());
+                        // TODO: Use the schema from the file
+                        // For now, just proceed with the default schema
+                    }
+                }
+                
                 return self.read_batches(path, &schema::family_schema());
             }
         }

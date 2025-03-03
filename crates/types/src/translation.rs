@@ -11,6 +11,7 @@ pub enum TranslationType {
     Hustype,
     Reg,
     Socio13,
+    Hfaudd,  // Added HFAUDD to ISCED mapping
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ pub struct TranslationMaps {
     hustype: HashMap<String, String>,
     reg: HashMap<String, String>,
     socio13: HashMap<String, String>,
+    hfaudd: HashMap<String, String>,  // Added HFAUDD to ISCED mapping
 }
 
 impl TranslationMaps {
@@ -34,6 +36,7 @@ impl TranslationMaps {
             hustype: load_translation_map("mappings/hustype.json")?,
             reg: load_translation_map("mappings/reg.json")?,
             socio13: load_translation_map("mappings/socio13.json")?,
+            hfaudd: load_translation_map("mappings/hfaudd.json")?,  // Added HFAUDD to ISCED mapping
         })
     }
     
@@ -47,6 +50,7 @@ impl TranslationMaps {
             hustype: HashMap::new(),
             reg: HashMap::new(),
             socio13: HashMap::new(),
+            hfaudd: HashMap::new(),  // Added HFAUDD to ISCED mapping
         }
     }
 
@@ -59,8 +63,29 @@ impl TranslationMaps {
             TranslationType::Hustype => &self.hustype,
             TranslationType::Reg => &self.reg,
             TranslationType::Socio13 => &self.socio13,
+            TranslationType::Hfaudd => &self.hfaudd,  // Added HFAUDD to ISCED mapping
         };
         map.get(code).map(String::as_str)
+    }
+    
+    /// Get all codes that translate to a specific value for a given translation type
+    /// Useful for finding all HFAUDD codes that map to a specific ISCED level
+    pub fn get_codes_for_value(&self, translation_type: TranslationType, value: &str) -> Vec<String> {
+        let map = match translation_type {
+            TranslationType::Statsb => &self.statsb,
+            TranslationType::Civst => &self.civst,
+            TranslationType::FamilyType => &self.family_type,
+            TranslationType::FmMark => &self.fm_mark,
+            TranslationType::Hustype => &self.hustype,
+            TranslationType::Reg => &self.reg,
+            TranslationType::Socio13 => &self.socio13,
+            TranslationType::Hfaudd => &self.hfaudd,
+        };
+        
+        map.iter()
+            .filter(|(_, v)| v == &value)
+            .map(|(k, _)| k.clone())
+            .collect()
     }
 }
 
@@ -68,7 +93,26 @@ fn load_translation_map(path: &str) -> Result<HashMap<String, String>, Box<dyn s
     // Log the attempted path
     log::info!("Loading translation map from path: {}", path);
     
-    // Make the path more robust - try with current directory if a relative path is provided
+    // Try locations in order of priority:
+    // 1. Check if there's an environment variable specifying mappings directory
+    // 2. Try the provided path directly
+    // 3. Try with current directory
+    
+    // First, check for environment variable IDS_MAPPINGS_DIR
+    if let Ok(mappings_dir) = std::env::var("IDS_MAPPINGS_DIR") {
+        let file_name = Path::new(path).file_name().ok_or("Invalid path")?;
+        let env_path = Path::new(&mappings_dir).join(file_name);
+        log::info!("Trying path from IDS_MAPPINGS_DIR: {}", env_path.display());
+        
+        if let Ok(file) = File::open(&env_path) {
+            let map: HashMap<String, String> = serde_json::from_reader(file)?;
+            return Ok(map);
+        } else {
+            log::warn!("Failed to open translation map at environment path: {}", env_path.display());
+        }
+    }
+    
+    // Try the provided path directly
     let file_result = File::open(Path::new(path));
     
     if let Err(ref e) = file_result {

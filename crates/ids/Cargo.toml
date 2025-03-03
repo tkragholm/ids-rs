@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "ids"
 version.workspace = true
 edition.workspace = true
 
@@ -20,6 +20,10 @@ indicatif.workspace = true
 colored.workspace = true
 hashbrown.workspace = true
 serde_json.workspace = true
+
+[profile.release-lto]
+lto = true
+inherits = "release"
 
 [[bin]]
 name = "ids"
