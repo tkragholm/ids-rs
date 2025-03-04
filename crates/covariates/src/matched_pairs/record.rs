@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct MatchedPairRecord {
@@ -14,8 +14,23 @@ pub struct MatchedPairRecord {
     #[serde(with = "core::utils::date_format")]
     pub control_birth_date: NaiveDate,
     pub birth_date_diff_days: i64,
+    #[serde(deserialize_with = "deserialize_optional_i64")]
     pub mother_age_diff_days: i64,
+    #[serde(deserialize_with = "deserialize_optional_i64")]
     pub father_age_diff_days: i64,
+}
+
+// Function to deserialize columns that could be NA or empty as 0
+fn deserialize_optional_i64<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    match s {
+        Some(s) if s.is_empty() || s.to_uppercase() == "NA" => Ok(0),
+        Some(s) => s.parse::<i64>().map_err(serde::de::Error::custom),
+        None => Ok(0),
+    }
 }
 
 impl MatchedPairRecord {

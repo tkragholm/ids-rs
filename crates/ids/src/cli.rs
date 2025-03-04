@@ -96,7 +96,7 @@ pub enum Commands {
         covariate_dir: Option<String>,
         
         /// Path to the family.parquet file
-        #[arg(long, value_name = "FILE", help = "Path to the family relationships data. Can be either a directory containing 'family.parquet' or a direct path to the parquet file. Either absolute or relative paths are supported.")]
+        #[arg(long, value_name = "FILE", help = "Path to the family relationships file (family.parquet). This should be a direct path to the parquet file, NOT a directory. This path is handled independently from the covariate directory.")]
         family_file: Option<String>,
         
         /// Path to the AKM register directory

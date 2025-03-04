@@ -142,27 +142,39 @@ fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>>
     // Create report directory for HTML reports
     fs::create_dir_all(base_path.join("report"))?;
 
-    // Create register subdirectories for data storage
-    let register_dirs = ["akm", "bef", "ind", "uddf"];
-    for dir in &register_dirs {
-        fs::create_dir_all(base_path.join(dir))?;
-    }
+    // Note: We no longer create empty register directories by default
+    // They will only be created when actually needed for data generation
 
     info!("Created output directories in {}", output_dir);
     Ok(())
 }
 
 fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let log_path = format!("{}/log/cli.log", output_dir);
-
-    // Use more restrictive logging in the console to reduce terminal noise
-    // Only show warnings and errors in the console
-    let log_level = log::LevelFilter::Warn;
-
-    // This will send logs to both console and file, but we're setting
-    // the overall level to Warn to reduce console output
-    configure_logging_with_level(Some(&log_path), log_level)?;
-
+    // Generate more obvious log path in current directory and output dir
+    let current_log_path = "ids_cli.log"; // Log in current directory for easier discovery
+    let output_log_path = format!("{}/log/ids_cli.log", output_dir);
+    
+    // Make sure file is writable - try to create both
+    let log_paths = [current_log_path, &output_log_path];
+    
+    // Use more descriptive logging levels
+    let console_level = log::LevelFilter::Info; // Show more info in console
+    let file_level = log::LevelFilter::Debug;  // Detailed logs in file
+    
+    // Try to initialize all possible logging locations by using existing logging setup
+    for path in &log_paths {
+        info!("Setting up logger at: {}", path);
+        // Use existing logging setup instead of trying to import utils directly
+        if let Err(e) = configure_logging_with_level(Some(path), file_level) {
+            warn!("Failed to set up logger at {}: {}", path, e);
+        }
+    }
+    
+    // Also configure legacy logging to maintain compatibility
+    configure_logging_with_level(Some(&output_log_path), console_level)?;
+    
+    info!("Logs are being saved to: {} and {}", current_log_path, output_log_path);
+    
     Ok(())
 }
 
@@ -491,10 +503,72 @@ fn handle_balance_check(
     // Helper function to normalize paths with extensive debugging
     let normalize_path = |path: &str, register_type: &str| -> String {
         let path_obj = Path::new(path);
+        let is_family = register_type == "family";
 
         // Log the input path
         log::debug!("Normalizing {} path: {}", register_type, path);
-
+        
+        // Special handling for family files to make them more robust
+        if is_family {
+            // For family files, we prioritize finding the actual file without
+            // trying to append it to the covariate directory
+            
+            // Check for .parquet extension and add if missing
+            let mut family_path = path.to_string();
+            if !family_path.ends_with(".parquet") {
+                family_path = format!("{}.parquet", family_path);
+                log::debug!("Added .parquet extension to family path: {}", family_path);
+            }
+            
+            let family_obj = Path::new(&family_path);
+            
+            // Try direct absolute path first
+            if family_obj.is_absolute() {
+                check_path_exists(&family_path, "family file (absolute)");
+                if Path::new(&family_path).exists() {
+                    log::info!("Found family file at absolute path: {}", family_path);
+                    return family_path;
+                }
+            }
+            
+            // Try relative to current directory
+            let current_dir = std::env::current_dir()
+                .unwrap_or_else(|_| Path::new(".").to_path_buf());
+            let relative_path = current_dir.join(&family_path);
+            let relative_str = relative_path.to_string_lossy().to_string();
+            
+            check_path_exists(&relative_str, "family file (relative to current dir)");
+            if relative_path.exists() {
+                log::info!("Found family file relative to current dir: {}", relative_str);
+                return relative_str;
+            }
+            
+            // As a last resort, if covariate_dir is specified, try there
+            // but ONLY if the path doesn't already have directory components
+            if let Some(base_dir) = covariate_dir {
+                // Don't do this if the family path already has directory components
+                if !family_obj.parent().map_or(false, |p| p != Path::new("")) {
+                    let cov_path = Path::new(base_dir).join(family_obj.file_name().unwrap_or_default());
+                    let cov_str = cov_path.to_string_lossy().to_string();
+                    
+                    check_path_exists(&cov_str, "family file (in covariate dir)");
+                    if cov_path.exists() {
+                        log::info!("Found family file in covariate dir: {}", cov_str);
+                        return cov_str;
+                    }
+                }
+            }
+            
+            // If we've tried everything and still don't have a file,
+            // return the most reasonable path (prioritizing the original input)
+            if family_obj.is_absolute() {
+                return family_path;
+            } else {
+                return relative_str;
+            }
+        }
+        
+        // Standard handling for non-family register directories
         if path_obj.is_absolute() {
             // If the path is absolute, use it as-is
             log::debug!("Using absolute path for {}: {}", register_type, path);

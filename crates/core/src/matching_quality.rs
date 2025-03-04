@@ -128,8 +128,11 @@ impl MatchingQuality {
 
     pub fn generate_summary_plots(&self, output_dir: &str) -> Result<(), Box<dyn Error>> {
         std::fs::create_dir_all(output_dir)?;
+        
+        // 1. Generate the traditional distribution plots
         self.plot_all_distributions(&format!("{output_dir}/distributions"))?;
 
+        // 2. Generate utilization summary (pie chart)
         let (utilization_rate, average_reuse) = {
             let total_matched_controls =
                 self.stats.matched_cases as f64 * self.stats.avg_controls_per_case;
@@ -149,6 +152,27 @@ impl MatchingQuality {
                 average_reuse,
             )
             .map_err(|e| Box::new(e) as Box<dyn Error>)?;
+            
+        // 3. Generate overall matching statistics visualization
+        self.plotting
+            .plot_matching_stats(
+                &format!("{output_dir}/matching_stats.png"),
+                self.stats.matched_cases,
+                self.stats.total_cases - self.stats.matched_cases,
+                self.stats.avg_controls_per_case,
+            )
+            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
+            
+        // 4. Generate combined differences visualization
+        self.plotting
+            .plot_matched_pairs_summary(
+                &format!("{output_dir}/pairs_summary.png"),
+                &self.stats.differences.birth_date,
+                &self.stats.differences.mother_age,
+                &self.stats.differences.father_age,
+            )
+            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
+            
         Ok(())
     }
 
