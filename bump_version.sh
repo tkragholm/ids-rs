@@ -33,12 +33,24 @@ log_step() { echo -e "\n${CYAN}⚡ $1${NC}"; }
 
 # Detect OS for sed compatibility
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS requires an empty string after -i
-    SED_INPLACE="sed -i ''"
+    # macOS requires -i '' as separate arguments
+    SED_COMMAND="sed -i ''"
 else
     # Linux and others don't
-    SED_INPLACE="sed -i"
+    SED_COMMAND="sed -i"
 fi
+
+# Function to perform safe sed replacements cross-platform
+safe_sed() {
+    local pattern="$1"
+    local file="$2"
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$pattern" "$file"
+    else
+        sed -i "$pattern" "$file"
+    fi
+}
 
 # =========================================================================
 # Dependency checks
@@ -147,31 +159,48 @@ fi
 log_step "Updating version in project files..."
 
 # Update workspace version in Cargo.toml
-$SED_INPLACE "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
+safe_sed "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
 log_info "Updated Cargo.toml workspace version"
 
 # Update all Cargo.toml files in member crates
 find ./crates -name "Cargo.toml" -not -path "*/\.*" -not -path "*/target/*" | while read -r cargo_file; do
     if grep -q "^\[package\]" "$cargo_file"; then
         # Only update version in actual package Cargo.toml files, not workspace files
-        $SED_INPLACE "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$cargo_file"
+        safe_sed "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$cargo_file"
         log_info "Updated version in $cargo_file"
     fi
 done
 
 # Update Python packages versions in all pyproject.toml files (excluding venv directories)
 find . -name "pyproject.toml" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" | while read -r pyproject_file; do
-    $SED_INPLACE "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$pyproject_file"
-    $SED_INPLACE "s/version = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/version = \"$NEW_VERSION\"/" "$pyproject_file"
+    if grep -q "version = \"$CURRENT_VERSION\"" "$pyproject_file"; then
+        safe_sed "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$pyproject_file"
+    else
+        safe_sed "s/version = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/version = \"$NEW_VERSION\"/" "$pyproject_file"
+    fi
     log_info "Updated version in $pyproject_file"
 done
 
 # Update version in any project __init__.py files (excluding venv directories)
-find ./crates -name "__init__.py" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" | while read -r init_file; do
-    $SED_INPLACE "s/__version__ = \"$CURRENT_VERSION\"/__version__ = \"$NEW_VERSION\"/" "$init_file"
-    $SED_INPLACE "s/__version__ = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/__version__ = \"$NEW_VERSION\"/" "$init_file"
+find ./crates -name "__init__.py" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" -not -path "*/build/*" | while read -r init_file; do
+    if grep -q "__version__ = \"$CURRENT_VERSION\"" "$init_file"; then
+        safe_sed "s/__version__ = \"$CURRENT_VERSION\"/__version__ = \"$NEW_VERSION\"/" "$init_file"
+    else
+        safe_sed "s/__version__ = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/__version__ = \"$NEW_VERSION\"/" "$init_file"
+    fi
     log_info "Updated version in $init_file"
 done
+
+# Special handling for build directory if it exists and isn't gitignored
+if find ./crates -path "*/build/lib/*/__init__.py" 2>/dev/null | grep -q .; then
+    log_warning "Found __init__.py files in build directories. These will be updated but not committed."
+    find ./crates -path "*/build/lib/*/__init__.py" | while read -r init_file; do
+        if grep -q "__version__ = \"" "$init_file"; then
+            safe_sed "s/__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" "$init_file"
+            log_info "Updated version in $init_file"
+        fi
+    done
+fi
 
 # Run cargo update to update Cargo.lock with new version
 log_step "Updating Cargo.lock..."
@@ -198,7 +227,7 @@ grep -n "version" Cargo.toml | head -n 5
 echo -e "\n${BLUE}pyproject.toml files:${NC}"
 find ./crates -name "pyproject.toml" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" -exec grep -n "version" {} \;
 echo -e "\n${BLUE}__init__.py files:${NC}"
-find ./crates -name "__init__.py" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" -exec grep -n "__version__" {} \;
+find ./crates -name "__init__.py" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" -not -path "*/build/*" -exec grep -n "__version__" {} \;
 
 # =========================================================================
 # Git operations
@@ -245,7 +274,7 @@ find ./crates -name "pyproject.toml" -not -path "*/\.*" -not -path "*/venv/*" -n
 done
 
 # Add __init__.py files
-find ./crates -name "__init__.py" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" | while read -r file; do
+find ./crates -name "__init__.py" -not -path "*/\.*" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/target/*" -not -path "*/build/*" | while read -r file; do
     if [ -f "$file" ]; then
         git add "$file"
     fi
