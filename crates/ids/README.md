@@ -5,7 +5,7 @@ This Python package provides access to the IDS-RS tool, a Rust implementation fo
 ## Installation
 
 ```bash
-pip install ids-rs
+pip install ids-tk
 ```
 
 ## Usage
@@ -19,17 +19,17 @@ ids --help
 Or from Python:
 
 ```python
-import ids_rs
+import ids_tk
 
 # Run with arguments
-ids_rs.run_ids(["--help"])
+ids_tk.run_ids(["--help"])
 
 # Check what mappings and schemas are available
-print(ids_rs.list_mappings())
-print(ids_rs.list_schemas())
+print(ids_tk.list_mappings())
+print(ids_tk.list_schemas())
 
 # Get a specific mapping file
-hfaudd_mapping = ids_rs.get_mapping_file("hfaudd")
+hfaudd_mapping = ids_tk.get_mapping_file("hfaudd")
 if hfaudd_mapping:
     with open(hfaudd_mapping) as f:
         hfaudd_data = json.load(f)
@@ -41,24 +41,24 @@ if hfaudd_mapping:
 The package includes all necessary mapping and schema files:
 
 ```python
-import ids_rs
+import ids_tk
 import json
 
 # List all available mappings
-mappings = ids_rs.list_mappings()
+mappings = ids_tk.list_mappings()
 print(f"Available mappings: {mappings}")
 
 # Load a specific mapping file
-hfaudd_path = ids_rs.get_mapping_file("hfaudd")
+hfaudd_path = ids_tk.get_mapping_file("hfaudd")
 with open(hfaudd_path) as f:
     hfaudd_mapping = json.load(f)
 
 # List all available schemas
-schemas = ids_rs.list_schemas()
+schemas = ids_tk.list_schemas()
 print(f"Available schemas: {schemas}")
 
 # Load a specific schema
-bef_schema_path = ids_rs.get_schema_file("bef")
+bef_schema_path = ids_tk.get_schema_file("bef")
 with open(bef_schema_path) as f:
     bef_schema = json.load(f)
 ```

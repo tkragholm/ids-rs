@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "ids-rs"
+name = "ids-tk"
 version = "1.0.0"
 description = "Incidence Density Sampling CLI Tool"
 authors = [
@@ -27,6 +27,6 @@ classifiers = [
 [tool.maturin]
 # Configure maturin to build and package the binary
 bindings = "bin"  # We're creating a binary package
-module-name = "ids_rs"
+module-name = "ids_tk"
 manifest-path = "Cargo.toml"
 python-source = "python"  # Directory with Python code
