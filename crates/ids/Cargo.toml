@@ -21,9 +21,6 @@ colored.workspace = true
 hashbrown.workspace = true
 serde_json.workspace = true
 
-[profile.release-lto]
-lto = true
-inherits = "release"
 
 [[bin]]
 name = "ids"

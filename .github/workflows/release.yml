@@ -5,7 +5,7 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch: # Allow manual triggering
 
 jobs:
   build_wheels:
@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Get all history for versioning
+          fetch-depth: 0 # Get all history for versioning
 
       - uses: actions/setup-python@v5
         with:
@@ -37,7 +37,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-          
+
       # Install default Rust toolchain for non-cross-compile builds
       - name: Install default Rust toolchain
         if: matrix.target == ''
@@ -70,7 +70,7 @@ jobs:
           ls -la crates/ids/
           echo "Contents of crates/ids/src directory:"
           ls -la crates/ids/src/
-          
+
       # Add debugging step for Windows
       - name: Debug directory structure - Windows
         if: runner.os == 'Windows'
@@ -134,6 +134,6 @@ jobs:
 
       - name: Create GitHub Release with wheels
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: wheels/*.whl
