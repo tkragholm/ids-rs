@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ids-tk"
-version = "1.2.0"
+version = "1.2.1"
 description = "Incidence Density Sampling CLI Tool"
 authors = [
     {name = "Tobias Kragholm", email = "tkragholm@gmail.com"}
