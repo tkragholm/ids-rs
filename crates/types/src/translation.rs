@@ -60,24 +60,24 @@ impl TranslationMaps {
     fn load_embedded() -> Self {
         Self {
             statsb: parse_embedded_json(include_str!(
-                "../../ids/python/ids_tk/mappings/statsb.json"
+                "../../ids/python/ids_toolkit/mappings/statsb.json"
             )),
-            civst: parse_embedded_json(include_str!("../../ids/python/ids_tk/mappings/civst.json")),
+            civst: parse_embedded_json(include_str!("../../ids/python/ids_toolkit/mappings/civst.json")),
             family_type: parse_embedded_json(include_str!(
-                "../../ids/python/ids_tk/mappings/family_type.json"
+                "../../ids/python/ids_toolkit/mappings/family_type.json"
             )),
             fm_mark: parse_embedded_json(include_str!(
-                "../../ids/python/ids_tk/mappings/fm_mark.json"
+                "../../ids/python/ids_toolkit/mappings/fm_mark.json"
             )),
             hustype: parse_embedded_json(include_str!(
-                "../../ids/python/ids_tk/mappings/hustype.json"
+                "../../ids/python/ids_toolkit/mappings/hustype.json"
             )),
-            reg: parse_embedded_json(include_str!("../../ids/python/ids_tk/mappings/reg.json")),
+            reg: parse_embedded_json(include_str!("../../ids/python/ids_toolkit/mappings/reg.json")),
             socio13: parse_embedded_json(include_str!(
-                "../../ids/python/ids_tk/mappings/socio13.json"
+                "../../ids/python/ids_toolkit/mappings/socio13.json"
             )),
             hfaudd: parse_embedded_json(include_str!(
-                "../../ids/python/ids_tk/mappings/hfaudd.json"
+                "../../ids/python/ids_toolkit/mappings/hfaudd.json"
             )),
         }
     }
