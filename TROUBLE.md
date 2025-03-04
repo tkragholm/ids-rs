@@ -1,10 +1,7 @@
-1s
-Run echo "Current directory: $(pwd)"
-Current directory: D:\a\ids-rs\ids-rs
-Contents of crates directory:
-Get-ChildItem: D:\a\_temp\3ca67615-6e45-40e4-8bdb-f4f2cfa3f993.ps1:4
-Line |
-4 | ls -la crates/
-| ~~~
-| A parameter cannot be found that matches parameter name 'la'.
-Error: Process completed with exit code 1.
+0s
+Run softprops/action-gh-release@v2
+👩‍🏭 Creating new GitHub release for tag v1.2.0...
+⚠️ GitHub release failed with status: 403
+{"message":"Resource not accessible by integration","documentation_url":"https://docs.github.com/rest/releases/releases#create-a-release","status":"403"}
+Skip retry — your GitHub token/PAT does not have the required permission to create a release
+Error: Resource not accessible by integration - https://docs.github.com/rest/releases/releases#create-a-release

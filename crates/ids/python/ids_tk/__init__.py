@@ -11,7 +11,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 def _find_binary():
     """Find the IDS binary."""
