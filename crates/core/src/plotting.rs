@@ -156,7 +156,7 @@ impl Plottable for DefaultPlotter {
         
         // Draw a simple text report
         root.draw_text(
-            &format!("Matching Statistics Summary"),
+            &"Matching Statistics Summary".to_string(),
             &TextStyle::from(("sans-serif", 30).into_font()),
             (20, 30),
         ).map_err(|e| PlottingError::plotting(e.to_string()))?;
@@ -221,7 +221,7 @@ impl Plottable for DefaultPlotter {
         
         // Draw a simple text summary
         root.draw_text(
-            &format!("Matched Pairs Statistics Summary"),
+            &"Matched Pairs Statistics Summary".to_string(),
             &TextStyle::from(("sans-serif", 30).into_font()),
             (20, 30),
         ).map_err(|e| PlottingError::plotting(e.to_string()))?;
