@@ -23,8 +23,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     for arg in std::env::args() {
         if arg.starts_with("--family-file") && arg != "--family-file" {
             eprintln!(
-                "ERROR: Detected possible command line issue. You provided '{}' without a space.",
-                arg
+                "ERROR: Detected possible command line issue. You provided '{arg}' without a space."
             );
             eprintln!("       Did you mean to write: --family-file {}", &arg[13..]);
             eprintln!(
@@ -52,8 +51,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let multi = MultiProgress::new();
 
     // Connect logger with progress bars to prevent progress bars from being interrupted by logs
-    if let Err(e) = LogWrapper::new(multi.clone(), logger).try_init() {
-        eprintln!("Warning: Failed to initialize logger: {}", e);
+    if let Err(e) = LogWrapper::new(multi, logger).try_init() {
+        eprintln!("Warning: Failed to initialize logger: {e}");
     }
 
     // Set the global max log level
@@ -63,7 +62,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = match Cli::try_parse() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("{e}");
             eprintln!("\nNOTE: Make sure there is a space between each flag and its value!");
             eprintln!("Example: --family-file data/registers/family.parquet");
             std::process::exit(1);
@@ -113,7 +112,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             ind_dir,
             uddf_dir,
             structured,
-        } => handle_balance_check(BalanceCheckConfig {
+        } => handle_balance_check(&BalanceCheckConfig {
             matches_file,
             covariate_dir: covariate_dir.as_deref(),
             output_dir: &cli.output_dir,
@@ -150,7 +149,7 @@ fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>>
 fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Generate more obvious log path in current directory and output dir
     let current_log_path = "ids_cli.log"; // Log in current directory for easier discovery
-    let output_log_path = format!("{}/log/ids_cli.log", output_dir);
+    let output_log_path = format!("{output_dir}/log/ids_cli.log");
     
     // Make sure file is writable - try to create both
     let log_paths = [current_log_path, &output_log_path];
@@ -195,7 +194,7 @@ fn handle_generate_registers(
     ConsoleOutput::key_value("Output directory", output_dir);
     ConsoleOutput::key_value("Total records", &ConsoleOutput::format_number(num_records));
     ConsoleOutput::key_value("Case records", &ConsoleOutput::format_number(num_cases));
-    ConsoleOutput::key_value("Year range", &format!("{} - {}", start_year, end_year));
+    ConsoleOutput::key_value("Year range", &format!("{start_year} - {end_year}"));
 
     if let Some(s) = seed {
         ConsoleOutput::key_value("Random seed", &s.to_string());
@@ -223,7 +222,9 @@ fn handle_generate_registers(
     ConsoleOutput::subsection("Generating Pediatric Data");
     let pediatric_start = Instant::now();
     let pediatric_path = Path::new(output_dir).join("pediatric.csv");
-    generator.generate_pediatric(pediatric_path.to_str().unwrap())?;
+    let pediatric_path_str = pediatric_path.to_str()
+        .ok_or_else(|| format!("Invalid path: {}", pediatric_path.display()))?;
+    generator.generate_pediatric(pediatric_path_str)?;
     let pediatric_time = pediatric_start.elapsed();
 
     ConsoleOutput::key_value("Pediatric data file", &pediatric_path.display().to_string());
@@ -251,16 +252,15 @@ fn validate_and_load_data(input: &str) -> Result<(), Box<dyn std::error::Error>>
 
     let validation_start = Instant::now();
     match validate_csv_format(input) {
-        Ok(_) => {
+        Ok(()) => {
             let validation_time = validation_start.elapsed();
             ConsoleOutput::success(&format!(
-                "CSV format validation completed in {:?}",
-                validation_time
+                "CSV format validation completed in {validation_time:?}"
             ));
             Ok(())
         }
         Err(e) => {
-            ConsoleOutput::error(&format!("CSV validation failed: {}", e));
+            ConsoleOutput::error(&format!("CSV validation failed: {e}"));
             error!("CSV validation failed: {}", e);
             Err(e)
         }
@@ -293,7 +293,7 @@ fn create_sampler(
 
     // Get statistics and display in a more structured way
     let stats = sampler.get_statistics();
-    println!("{}", stats);
+    println!("{stats}");
 
     ConsoleOutput::key_value("Initialization time", &format_duration_short(init_time));
 
@@ -320,8 +320,8 @@ fn handle_sampling(
         parent_date_window: parent_window,
     };
 
-    ConsoleOutput::key_value("Birth date window", &format!("{} days", birth_window));
-    ConsoleOutput::key_value("Parent date window", &format!("{} days", parent_window));
+    ConsoleOutput::key_value("Birth date window", &format!("{birth_window} days"));
+    ConsoleOutput::key_value("Parent date window", &format!("{parent_window} days"));
 
     let sampler = create_sampler(input, criteria)?;
     process_sampling_results(&sampler, controls, output_dir)?;
@@ -362,11 +362,11 @@ fn process_sampling_results(
     // Save matched pairs
     let matches_path = Path::new(output_dir).join("matched_pairs.csv");
     match sampler.save_matches_to_csv(&case_control_pairs, &matches_path.to_string_lossy()) {
-        Ok(_) => {
+        Ok(()) => {
             ConsoleOutput::success(&format!("Matches saved to {}", matches_path.display()));
         }
         Err(e) => {
-            ConsoleOutput::error(&format!("Error saving matches to CSV: {}", e));
+            ConsoleOutput::error(&format!("Error saving matches to CSV: {e}"));
             error!("Error saving matches to CSV: {}", e);
         }
     }
@@ -374,11 +374,11 @@ fn process_sampling_results(
     // Save statistics
     let stats_path = Path::new(output_dir).join("matching_stats.csv");
     match sampler.save_matching_statistics(&case_control_pairs, &stats_path.to_string_lossy()) {
-        Ok(_) => {
+        Ok(()) => {
             ConsoleOutput::success(&format!("Statistics saved to {}", stats_path.display()));
         }
         Err(e) => {
-            ConsoleOutput::error(&format!("Error saving statistics: {}", e));
+            ConsoleOutput::error(&format!("Error saving statistics: {e}"));
             error!("Error saving matching statistics: {}", e);
         }
     }
@@ -393,14 +393,14 @@ fn process_sampling_results(
     fs::create_dir_all(&plots_dir)?;
 
     match quality.generate_summary_plots(&plots_dir.to_string_lossy()) {
-        Ok(_) => {
+        Ok(()) => {
             ConsoleOutput::success(&format!(
                 "Quality plots generated in {}",
                 plots_dir.display()
             ));
         }
         Err(e) => {
-            ConsoleOutput::error(&format!("Error generating plots: {}", e));
+            ConsoleOutput::error(&format!("Error generating plots: {e}"));
             error!("Error generating plots: {}", e);
         }
     }
@@ -421,9 +421,10 @@ struct BalanceCheckConfig<'a> {
     generate_structured_output: bool,
 }
 
-fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_balance_check(config: &BalanceCheckConfig) -> Result<(), Box<dyn std::error::Error>> {
     use core::utils::console::{format_duration_short, ConsoleOutput};
     use covariates::balance::BalanceChecker;
+    use covariates::reporting::ComprehensiveReport;
     use loader::ParquetLoader;
 
     ConsoleOutput::section("Covariate Balance Analysis");
@@ -449,7 +450,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
     let matched_pairs = match load_matched_pairs(matches_path) {
         Ok(pairs) => pairs,
         Err(e) => {
-            ConsoleOutput::error(&format!("Failed to load matched pairs: {}", e));
+            ConsoleOutput::error(&format!("Failed to load matched pairs: {e}"));
             return Err(e.into());
         }
     };
@@ -487,14 +488,12 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
 
         if exists {
             ConsoleOutput::info(&format!(
-                "Found {} at {} ({})",
-                path_type, path, path_type_str
+                "Found {path_type} at {path} ({path_type_str})"
             ));
             log::debug!("Found {} at {} ({})", path_type, path, path_type_str);
         } else {
             ConsoleOutput::warning(&format!(
-                "{} not found at {} - will attempt to find alternative paths",
-                path_type, path
+                "{path_type} not found at {path} - will attempt to find alternative paths"
             ));
             log::warn!("{} not found at {}", path_type, path);
         }
@@ -517,7 +516,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
             // Check for .parquet extension and add if missing
             let mut family_path = path.to_string();
             if !family_path.ends_with(".parquet") {
-                family_path = format!("{}.parquet", family_path);
+                family_path = format!("{family_path}.parquet");
                 log::debug!("Added .parquet extension to family path: {}", family_path);
             }
             
@@ -564,22 +563,21 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
             // return the most reasonable path (prioritizing the original input)
             if family_obj.is_absolute() {
                 return family_path;
-            } else {
-                return relative_str;
             }
+            return relative_str;
         }
         
         // Standard handling for non-family register directories
         if path_obj.is_absolute() {
             // If the path is absolute, use it as-is
             log::debug!("Using absolute path for {}: {}", register_type, path);
-            check_path_exists(path, &format!("{} (absolute)", register_type));
+            check_path_exists(path, &format!("{register_type} (absolute)"));
             path.to_string()
         } else if let Some(base_dir) = config.covariate_dir {
             // Check if the path already starts with the base_dir to avoid duplication
             if path.contains(base_dir) {
                 log::debug!("Path already contains base_dir ({}): {}", base_dir, path);
-                check_path_exists(path, &format!("{} (with base_dir)", register_type));
+                check_path_exists(path, &format!("{register_type} (with base_dir)"));
                 path.to_string()
             } else {
                 let full_path = Path::new(base_dir).join(path).to_string_lossy().to_string();
@@ -589,7 +587,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     path,
                     full_path
                 );
-                check_path_exists(&full_path, &format!("{} (combined)", register_type));
+                check_path_exists(&full_path, &format!("{register_type} (combined)"));
                 full_path
             }
         } else {
@@ -609,7 +607,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     path.to_string()
                 }
             };
-            check_path_exists(&resolved_path, &format!("{} (relative)", register_type));
+            check_path_exists(&resolved_path, &format!("{register_type} (relative)"));
             resolved_path
         }
     };
@@ -656,35 +654,28 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
     // Attempt to load the data based on what paths we have
     let arrow_store_result = if has_custom_paths {
         // If we have custom paths, use them regardless of whether covariate_dir is provided
-        let base_dir = match config.covariate_dir {
-            Some(dir) => {
-                ConsoleOutput::info(&format!("Using base directory: {}", dir));
-                log::debug!("Using base directory with custom paths: {}", dir);
+        let base_dir = if let Some(dir) = config.covariate_dir {
+            ConsoleOutput::info(&format!("Using base directory: {dir}"));
+            log::debug!("Using base directory with custom paths: {}", dir);
 
-                // Check if the directory exists
-                if !Path::new(dir).exists() {
-                    ConsoleOutput::warning(&format!(
-                        "Base directory doesn't exist: {}. Will try to use custom paths directly.",
-                        dir
-                    ));
-                    log::warn!("Base directory doesn't exist: {}", dir);
-                }
-
-                dir.to_string()
-            }
-            None => {
-                // If no base directory is provided, use the current directory
-                let current_dir = std::env::current_dir()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_else(|_| ".".to_string());
-
-                ConsoleOutput::info(&format!(
-                    "No base directory provided, using current directory: {}",
-                    current_dir
+            // Check if the directory exists
+            if !Path::new(dir).exists() {
+                ConsoleOutput::warning(&format!(
+                    "Base directory doesn't exist: {dir}. Will try to use custom paths directly."
                 ));
-                log::debug!("Using current directory as base: {}", current_dir);
-                current_dir
+                log::warn!("Base directory doesn't exist: {}", dir);
             }
+
+            dir.to_string()
+        } else {
+            // If no base directory is provided, use the current directory
+            let current_dir = std::env::current_dir().map_or_else(|_| ".".to_string(), |p| p.to_string_lossy().to_string());
+
+            ConsoleOutput::info(&format!(
+                "No base directory provided, using current directory: {current_dir}"
+            ));
+            log::debug!("Using current directory as base: {}", current_dir);
+            current_dir
         };
 
         // CRITICAL DEBUG: Check family file first specifically since it's the most important
@@ -705,14 +696,13 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                             match std::io::Read::read(&mut file, &mut buffer) {
                                 Ok(bytes_read) => {
                                     ConsoleOutput::info(&format!(
-                                        "Successfully read {} bytes from family file",
-                                        bytes_read
+                                        "Successfully read {bytes_read} bytes from family file"
                                     ));
                                     // Print the first few bytes in hex for debugging
                                     let hex_bytes: Vec<String> = buffer
                                         .iter()
                                         .take(bytes_read)
-                                        .map(|b| format!("{:02x}", b))
+                                        .map(|b| format!("{b:02x}"))
                                         .collect();
                                     ConsoleOutput::info(&format!(
                                         "First bytes: {}",
@@ -721,14 +711,13 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                                 }
                                 Err(e) => {
                                     ConsoleOutput::error(&format!(
-                                        "Failed to read bytes from family file: {}",
-                                        e
+                                        "Failed to read bytes from family file: {e}"
                                     ));
                                 }
                             }
                         }
                         Err(e) => {
-                            ConsoleOutput::error(&format!("Failed to open family file: {}", e));
+                            ConsoleOutput::error(&format!("Failed to open family file: {e}"));
                         }
                     }
 
@@ -768,7 +757,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
         // Log all custom paths for debugging
         ConsoleOutput::info("Using the following custom register paths:");
         for (reg_type, path) in &custom_paths {
-            ConsoleOutput::key_value(&format!("  - {}", reg_type), path);
+            ConsoleOutput::key_value(&format!("  - {reg_type}"), path);
             log::debug!("Custom path for {}: {}", reg_type, path);
 
             // Additional checks to help with debugging
@@ -801,7 +790,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     }
                 }
             } else {
-                ConsoleOutput::warning(&format!("Path doesn't exist: {}", path));
+                ConsoleOutput::warning(&format!("Path doesn't exist: {path}"));
                 log::warn!("Path doesn't exist: {}", path);
             }
         }
@@ -809,11 +798,11 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
         // Make a debugging copy of custom_paths for better error reporting
         let debug_custom_paths = custom_paths.clone();
 
-        let loader_result = loader.load_with_custom_paths_map(base_dir.clone(), custom_paths);
+        let loader_result = loader.load_with_custom_paths_map(base_dir, custom_paths);
 
         // Provide additional error context if loading fails
         if let Err(ref e) = loader_result {
-            ConsoleOutput::error(&format!("Loading failed with error: {}", e));
+            ConsoleOutput::error(&format!("Loading failed with error: {e}"));
             ConsoleOutput::info("Trying to diagnose the issue:");
 
             // Check file access for each register directory
@@ -833,8 +822,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                                 "Family file can be opened with Rust std::fs::File",
                             ),
                             Err(e) => ConsoleOutput::error(&format!(
-                                "Failed to open family file with std::fs::File: {}",
-                                e
+                                "Failed to open family file with std::fs::File: {e}"
                             )),
                         }
                     }
@@ -842,7 +830,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     // Other register types should be directories
                     let dir_path = Path::new(path);
                     if dir_path.exists() && dir_path.is_dir() {
-                        ConsoleOutput::info(&format!("Register directory {} exists", reg_type));
+                        ConsoleOutput::info(&format!("Register directory {reg_type} exists"));
 
                         // Try to list first parquet file in directory
                         if let Ok(entries) = std::fs::read_dir(dir_path) {
@@ -868,8 +856,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                                         "Sample file can be opened with Rust std::fs::File",
                                     ),
                                     Err(e) => ConsoleOutput::error(&format!(
-                                        "Failed to open sample file with std::fs::File: {}",
-                                        e
+                                        "Failed to open sample file with std::fs::File: {e}"
                                     )),
                                 }
                             }
@@ -884,7 +871,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
         // Check if the directory exists and contains register data
         let cov_dir_path = Path::new(cov_dir);
         if !cov_dir_path.exists() || !cov_dir_path.is_dir() {
-            ConsoleOutput::warning(&format!("Covariate directory not found: {}", cov_dir));
+            ConsoleOutput::warning(&format!("Covariate directory not found: {cov_dir}"));
             log::warn!("Covariate directory not found: {}", cov_dir);
         } else {
             // List contents to help with debugging
@@ -906,7 +893,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
             }
         }
 
-        ConsoleOutput::info(&format!("Checking register data in: {}", cov_dir));
+        ConsoleOutput::info(&format!("Checking register data in: {cov_dir}"));
         loader.load_from_path(cov_dir.to_string())
     } else {
         // Neither custom paths nor covariate_dir provided
@@ -925,7 +912,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
             (BalanceChecker::new(store), false)
         }
         Err(e) => {
-            ConsoleOutput::warning(&format!("Failed to load register data: {}", e));
+            ConsoleOutput::warning(&format!("Failed to load register data: {e}"));
             log::error!("Detailed register loading error: {:?}", e);
             ConsoleOutput::info("Continuing in diagnostic mode with simulated data");
             ConsoleOutput::info(
@@ -979,7 +966,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
 
         // Add C/K format IDs for each original PNR
         for (i, (pnr, date)) in original_cases.iter().enumerate() {
-            let c_format_pnr = format!("C{:06}", i);
+            let c_format_pnr = format!("C{i:06}");
             cases.push((c_format_pnr.clone(), *date));
 
             // Print a debug message for the first few
@@ -989,12 +976,12 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     c_format_pnr,
                     pnr
                 );
-                ConsoleOutput::info(&format!("Adding C-format duplicate for case: {}", pnr));
+                ConsoleOutput::info(&format!("Adding C-format duplicate for case: {pnr}"));
             }
         }
 
         for (i, (pnr, date)) in original_controls.iter().enumerate() {
-            let k_format_pnr = format!("K{:06}", i);
+            let k_format_pnr = format!("K{i:06}");
             controls.push((k_format_pnr.clone(), *date));
 
             // Print a debug message for the first few
@@ -1004,7 +991,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     k_format_pnr,
                     pnr
                 );
-                ConsoleOutput::info(&format!("Adding K-format duplicate for control: {}", pnr));
+                ConsoleOutput::info(&format!("Adding K-format duplicate for control: {pnr}"));
             }
         }
 
@@ -1048,7 +1035,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
             let save_path = Path::new(config.output_dir).join("covariate_balance.csv");
 
             // Create a comprehensive report
-            use covariates::reporting::ComprehensiveReport;
+            // Create report from balance results
             let balance_results_copy = balance_results.clone();
             let report = ComprehensiveReport::new(balance_results);
             report.save_to_files(Path::new(config.output_dir))?;
@@ -1065,8 +1052,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                         Ok(records) => records,
                         Err(e) => {
                             ConsoleOutput::warning(&format!(
-                                "Could not load matched pair records for structured reports: {}",
-                                e
+                                "Could not load matched pair records for structured reports: {e}"
                             ));
                             Vec::new()
                         }
@@ -1078,7 +1064,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     &matched_pair_records,
                     config.output_dir,
                 ) {
-                    Ok(_) => {
+                    Ok(()) => {
                         ConsoleOutput::success(&format!(
                             "Generated structured reports in {}/report/",
                             config.output_dir
@@ -1086,8 +1072,7 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
                     }
                     Err(e) => {
                         ConsoleOutput::warning(&format!(
-                            "Failed to generate structured reports: {}",
-                            e
+                            "Failed to generate structured reports: {e}"
                         ));
                     }
                 }
@@ -1100,16 +1085,16 @@ fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::e
 
             // Generate plots using the report
             match report.generate_plots(&plots_dir) {
-                Ok(_) => {
+                Ok(()) => {
                     ConsoleOutput::success(&format!("Generated plots in {}", plots_dir.display()));
                 }
                 Err(e) => {
-                    ConsoleOutput::warning(&format!("Failed to generate plots: {}", e));
+                    ConsoleOutput::warning(&format!("Failed to generate plots: {e}"));
                 }
             }
         }
         Err(e) => {
-            ConsoleOutput::error(&format!("Failed to calculate balance: {}", e));
+            ConsoleOutput::error(&format!("Failed to calculate balance: {e}"));
             return Err(e.into());
         }
     }
@@ -1176,7 +1161,7 @@ fn process_balance_results(
     for (i, (pnr, date)) in cases.iter().take(3).enumerate() {
         match checker.get_covariate(pnr, CovariateType::Demographics, *date) {
             Ok(Some(covariate)) => {
-                let covariate_str = format!("{:?}", covariate);
+                let covariate_str = format!("{covariate:?}");
                 // Truncate if too long for display
                 let display_str = if covariate_str.len() > 60 {
                     format!("{}...", &covariate_str[0..57])
@@ -1264,26 +1249,26 @@ fn process_balance_results(
     ConsoleOutput::subsection("Saving Results");
     let save_start = Instant::now();
 
-    use covariates::reporting::ComprehensiveReport;
+    // Create report from balance results
     let report = ComprehensiveReport::new(balance_results);
     report.save_to_files(Path::new(output_dir))?;
 
     let save_time = save_start.elapsed();
     ConsoleOutput::key_value("Save time", &format_duration_short(save_time));
-    ConsoleOutput::success(&format!("Balance results saved to {}", output_dir));
+    ConsoleOutput::success(&format!("Balance results saved to {output_dir}"));
 
     Ok(())
 }
 
 // Helper function to resolve a path - absolute or relative to base
 #[allow(dead_code)]
-fn resolve_path(base_path: &str, path: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn resolve_path(base_path: &str, path: &str) -> String {
     if Path::new(path).is_absolute() {
-        Ok(path.to_string())
+        path.to_string()
     } else {
         // Join relative path to base path
         let full_path = Path::new(base_path).join(path);
-        Ok(full_path.to_string_lossy().to_string())
+        full_path.to_string_lossy().to_string()
     }
 }
 
@@ -1294,11 +1279,11 @@ fn handle_config_command(cmd: &ConfigCommands) -> Result<(), Box<dyn std::error:
     match cmd {
         ConfigCommands::GenerateCovariates { output, force, .. } => {
             ConsoleOutput::section("Generating Covariate Configuration");
-            ConsoleOutput::info(&format!("Generating default configuration to {}", output));
+            ConsoleOutput::info(&format!("Generating default configuration to {output}"));
             
             // Check if file exists and we're not forcing overwrite
             if Path::new(output).exists() && !force {
-                ConsoleOutput::error(&format!("File '{}' already exists. Use --force to overwrite.", output));
+                ConsoleOutput::error(&format!("File '{output}' already exists. Use --force to overwrite."));
                 return Err("File already exists".into());
             }
             
@@ -1307,12 +1292,12 @@ fn handle_config_command(cmd: &ConfigCommands) -> Result<(), Box<dyn std::error:
             
             // Convert to JSON
             let json = serde_json::to_string_pretty(&default_config)
-                .map_err(|e| format!("Failed to serialize configuration: {}", e))?;
+                .map_err(|e| format!("Failed to serialize configuration: {e}"))?;
             
             // Write to file
             fs::write(output, json)?;
             
-            ConsoleOutput::success(&format!("Default covariate configuration written to {}", output));
+            ConsoleOutput::success(&format!("Default covariate configuration written to {output}"));
             Ok(())
         }
     }
@@ -1365,7 +1350,7 @@ fn generate_structured_reports(
     // Log completion
     ConsoleOutput::success(&format!("Generated structured reports in {} seconds", 
         start_time.elapsed().as_secs()));
-    ConsoleOutput::info(&format!("Reports available at: {}/report/", output_dir));
+    ConsoleOutput::info(&format!("Reports available at: {output_dir}/report/"));
     
     Ok(())
 }

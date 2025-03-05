@@ -35,7 +35,7 @@ pub fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Err
 
 // Configure logging with directory
 pub fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let log_path = format!("{}/log/cli.log", output_dir);
+    let log_path = format!("{output_dir}/log/cli.log");
 
     // Use more restrictive logging in the console to reduce terminal noise
     // Only show warnings and errors in the console
@@ -90,7 +90,7 @@ pub fn generate_structured_reports(
     // Log completion
     ConsoleOutput::success(&format!("Generated structured reports in {} seconds", 
         start_time.elapsed().as_secs()));
-    ConsoleOutput::info(&format!("Reports available at: {}/report/", output_dir));
+    ConsoleOutput::info(&format!("Reports available at: {output_dir}/report/"));
     
     Ok(())
 }
