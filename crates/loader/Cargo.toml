@@ -14,7 +14,6 @@ arrow-select.workspace = true
 parquet.workspace = true
 indicatif.workspace = true
 types = { path = "../types" }
-indicatif-log-bridge.workspace = true
 rayon.workspace = true
 crossbeam-channel.workspace = true
 crossbeam-deque.workspace = true

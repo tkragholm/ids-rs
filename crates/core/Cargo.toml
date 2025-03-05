@@ -14,17 +14,13 @@ thiserror.workspace = true
 types = { path = "../types" }
 
 colored.workspace = true
-bit-vec.workspace = true
 dashmap.workspace = true
 fastrand.workspace = true
 hashbrown.workspace = true
 humantime.workspace = true
 indicatif.workspace = true
-mimalloc.workspace = true
-ndarray.workspace = true
 parking_lot.workspace = true
 plotters.workspace = true
 rand.workspace = true
-rand_distr.workspace = true
 rustc-hash.workspace = true
 smallvec.workspace = true
