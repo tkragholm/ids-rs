@@ -397,7 +397,7 @@ impl ArrowBackend {
 
         // Optimize batch memory layout
         for batch in &mut batches {
-            ArrowUtils::align_batch_buffers(batch);
+            let _ = ArrowUtils::align_batch_buffers(batch);
         }
 
         self.akm_data.insert(year, batches);
@@ -413,7 +413,7 @@ impl ArrowBackend {
 
         // Optimize batch memory layout
         for batch in &mut batches {
-            ArrowUtils::align_batch_buffers(batch);
+            let _ = ArrowUtils::align_batch_buffers(batch);
         }
 
         self.bef_data.insert(period, batches);
@@ -429,7 +429,7 @@ impl ArrowBackend {
 
         // Optimize batch memory layout
         for batch in &mut batches {
-            ArrowUtils::align_batch_buffers(batch);
+            let _ = ArrowUtils::align_batch_buffers(batch);
         }
 
         self.ind_data.insert(year, batches);
@@ -445,7 +445,7 @@ impl ArrowBackend {
 
         // Optimize batch memory layout
         for batch in &mut batches {
-            ArrowUtils::align_batch_buffers(batch);
+            let _ = ArrowUtils::align_batch_buffers(batch);
         }
 
         self.uddf_data.insert(period, batches);
@@ -539,7 +539,7 @@ impl ArrowBackend {
     /// Optimize batch operations by slicing when needed
     pub fn optimize_batch(&mut self, batch: &mut RecordBatch) -> Result<(), IdsError> {
         // Align buffers for better memory performance
-        ArrowUtils::align_batch_buffers(batch);
+        let _ = ArrowUtils::align_batch_buffers(batch);
         Ok(())
     }
 
@@ -607,7 +607,7 @@ impl ArrowBackend {
             }
 
             // Optimize memory layout
-            ArrowUtils::align_batch_buffers(batch);
+            let _ = ArrowUtils::align_batch_buffers(batch);
         }
 
         let mut family_store = FamilyStore::new();
