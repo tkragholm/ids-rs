@@ -9,10 +9,8 @@ pub use cli::{Cli, Commands, ConfigCommands};
 pub use error::{IdsError, IdsResult};
 
 use clap::Parser;
-use env_logger;
 use indicatif::MultiProgress;
 use indicatif_log_bridge::LogWrapper;
-use log;
 use std::process;
 
 /// Main entry function for the library

@@ -207,7 +207,7 @@ pub fn read_parquet(
     let num_workers = std::env::var("IDS_MAX_THREADS")
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or_else(|| num_cpus::get())
+        .unwrap_or_else(num_cpus::get)
         .max(2); // At least 2 workers for parallelism
     
     log::info!("Using {} worker threads for Parquet batch processing", num_workers);
