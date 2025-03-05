@@ -1,19 +1,31 @@
-use crate::{
-    error::IdsError,
-    family::FamilyRelations,
-    models::{Covariate, CovariateType, TimeVaryingValue},
-};
+use std::path::Path;
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use hashbrown::HashMap;
 
+use crate::{
+    error::IdsError,
+    family::FamilyRelations,
+    models::{Covariate, CovariateType, TimeVaryingValue},
+    traits::Store,
+};
+
+/// Time-varying storage backend
 #[derive(Debug)]
-pub struct TimeVaryingStore {
+pub struct TimeVaryingBackend {
     data: DashMap<String, Vec<TimeVaryingValue<Covariate>>>,
     family_data: HashMap<String, FamilyRelations>,
 }
 
-impl TimeVaryingStore {
+impl Default for TimeVaryingBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TimeVaryingBackend {
+    /// Create a new time-varying backend
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             data: DashMap::new(),
@@ -21,6 +33,7 @@ impl TimeVaryingStore {
         }
     }
 
+    /// Get the latest value at a specific date
     fn get_latest_value(
         &self,
         pnr: &str,
@@ -35,9 +48,39 @@ impl TimeVaryingStore {
                 .map(|v| v.value.clone())
         })
     }
+
+    /// Save data to CSV
+    pub fn save_to_csv(&self, path: &Path) -> Result<(), IdsError> {
+        let mut writer = csv::Writer::from_path(path).map_err(IdsError::Csv)?;
+
+        writer
+            .write_record(["PNR", "Date", "Covariate Type", "Value"])
+            .map_err(IdsError::Csv)?;
+
+        for entry in &self.data {
+            for value in entry.value() {
+                writer
+                    .write_record([
+                        &value.pnr,
+                        &value.date.to_string(),
+                        &format!("{:?}", value.value.get_type()),
+                        &format!("{:?}", value.value),
+                    ])
+                    .map_err(IdsError::Csv)?;
+            }
+        }
+
+        writer.flush().map_err(IdsError::Io)?;
+        Ok(())
+    }
+    
+    /// Add family relation
+    pub fn add_family_relation(&mut self, relation: FamilyRelations) {
+        self.family_data.insert(relation.pnr.clone(), relation);
+    }
 }
 
-impl super::Store for TimeVaryingStore {
+impl Store for TimeVaryingBackend {
     fn get_covariate(
         &self,
         pnr: &str,
@@ -56,5 +99,13 @@ impl super::Store for TimeVaryingStore {
             self.data.entry(value.pnr.clone()).or_default().push(value);
         }
         Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }

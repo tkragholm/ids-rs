@@ -5,22 +5,75 @@ use crate::{
 };
 use chrono::{Datelike, NaiveDate};
 
-// Import Storage from where it's actually defined
-pub use crate::storage::Storage;
+// Add Store trait definition here directly
+/// Combined Store trait - both data and family access
+pub trait Store: Send + Sync {
+    /// Get a covariate for a person at a specific date
+    fn get_covariate(
+        &self, 
+        pnr: &str, 
+        covariate_type: CovariateType, 
+        date: NaiveDate
+    ) -> Result<Option<Covariate>, IdsError>;
 
-// Alias for backward compatibility
-pub type DataAccess = dyn Storage;
+    /// Get family relations for a person
+    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
+
+    /// Load data into the store
+    fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError>;
+
+    /// Get all covariates for a person at a specific date
+    fn get_covariates(
+        &self, 
+        pnr: &str, 
+        date: NaiveDate
+    ) -> Result<hashbrown::HashMap<CovariateType, Covariate>, IdsError> {
+        let mut covariates = hashbrown::HashMap::new();
+        
+        for covariate_type in &[
+            CovariateType::Demographics,
+            CovariateType::Education,
+            CovariateType::Income,
+            CovariateType::Occupation,
+        ] {
+            if let Some(covariate) = self.get_covariate(pnr, *covariate_type, date)? {
+                covariates.insert(*covariate_type, covariate);
+            }
+        }
+        
+        Ok(covariates)
+    }
+
+    /// Get family covariates for a person at a specific date
+    fn get_family_covariates(
+        &self, 
+        pnr: &str, 
+        date: NaiveDate
+    ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>, IdsError> {
+        let family = self.get_family_relations(pnr);
+        
+        if let Some(family) = family {
+            let covariates = self.get_covariates(pnr, date)?;
+            if !covariates.is_empty() {
+                return Ok(Some(covariates));
+            }
+        }
+        
+        Ok(None)
+    }
+    
+    /// Convert to Any for dynamic casting
+    fn as_any(&self) -> &dyn std::any::Any;
+    
+    /// Convert to Any for dynamic casting (mutable)
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
 
 /// Trait for accessing family relations
 pub trait FamilyAccess {
     fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
     fn get_parents(&self, pnr: &str) -> Option<(Option<String>, Option<String>)>;
     fn get_birth_date(&self, pnr: &str) -> Option<NaiveDate>;
-}
-
-/// Combined Store trait - both data and family access
-pub trait Store: Storage + FamilyAccess {
-    fn load_covariate(&self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError>;
 }
 
 /// Trait for accessing time-varying data
@@ -38,10 +91,10 @@ pub trait DateHelpers: Datelike {
 
 impl DateHelpers for NaiveDate {}
 
-// Implement FamilyAccess for any type that implements Storage
-impl<T: Storage> FamilyAccess for T {
+// Implement FamilyAccess for any type that implements Store
+impl<T: Store> FamilyAccess for T {
     fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
-        Storage::get_family_relations(self, pnr)
+        Store::get_family_relations(self, pnr)
     }
 
     fn get_parents(&self, pnr: &str) -> Option<(Option<String>, Option<String>)> {
@@ -52,17 +105,6 @@ impl<T: Storage> FamilyAccess for T {
     fn get_birth_date(&self, pnr: &str) -> Option<NaiveDate> {
         self.get_family_relations(pnr)
             .map(|rel| rel.birth_date)
-    }
-}
-
-// Default implementation of Store for any type that implements Storage + FamilyAccess
-impl<T: Storage + FamilyAccess> Store for T {
-    fn load_covariate(&self, _data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError> {
-        // This is a default implementation that just returns an error
-        // Concrete implementations should override this
-        Err(IdsError::invalid_operation(
-            "This store does not support loading covariates directly",
-        ))
     }
 }
 
@@ -105,7 +147,9 @@ pub trait CovariateProcessor: Send + Sync {
     
     /// Convert a categorical value to a numeric representation if needed for calculations
     fn categorical_to_numeric(&self, value: &str) -> f64 {
-        if let Ok(num) = value.parse::<f64>() { num } else {
+        if let Ok(num) = value.parse::<f64>() { 
+            num 
+        } else {
             // Hash the string to create a stable numeric value
             let mut hash = 0.0;
             for (i, b) in value.bytes().enumerate() {

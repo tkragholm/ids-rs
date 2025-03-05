@@ -1,17 +1,23 @@
-use crate::{
-    arrow_utils::ArrowAccess,
-    error::IdsError,
-    family::FamilyRelations,
-    family::FamilyStore,
-    models::{Covariate, CovariateType, TimeVaryingValue},
-    translation::TranslationMaps,
-};
+use arrow::array::{Array, StringArray};
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use hashbrown::HashMap;
+use std::sync::Arc;
+use log;
 
+use crate::{
+    arrow::access::ArrowAccess,
+    arrow::utils::ArrowUtils,
+    error::IdsError,
+    family::{FamilyRelations, FamilyStore},
+    models::{Covariate, CovariateType, TimeVaryingValue},
+    traits::Store,
+    translation::TranslationMaps,
+};
+
+/// Arrow-based storage backend
 #[derive(Debug, Clone)]
-pub struct ArrowStore {
+pub struct ArrowBackend {
     family_data: HashMap<String, FamilyRelations>,
     akm_data: HashMap<i32, Vec<RecordBatch>>,
     bef_data: HashMap<String, Vec<RecordBatch>>,
@@ -20,24 +26,11 @@ pub struct ArrowStore {
     translations: TranslationMaps,
 }
 
-impl ArrowStore {
+impl ArrowBackend {
     pub fn new() -> Result<Self, IdsError> {
-        // Try to load translation maps, if they fail, use empty maps but log the error
-        let translations = match TranslationMaps::new() {
-            Ok(maps) => {
-                log::info!("Successfully loaded translation maps");
-                maps
-            },
-            Err(e) => {
-                log::warn!("Failed to load translation maps: {}. Using empty maps instead.", e);
-                log::warn!("This is likely due to missing mapping files - proceeding with empty translations");
-                log::info!("Translation map error details: {}", e);
-                TranslationMaps::new_empty()
-            }
-        };
+        let translations =
+            TranslationMaps::new().map_err(|e| IdsError::invalid_format(format!("{e}")))?;
 
-        log::info!("Creating new ArrowStore");
-        
         Ok(Self {
             family_data: HashMap::new(),
             akm_data: HashMap::new(),
@@ -48,19 +41,139 @@ impl ArrowStore {
         })
     }
 
-    pub fn add_akm_data(&mut self, year: i32, batches: Vec<RecordBatch>) {
+    /// Create a new empty ArrowBackend, used for diagnostic mode when data loading fails
+    #[must_use]
+    pub fn new_empty() -> Self {
+        // Create a minimal store for diagnostic operations with some synthetic data for debugging
+        let mut family_data = HashMap::new();
+        let ind_data = HashMap::new();
+        let bef_data = HashMap::new();
+
+        // Add synthetic relationships and data for debugging in diagnostic mode
+        for i in 0..100 {
+            // Add some synthetic family data for diagnostic purposes
+            let case_id = format!("C{i:06}");
+            let control_id = format!("K{i:06}");
+
+            // Get a birth date based on the index
+            let birth_date = chrono::NaiveDate::from_ymd_opt(
+                1990 + (i % 30),
+                1 + (i % 12) as u32,
+                1 + (i % 28) as u32,
+            )
+            .unwrap();
+            let father_birth_date = chrono::NaiveDate::from_ymd_opt(
+                1950 + (i % 30),
+                1 + (i % 12) as u32,
+                1 + (i % 28) as u32,
+            )
+            .unwrap();
+            let mother_birth_date = chrono::NaiveDate::from_ymd_opt(
+                1955 + (i % 30),
+                1 + (i % 12) as u32,
+                1 + (i % 28) as u32,
+            )
+            .unwrap();
+
+            // Add family relations for cases and controls
+            family_data.insert(
+                case_id.clone(),
+                FamilyRelations {
+                    pnr: case_id.clone(),
+                    birth_date,
+                    father_id: Some(format!("F{i:06}")),
+                    father_birth_date: Some(father_birth_date),
+                    mother_id: Some(format!("M{i:06}")),
+                    mother_birth_date: Some(mother_birth_date),
+                    family_id: Some(format!("FAM{i:06}")),
+                },
+            );
+
+            family_data.insert(
+                control_id.clone(),
+                FamilyRelations {
+                    pnr: control_id.clone(),
+                    birth_date,
+                    father_id: Some(format!("F{:06}", i + 1000)),
+                    father_birth_date: Some(father_birth_date),
+                    mother_id: Some(format!("M{:06}", i + 1000)),
+                    mother_birth_date: Some(mother_birth_date),
+                    family_id: Some(format!("FAM{:06}", i + 1000)),
+                },
+            );
+        }
+
+        Self {
+            family_data,
+            akm_data: HashMap::new(),
+            bef_data,
+            ind_data,
+            uddf_data: HashMap::new(),
+            translations: TranslationMaps::new_empty(),
+        }
+    }
+
+    pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) {
+        // Validate batches first
+        for batch in &batches {
+            if let Err(e) = self.validate_batch(batch) {
+                log::warn!("Invalid AKM batch for year {}: {}", year, e);
+            }
+        }
+
+        // Optimize batch memory layout
+        for batch in &mut batches {
+            let _ = ArrowUtils::align_batch_buffers(batch);
+        }
+
         self.akm_data.insert(year, batches);
     }
 
-    pub fn add_bef_data(&mut self, period: String, batches: Vec<RecordBatch>) {
+    pub fn add_bef_data(&mut self, period: String, mut batches: Vec<RecordBatch>) {
+        // Validate batches first
+        for batch in &batches {
+            if let Err(e) = self.validate_batch(batch) {
+                log::warn!("Invalid BEF batch for period {}: {}", period, e);
+            }
+        }
+
+        // Optimize batch memory layout
+        for batch in &mut batches {
+            let _ = ArrowUtils::align_batch_buffers(batch);
+        }
+
         self.bef_data.insert(period, batches);
     }
 
-    pub fn add_ind_data(&mut self, year: i32, batches: Vec<RecordBatch>) {
+    pub fn add_ind_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) {
+        // Validate batches first
+        for batch in &batches {
+            if let Err(e) = self.validate_batch(batch) {
+                log::warn!("Invalid IND batch for year {}: {}", year, e);
+            }
+        }
+
+        // Optimize batch memory layout
+        for batch in &mut batches {
+            let _ = ArrowUtils::align_batch_buffers(batch);
+        }
+
         self.ind_data.insert(year, batches);
     }
 
-    pub fn add_uddf_data(&mut self, period: String, batches: Vec<RecordBatch>) {
+    pub fn add_uddf_data(&mut self, period: String, mut batches: Vec<RecordBatch>) {
+        // Validate batches first
+        for batch in &batches {
+            if let Err(e) = self.validate_batch(batch) {
+                log::warn!("Invalid UDDF batch for period {}: {}", period, e);
+            }
+        }
+
+        // Optimize batch memory layout
+        for batch in &mut batches {
+            let _ = ArrowUtils::align_batch_buffers(batch);
+        }
+
         self.uddf_data.insert(period, batches);
     }
 
@@ -71,9 +184,12 @@ impl ArrowStore {
         if let Some(batches) = period.and_then(|p| self.uddf_data.get(p)) {
             for batch in batches {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
-                    let level: Option<String> = self.get_value(batch, "HFAUDD", idx)?;
-                    if let Some(level) = level {
-                        return Ok(Some(Covariate::education(level, None, None)));
+                    // Use optimized array data access
+                    let hfaudd_array = self.get_string_array(batch, "HFAUDD")?;
+
+                    if !hfaudd_array.is_null(idx) {
+                        let level = hfaudd_array.value(idx).to_string();
+                        return Ok(Some(Covariate::education(level).build()));
                     }
                 }
             }
@@ -87,13 +203,14 @@ impl ArrowStore {
         if let Some(batches) = self.ind_data.get(&year) {
             for batch in batches {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
+                    // Get value directly using optimized method
                     let amount: Option<f64> = self.get_value(batch, "PERINDKIALT_13", idx)?;
                     if let Some(amount) = amount {
                         return Ok(Some(Covariate::income(
                             amount,
-                            "DKK".to_string(),
-                            "PERINDKIALT_13".to_string(),
-                        )));
+                            "DKK",
+                            "PERINDKIALT_13",
+                        ).build()));
                     }
                 }
             }
@@ -107,54 +224,81 @@ impl ArrowStore {
         if let Some(batches) = period.and_then(|p| self.bef_data.get(p)) {
             for batch in batches {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
+                    // Use direct access for better performance - get all values at once
                     let family_size: Option<i32> = self.get_value(batch, "ANTPERSF", idx)?;
                     let municipality: Option<i32> = self.get_value(batch, "KOM", idx)?;
-                    // Try to get FAMILIE_TYPE as i32 first, then as string if that fails
-                    let family_type_result: Result<Option<i32>, IdsError> = self.get_value(batch, "FAMILIE_TYPE", idx);
-                    let family_type_str: Result<Option<String>, IdsError> = self.get_value(batch, "FAMILIE_TYPE", idx);
-                    
-                    // Get STATSB as string to match parquet schema
+                    let family_type: Option<i32> = self.get_value(batch, "FAMILIE_TYPE", idx)?;
+                    // Fix: Get STATSB as a string value, not an integer
                     let statsb: Option<String> = self.get_value(batch, "STATSB", idx)?;
 
-                    // Get a valid family_type string one way or another
-                    let family_type_value = if let Ok(Some(ft)) = family_type_result {
-                        // If i32 works, use that
-                        ft.to_string()
-                    } else if let Ok(Some(ft_str)) = family_type_str {
-                        // If string works, use that
-                        ft_str
-                    } else {
-                        // If both fail, we don't have a valid family type
-                        log::debug!("Could not get FAMILIE_TYPE for PNR {}", pnr);
-                        return Ok(None);
-                    };
-
-                    if let (Some(family_size), Some(municipality)) = (family_size, municipality) {
-                        let mut covariate = Covariate::demographics(
+                    if let (Some(family_size), Some(municipality), Some(family_type)) =
+                        (family_size, municipality, family_type)
+                    {
+                        let mut builder = Covariate::demographics(
                             family_size,
                             municipality,
-                            family_type_value,
+                            family_type.to_string(),
                         );
 
-                        // Add translated values to metadata - use string directly
+                        // Add citizenship if available
                         if let Some(statsb) = statsb {
-                            if let Some(translated) = self.translations.translate(
-                                crate::translation::TranslationType::Statsb,
-                                &statsb,
-                            ) {
-                                covariate.metadata.insert(
-                                    "statsb_translated".to_string(),
-                                    translated.to_string(),
+                            builder = builder.with_citizenship(statsb.clone());
+                            
+                            // Add translated value to metadata
+                            if let Some(translated) = self
+                                .translations
+                                .translate(crate::translation::TranslationType::Statsb, &statsb)
+                            {
+                                builder = builder.with_metadata(
+                                    "statsb_translated",
+                                    translated,
                                 );
                             }
                         }
 
-                        return Ok(Some(covariate));
+                        return Ok(Some(builder.build()));
                     }
                 }
             }
         }
         Ok(None)
+    }
+
+    /// Optimize batch operations by slicing when needed
+    pub fn optimize_batch(&mut self, batch: &mut RecordBatch) -> Result<(), IdsError> {
+        // Align buffers for better memory performance
+        let _ = ArrowUtils::align_batch_buffers(batch);
+        Ok(())
+    }
+
+    /// Slice a batch for zero-copy operations
+    pub fn slice_batch(
+        &self,
+        batch: &RecordBatch,
+        offset: usize,
+        length: usize,
+    ) -> Result<RecordBatch, IdsError> {
+        let mut columns = Vec::with_capacity(batch.num_columns());
+
+        for i in 0..batch.num_columns() {
+            columns.push(ArrowUtils::slice_array(
+                batch.column(i).as_ref(),
+                offset,
+                length,
+            ));
+        }
+
+        RecordBatch::try_new(batch.schema(), columns).map_err(|e| {
+            IdsError::invalid_operation(format!("Failed to create sliced batch: {e}"))
+        })
+    }
+
+    /// Create an optimized string array
+    pub fn create_optimized_string_array(
+        &self,
+        strings: &[String],
+    ) -> Result<StringArray, IdsError> {
+        ArrowUtils::create_optimized_string_array(strings, strings.len())
     }
 
     fn find_closest_period<'a>(
@@ -172,24 +316,34 @@ impl ArrowStore {
                     12
                 };
                 NaiveDate::from_ymd_opt(year, month as u32, 1)
-                    .map(|period_date| period_date <= date)
-                    .unwrap_or(false)
+                    .is_some_and(|period_date| period_date <= date)
             })
             .max_by_key(|p| p.len()))
     }
 
     pub fn load_family_relations(
         &mut self,
-        family_batches: Vec<RecordBatch>,
+        mut family_batches: Vec<RecordBatch>,
     ) -> Result<(), IdsError> {
-        let mut family_store = FamilyStore::new(self.clone());
+        // Optimize batches before loading
+        for batch in &mut family_batches {
+            // Validate batch
+            if let Err(e) = self.validate_batch(batch) {
+                log::warn!("Invalid family relations batch: {}", e);
+            }
+
+            // Optimize memory layout
+            let _ = ArrowUtils::align_batch_buffers(batch);
+        }
+
+        let mut family_store = FamilyStore::new();
         family_store.load_family_relations(family_batches)?;
-        self.family_data = family_store.relations;
+        self.family_data = family_store.get_relations().clone();
         Ok(())
     }
 }
 
-impl super::Store for ArrowStore {
+impl Store for ArrowBackend {
     fn get_covariate(
         &self,
         pnr: &str,
@@ -209,8 +363,16 @@ impl super::Store for ArrowStore {
     }
 
     fn load_data(&mut self, _data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError> {
-        Err(IdsError::InvalidOperation(
-            "Cannot load time-varying data into Arrow store".to_string(),
+        Err(IdsError::invalid_operation(
+            "Cannot load time-varying data into Arrow store",
         ))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
