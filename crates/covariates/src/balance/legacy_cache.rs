@@ -185,6 +185,10 @@ impl CovariateCache {
         // We primarily track size through the primary cache
         self.primary_cache.len()
     }
+    
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     pub fn get_or_load(
         &self,

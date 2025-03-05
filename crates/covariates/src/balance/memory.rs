@@ -16,6 +16,12 @@ pub enum MemoryTier {
 /// Memory manager for adaptive memory usage
 pub struct MemoryManager {}
 
+impl Default for MemoryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryManager {
     /// Create a new memory manager
     pub fn new() -> Self {
@@ -46,7 +52,7 @@ impl MemoryManager {
     /// Get the optimal chunk size
     pub fn get_optimal_chunk_size(&self, total_items: usize) -> usize {
         // Use 1/10 of the total items, with a minimum of 1000 and max of 10,000
-        (total_items / 10).max(1000).min(10_000)
+        (total_items / 10).clamp(1000, 10_000)
     }
 }
 
@@ -75,7 +81,7 @@ impl<'a> MemoryGuard<'a> {
     }
 }
 
-impl<'a> Drop for MemoryGuard<'a> {
+impl Drop for MemoryGuard<'_> {
     fn drop(&mut self) {
         // No-op in legacy implementation
     }
