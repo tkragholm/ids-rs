@@ -8,14 +8,12 @@ use core::{
 use covariates::matched_pairs::load_matched_pair_records;
 use covariates::{balance::BalanceChecker, matched_pairs::load_matched_pairs, config::CovariatesConfig};
 use datagen::{GeneratorConfig, RegisterGenerator};
-use hashbrown;
 use indicatif::MultiProgress;
 use indicatif_log_bridge::LogWrapper;
 use log::{error, info, warn};
 use std::collections::HashSet;
 use std::{fs, path::Path, time::Instant};
 use types::models::CovariateType;
-use serde_json;
 
 use crate::cli::{Cli, Commands, ConfigCommands};
 
@@ -547,7 +545,7 @@ fn handle_balance_check(
             // but ONLY if the path doesn't already have directory components
             if let Some(base_dir) = covariate_dir {
                 // Don't do this if the family path already has directory components
-                if !family_obj.parent().map_or(false, |p| p != Path::new("")) {
+                if !family_obj.parent().is_some_and(|p| p != Path::new("")) {
                     let cov_path = Path::new(base_dir).join(family_obj.file_name().unwrap_or_default());
                     let cov_str = cov_path.to_string_lossy().to_string();
                     
@@ -848,7 +846,7 @@ fn handle_balance_check(
                             let parquet_files: Vec<_> = entries
                                 .filter_map(Result::ok)
                                 .filter(|e| {
-                                    e.path().extension().map_or(false, |ext| ext == "parquet")
+                                    e.path().extension().is_some_and(|ext| ext == "parquet")
                                 })
                                 .take(1)
                                 .collect();
@@ -890,10 +888,8 @@ fn handle_balance_check(
             match std::fs::read_dir(cov_dir_path) {
                 Ok(entries) => {
                     let mut contents = Vec::new();
-                    for entry in entries.take(10) {
-                        if let Ok(entry) = entry {
-                            contents.push(entry.file_name().to_string_lossy().to_string());
-                        }
+                    for entry in entries.take(10).flatten() {
+                        contents.push(entry.file_name().to_string_lossy().to_string());
                     }
                     log::debug!("Covariate directory contents: {}", contents.join(", "));
                     ConsoleOutput::info(&format!(
