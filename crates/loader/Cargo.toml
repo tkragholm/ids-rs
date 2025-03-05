@@ -6,6 +6,7 @@ edition.workspace = true
 [features]
 default = []
 polars_backend = ["polars", "polars-arrow", "lazy_static"]
+schema_json = []
 
 [dependencies]
 chrono.workspace = true

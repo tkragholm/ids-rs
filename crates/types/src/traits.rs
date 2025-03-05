@@ -52,7 +52,7 @@ pub trait Store: Send + Sync {
     ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>, IdsError> {
         let family = self.get_family_relations(pnr);
         
-        if let Some(family) = family {
+        if let Some(_family) = family {
             let covariates = self.get_covariates(pnr, date)?;
             if !covariates.is_empty() {
                 return Ok(Some(covariates));

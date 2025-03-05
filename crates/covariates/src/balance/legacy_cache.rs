@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
 use types::models::{Covariate, CovariateType};
-use types::storage::Storage as Store;
+use types::traits::Store;
 use types::IdsError;
 
 #[derive(Hash, Eq, PartialEq, Clone)]

@@ -20,7 +20,7 @@ pub fn detect_data_structure(base_path: &Path) -> Result<hashbrown::HashMap<Stri
     
     // Check for direct vs nested structure (with /registers subdirectory)
     let registers_path = base_path.join("registers");
-    let has_registers_subdir = registers_path.exists() && registers_path.is_dir();
+    let _has_registers_subdir = registers_path.exists() && registers_path.is_dir();
     
     // Check for family.parquet
     let family_paths = [

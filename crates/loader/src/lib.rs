@@ -15,7 +15,8 @@ pub use types::{
     error::IdsError,
     family::FamilyRelations,
     models::*,
-    storage::{ArrowBackend as ArrowStore, DataStore as UnifiedStore, Storage as Store},
+    storage::{ArrowBackend as ArrowStore, DataStore as UnifiedStore},
+    traits::Store,
 };
 
 // Public trait for loader implementations

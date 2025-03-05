@@ -499,7 +499,7 @@ fn extract_period_from_filename(filename: &str) -> Option<String> {
         let slice = &filename[i..i+6];
         if (slice.starts_with("19") || slice.starts_with("20")) && 
            slice.chars().all(|c| c.is_ascii_digit()) {
-            let year = &slice[0..4];
+            let _year = &slice[0..4];
             let month = &slice[4..6];
             // Validate month is between 01-12
             if let Ok(m) = month.parse::<u8>() {

@@ -1,5 +1,5 @@
 // Re-export from the types crate
-pub use types::error::{Context, IdsError, Result};
+pub use types::error::{ErrorContext as Context, IdsError, Result};
 
 // Type aliases to maintain compatibility
 pub type PlottingError = IdsError;
