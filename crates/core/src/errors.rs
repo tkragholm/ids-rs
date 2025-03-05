@@ -35,6 +35,6 @@ pub trait IntoSamplingError<T> {
 // Implement for any Result that can be converted to a String
 impl<T, E: std::fmt::Display + 'static> IntoSamplingError<T> for std::result::Result<T, E> {
     fn into_sampling_error(self, msg: &str) -> Result<T> {
-        self.with_context(|| format!("Sampling error: {}", msg))
+        self.with_context(|| format!("Sampling error: {msg}"))
     }
 }

@@ -285,12 +285,10 @@ impl MatchingQuality {
         };
         
         report.push_str(&format!(
-            "  Birth Date Balance: {}\n",
-            birth_balance
+            "  Birth Date Balance: {birth_balance}\n"
         ));
         report.push_str(&format!(
-            "  Parent Age Balance: {}\n",
-            parent_balance
+            "  Parent Age Balance: {parent_balance}\n"
         ));
 
         report

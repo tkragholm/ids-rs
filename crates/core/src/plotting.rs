@@ -73,7 +73,7 @@ impl Plottable for DefaultPlotter {
             histogram_data[bin] += 1;
         }
 
-        let max_count = *histogram_data.iter().max().unwrap_or(&1) as f64;
+        let max_count = f64::from(*histogram_data.iter().max().unwrap_or(&1));
 
         let mut chart = ChartBuilder::on(&root)
             .caption(title, ("sans-serif", 30))
@@ -92,7 +92,7 @@ impl Plottable for DefaultPlotter {
 
         chart
             .draw_series(histogram_data.iter().enumerate().map(|(i, &count)| {
-                Rectangle::new([(i, 0.0), (i + 1, count as f64)], RED.mix(0.3).filled())
+                Rectangle::new([(i, 0.0), (i + 1, f64::from(count))], RED.mix(0.3).filled())
             }))
             .map_err(|e| PlottingError::plotting(e.to_string()))?;
 
@@ -122,7 +122,7 @@ impl Plottable for DefaultPlotter {
         // Draw statistics as text
         let stats = [
             format!("Utilization Rate: {:.2}%", utilization_rate * 100.0),
-            format!("Average Control Reuse: {:.2} times", average_reuse),
+            format!("Average Control Reuse: {average_reuse:.2} times"),
         ];
 
         for (i, stat) in stats.iter().enumerate() {
@@ -163,10 +163,10 @@ impl Plottable for DefaultPlotter {
         
         // Display stats as text
         let stats = [
-            format!("Total Cases: {}", total),
+            format!("Total Cases: {total}"),
             format!("Matched Cases: {} ({:.1}%)", matched_count, matched_pct * 100.0),
             format!("Unmatched Cases: {} ({:.1}%)", unmatched_count, (1.0 - matched_pct) * 100.0),
-            format!("Avg. Controls per Case: {:.2}", avg_controls),
+            format!("Avg. Controls per Case: {avg_controls:.2}"),
         ];
 
         for (i, stat) in stats.iter().enumerate() {

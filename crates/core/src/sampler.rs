@@ -235,7 +235,7 @@ impl IncidenceDensitySampler {
         ));
         
         let ratio = total_controls as f64 / total_cases as f64;
-        let ratio_str = format!("{:.2}", ratio);
+        let ratio_str = format!("{ratio:.2}");
         let ratio_colored = if ratio >= 3.0 {
             ratio_str.green()
         } else if ratio >= 1.0 {

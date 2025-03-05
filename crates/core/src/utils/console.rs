@@ -52,7 +52,7 @@ impl ConsoleOutput {
     }
     
     /// Format a percentage with appropriate color based on value
-    pub fn format_percentage(value: f64) -> ColoredString {
+    #[must_use] pub fn format_percentage(value: f64) -> ColoredString {
         let percentage = format!("{:.2}%", value * 100.0);
         if value >= 0.9 {
             percentage.green()
@@ -64,7 +64,7 @@ impl ConsoleOutput {
     }
     
     /// Format a number with appropriate units (K, M, B)
-    pub fn format_number(num: usize) -> String {
+    #[must_use] pub fn format_number(num: usize) -> String {
         if num < 1_000 {
             num.to_string()
         } else if num < 1_000_000 {
@@ -78,8 +78,8 @@ impl ConsoleOutput {
     
     /// Print a progress status
     pub fn status(step: usize, total: usize, description: &str) {
-        let progress = format!("[{}/{}]", step, total).blue();
-        println!("{} {}", progress, description);
+        let progress = format!("[{step}/{total}]").blue();
+        println!("{progress} {description}");
     }
     
     /// Print a table with headers and rows
@@ -117,7 +117,7 @@ impl ConsoleOutput {
             for (i, cell) in row.iter().enumerate() {
                 if i < widths.len() {
                     let padding = " ".repeat(widths[i].saturating_sub(cell.len()));
-                    print!("{}{} │ ", cell, padding);
+                    print!("{cell}{padding} │ ");
                 }
             }
             println!();
@@ -126,23 +126,23 @@ impl ConsoleOutput {
 }
 
 /// Timer formatting utilities
-pub fn format_duration_short(duration: std::time::Duration) -> String {
+#[must_use] pub fn format_duration_short(duration: std::time::Duration) -> String {
     let total_secs = duration.as_secs();
     let millis = duration.subsec_millis();
     
     if total_secs == 0 {
-        format!("{}ms", millis)
+        format!("{millis}ms")
     } else if total_secs < 60 {
-        format!("{}.{:03}s", total_secs, millis)
+        format!("{total_secs}.{millis:03}s")
     } else {
         let mins = total_secs / 60;
         let secs = total_secs % 60;
         if mins < 60 {
-            format!("{}m {}s", mins, secs)
+            format!("{mins}m {secs}s")
         } else {
             let hours = mins / 60;
             let mins = mins % 60;
-            format!("{}h {}m", hours, mins)
+            format!("{hours}h {mins}m")
         }
     }
 }
