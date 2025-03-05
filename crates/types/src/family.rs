@@ -39,7 +39,7 @@ impl FamilyStore {
         }
     }
 
-    pub fn get_relations(&self) -> HashMap<String, FamilyRelations> {
+    #[must_use] pub fn get_relations(&self) -> HashMap<String, FamilyRelations> {
         self.relations.clone()
     }
 

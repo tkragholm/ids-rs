@@ -190,8 +190,7 @@ impl<T> ArrowAccess for T {
 
         if !(-25567..=25567).contains(&days_since_epoch) {
             return Err(IdsError::invalid_date(format!(
-                "Date value {} is outside reasonable range",
-                days_since_epoch
+                "Date value {days_since_epoch} is outside reasonable range"
             )));
         }
 
@@ -199,13 +198,13 @@ impl<T> ArrowAccess for T {
             epoch
                 .checked_add_days(Days::new(days_since_epoch as u64))
                 .ok_or_else(|| {
-                    IdsError::invalid_date(format!("Invalid date value: {}", days_since_epoch))
+                    IdsError::invalid_date(format!("Invalid date value: {days_since_epoch}"))
                 })
         } else {
             epoch
-                .checked_sub_days(Days::new(days_since_epoch.unsigned_abs() as u64))
+                .checked_sub_days(Days::new(u64::from(days_since_epoch.unsigned_abs())))
                 .ok_or_else(|| {
-                    IdsError::invalid_date(format!("Invalid date value: {}", days_since_epoch))
+                    IdsError::invalid_date(format!("Invalid date value: {days_since_epoch}"))
                 })
         }
     }
@@ -230,7 +229,7 @@ impl<T> ArrowAccess for T {
         let bool_array = BooleanArray::from(mask);
 
         let filtered_batch = filter_record_batch(batch, &bool_array)
-            .map_err(|e| IdsError::invalid_operation(format!("Failed to filter batch: {}", e)))?;
+            .map_err(|e| IdsError::invalid_operation(format!("Failed to filter batch: {e}")))?;
 
         if filtered_batch.num_rows() == 0 {
             Ok(None)
@@ -280,12 +279,12 @@ impl<T> ArrowAccess for T {
             let end_bool_array = BooleanArray::from(end_mask);
 
             bool_array = and(&bool_array, &end_bool_array).map_err(|e| {
-                IdsError::invalid_operation(format!("Failed to combine date filters: {}", e))
+                IdsError::invalid_operation(format!("Failed to combine date filters: {e}"))
             })?;
         }
 
         let filtered_batch = filter_record_batch(batch, &bool_array)
-            .map_err(|e| IdsError::invalid_operation(format!("Failed to filter batch: {}", e)))?;
+            .map_err(|e| IdsError::invalid_operation(format!("Failed to filter batch: {e}")))?;
 
         if filtered_batch.num_rows() == 0 {
             Ok(None)
@@ -315,7 +314,7 @@ impl<T> ArrowAccess for T {
 }
 
 // Helper function for creating schemas
-pub fn create_schema(fields: Vec<(&str, DataType)>) -> ArrowSchema {
+#[must_use] pub fn create_schema(fields: Vec<(&str, DataType)>) -> ArrowSchema {
     let fields = fields
         .into_iter()
         .map(|(name, data_type)| Field::new(name, data_type, true))
@@ -402,7 +401,7 @@ pub struct ArrowUtils;
 
 impl ArrowUtils {
     /// Create a new empty batch with the given schema
-    pub fn create_empty_batch(schema: ArrowSchema) -> RecordBatch {
+    #[must_use] pub fn create_empty_batch(schema: ArrowSchema) -> RecordBatch {
         let fields = schema.fields();
         let columns = fields
             .iter()
@@ -425,7 +424,7 @@ impl ArrowUtils {
     }
 
     /// Convert NaiveDate to days since epoch (for Date32 arrays)
-    pub fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
+    #[must_use] pub fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
         (date - epoch).num_days() as i32
     }
@@ -480,14 +479,14 @@ impl ArrowUtils {
                 .collect();
 
             let concat = arrow::compute::concat(&arrays).map_err(|e| {
-                IdsError::invalid_operation(format!("Failed to concatenate column: {}", e))
+                IdsError::invalid_operation(format!("Failed to concatenate column: {e}"))
             })?;
 
             columns.push(concat);
         }
 
         RecordBatch::try_new(schema, columns).map_err(|e| {
-            IdsError::invalid_operation(format!("Failed to create concatenated batch: {}", e))
+            IdsError::invalid_operation(format!("Failed to create concatenated batch: {e}"))
         })
     }
 
@@ -497,7 +496,7 @@ impl ArrowUtils {
         _capacity: usize,
     ) -> Result<StringArray, IdsError> {
         // Estimate total size of all strings
-        let total_string_size: usize = strings.iter().map(|s| s.len()).sum();
+        let total_string_size: usize = strings.iter().map(std::string::String::len).sum();
 
         // Create buffers
         let mut values = String::with_capacity(total_string_size);
@@ -530,7 +529,7 @@ impl ArrowUtils {
     }
 
     /// Align a batch's buffers for better memory performance
-    pub fn align_batch_buffers(batch: &RecordBatch) -> RecordBatch {
+    #[must_use] pub fn align_batch_buffers(batch: &RecordBatch) -> RecordBatch {
         let columns: Vec<Arc<dyn Array>> = batch
             .columns()
             .iter()

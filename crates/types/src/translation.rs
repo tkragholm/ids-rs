@@ -83,7 +83,7 @@ impl TranslationMaps {
     }
 
     /// Create an empty translation map for diagnostic purposes
-    pub fn new_empty() -> Self {
+    #[must_use] pub fn new_empty() -> Self {
         Self {
             statsb: HashMap::new(),
             civst: HashMap::new(),
@@ -112,7 +112,7 @@ impl TranslationMaps {
 
     /// Get all codes that translate to a specific value for a given translation type
     /// Useful for finding all HFAUDD codes that map to a specific ISCED level
-    pub fn get_codes_for_value(
+    #[must_use] pub fn get_codes_for_value(
         &self,
         translation_type: TranslationType,
         value: &str,
@@ -164,12 +164,12 @@ fn load_translation_map(path: &str) -> Result<HashMap<String, String>, Box<dyn s
         if let Ok(file) = File::open(&env_path) {
             let map: HashMap<String, String> = serde_json::from_reader(file)?;
             return Ok(map);
-        } else {
-            log::warn!(
-                "Failed to open translation map at environment path: {}",
-                env_path.display()
-            );
         }
+        
+        log::warn!(
+            "Failed to open translation map at environment path: {}",
+            env_path.display()
+        );
     }
 
     // Try the provided path directly

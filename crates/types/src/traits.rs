@@ -105,16 +105,13 @@ pub trait CovariateProcessor: Send + Sync {
     
     /// Convert a categorical value to a numeric representation if needed for calculations
     fn categorical_to_numeric(&self, value: &str) -> f64 {
-        match value.parse::<f64>() {
-            Ok(num) => num,
-            Err(_) => {
-                // Hash the string to create a stable numeric value
-                let mut hash = 0.0;
-                for (i, b) in value.bytes().enumerate() {
-                    hash += (b as f64) * (i + 1) as f64;
-                }
-                hash
+        if let Ok(num) = value.parse::<f64>() { num } else {
+            // Hash the string to create a stable numeric value
+            let mut hash = 0.0;
+            for (i, b) in value.bytes().enumerate() {
+                hash += f64::from(b) * (i + 1) as f64;
             }
+            hash
         }
     }
 }

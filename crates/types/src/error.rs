@@ -67,57 +67,57 @@ pub enum IdsError {
 impl IdsError {
     /// Create an invalid operation error
     pub fn invalid_operation<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::InvalidOperation(msg.to_string())
+        Self::InvalidOperation(msg.to_string())
     }
 
     /// Create a missing data error
     pub fn missing_data<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::MissingData(msg.to_string())
+        Self::MissingData(msg.to_string())
     }
 
     /// Create an invalid format error
     pub fn invalid_format<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::InvalidFormat(msg.to_string())
+        Self::InvalidFormat(msg.to_string())
     }
     
     /// Create an invalid date error
     pub fn invalid_date<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::InvalidDate(msg.to_string())
+        Self::InvalidDate(msg.to_string())
     }
     
     /// Create a sampling error
     pub fn sampling<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::Sampling(msg.to_string())
+        Self::Sampling(msg.to_string())
     }
     
     /// Create a plotting error
     pub fn plotting<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::Plotting(msg.to_string())
+        Self::Plotting(msg.to_string())
     }
     
     /// Create a covariate error
     pub fn covariate<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::Covariate(msg.to_string())
+        Self::Covariate(msg.to_string())
     }
     
     /// Create a generation error
     pub fn generation<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::Generation(msg.to_string())
+        Self::Generation(msg.to_string())
     }
     
     /// Create a configuration error
     pub fn config<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::Config(msg.to_string())
+        Self::Config(msg.to_string())
     }
     
     /// Create an invalid criteria error
     pub fn invalid_criteria<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::InvalidCriteria(msg.to_string())
+        Self::InvalidCriteria(msg.to_string())
     }
     
     /// Create an IO error with a message
     pub fn io_error<T: std::fmt::Display>(msg: T) -> Self {
-        IdsError::Io(std::io::Error::new(std::io::ErrorKind::Other, msg.to_string()))
+        Self::Io(std::io::Error::new(std::io::ErrorKind::Other, msg.to_string()))
     }
 }
 

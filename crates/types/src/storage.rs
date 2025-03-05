@@ -115,7 +115,7 @@ impl DataStore {
     }
 
     /// Create a new DataStore with a TimeVaryingBackend
-    pub fn new_time_varying() -> Self {
+    #[must_use] pub fn new_time_varying() -> Self {
         Self {
             backend: Arc::new(TimeVaryingBackend::new()),
             cache: DashMap::new(),
@@ -148,7 +148,7 @@ impl DataStore {
     }
 
     /// Access the underlying arrow backend (if available)
-    pub fn as_arrow_backend(&self) -> Option<&ArrowBackend> {
+    #[must_use] pub fn as_arrow_backend(&self) -> Option<&ArrowBackend> {
         self.backend.as_any().downcast_ref::<ArrowBackend>()
     }
 
@@ -303,7 +303,7 @@ pub struct ArrowBackend {
 impl ArrowBackend {
     pub fn new() -> Result<Self, IdsError> {
         let translations =
-            TranslationMaps::new().map_err(|e| IdsError::invalid_format(format!("{}", e)))?;
+            TranslationMaps::new().map_err(|e| IdsError::invalid_format(format!("{e}")))?;
 
         Ok(Self {
             family_data: HashMap::new(),
@@ -326,8 +326,8 @@ impl ArrowBackend {
         // Add synthetic relationships and data for debugging in diagnostic mode
         for i in 0..100 {
             // Add some synthetic family data for diagnostic purposes
-            let case_id = format!("C{:06}", i);
-            let control_id = format!("K{:06}", i);
+            let case_id = format!("C{i:06}");
+            let control_id = format!("K{i:06}");
 
             // Get a birth date based on the index
             let birth_date = chrono::NaiveDate::from_ymd_opt(
@@ -355,11 +355,11 @@ impl ArrowBackend {
                 FamilyRelations {
                     pnr: case_id.clone(),
                     birth_date,
-                    father_id: Some(format!("F{:06}", i)),
+                    father_id: Some(format!("F{i:06}")),
                     father_birth_date: Some(father_birth_date),
-                    mother_id: Some(format!("M{:06}", i)),
+                    mother_id: Some(format!("M{i:06}")),
                     mother_birth_date: Some(mother_birth_date),
-                    family_id: Some(format!("FAM{:06}", i)),
+                    family_id: Some(format!("FAM{i:06}")),
                 },
             );
 
@@ -560,8 +560,8 @@ impl ArrowBackend {
             ));
         }
 
-        RecordBatch::try_new(batch.schema().clone(), columns).map_err(|e| {
-            IdsError::invalid_operation(format!("Failed to create sliced batch: {}", e))
+        RecordBatch::try_new(batch.schema(), columns).map_err(|e| {
+            IdsError::invalid_operation(format!("Failed to create sliced batch: {e}"))
         })
     }
 
@@ -588,8 +588,7 @@ impl ArrowBackend {
                     12
                 };
                 NaiveDate::from_ymd_opt(year, month as u32, 1)
-                    .map(|period_date| period_date <= date)
-                    .unwrap_or(false)
+                    .is_some_and(|period_date| period_date <= date)
             })
             .max_by_key(|p| p.len()))
     }
@@ -668,7 +667,7 @@ impl Default for TimeVaryingBackend {
 }
 
 impl TimeVaryingBackend {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             data: DashMap::new(),
             family_data: HashMap::new(),
@@ -698,7 +697,7 @@ impl TimeVaryingBackend {
             .write_record(["PNR", "Date", "Covariate Type", "Value"])
             .map_err(IdsError::Csv)?;
 
-        for entry in self.data.iter() {
+        for entry in &self.data {
             for value in entry.value() {
                 writer
                     .write_record([
