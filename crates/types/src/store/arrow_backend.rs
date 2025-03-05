@@ -2,7 +2,6 @@ use arrow::array::{Array, StringArray};
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use hashbrown::HashMap;
-use std::sync::Arc;
 use log;
 
 use crate::{

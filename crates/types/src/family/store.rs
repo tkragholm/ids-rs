@@ -1,5 +1,5 @@
 use crate::{
-    arrow_utils::ArrowAccess,
+    arrow::access::ArrowAccess,
     error::IdsError,
     family::FamilyRelations,
 };

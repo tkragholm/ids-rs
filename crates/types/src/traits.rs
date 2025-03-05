@@ -1,6 +1,6 @@
 use crate::{
     error::IdsError,
-    family::FamilyRelations,
+    family::relations::FamilyRelations,
     models::{Covariate, CovariateType, TimeVaryingValue},
 };
 use chrono::{Datelike, NaiveDate};

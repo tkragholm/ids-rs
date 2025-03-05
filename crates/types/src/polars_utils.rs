@@ -3,11 +3,15 @@
 //! This module provides utilities for converting between Arrow and Polars
 //! data structures, enabling gradual migration to Polars.
 
-use arrow::record_batch::RecordBatch;
+#[cfg(feature = "polars_backend")]
+use std::sync::Arc;
+#[cfg(feature = "polars_backend")]
 use polars::prelude::*;
-use crate::error::IdsError;
+#[cfg(feature = "polars_backend")]
+use num_cpus;
 
 /// Convert Arrow RecordBatch to Polars DataFrame
+#[cfg(feature = "polars_backend")]
 pub fn record_batch_to_df(batch: &RecordBatch) -> Result<DataFrame, IdsError> {
     // Manual conversion since direct TryFrom isn't available
     let mut columns = Vec::with_capacity(batch.num_columns());
@@ -58,6 +62,7 @@ pub fn record_batch_to_df(batch: &RecordBatch) -> Result<DataFrame, IdsError> {
 }
 
 /// Convert Polars DataFrame to Arrow RecordBatch
+#[cfg(feature = "polars_backend")]
 pub fn df_to_record_batch(df: &DataFrame) -> Result<RecordBatch, IdsError> {
     // Manual conversion
     let mut arrays = Vec::with_capacity(df.width());
@@ -139,6 +144,7 @@ pub fn df_to_record_batch(df: &DataFrame) -> Result<RecordBatch, IdsError> {
 }
 
 /// Convert a Vector of Arrow RecordBatch to a Polars LazyFrame
+#[cfg(feature = "polars_backend")]
 pub fn batches_to_lazy_frame(batches: &[RecordBatch]) -> Result<LazyFrame, IdsError> {
     if batches.is_empty() {
         return Ok(DataFrame::empty().lazy());
@@ -159,6 +165,7 @@ pub fn batches_to_lazy_frame(batches: &[RecordBatch]) -> Result<LazyFrame, IdsEr
 }
 
 /// Perform compound filtering on a LazyFrame based on column conditions
+#[cfg(feature = "polars_backend")]
 pub fn filter_lazy_frame(
     lf: LazyFrame,
     conditions: Vec<(String, String, String)>
@@ -184,6 +191,7 @@ pub fn filter_lazy_frame(
 }
 
 /// Create a LazyFrame from a Parquet file with optimized scan parameters
+#[cfg(feature = "polars_backend")]
 pub fn scan_optimized_parquet(path: &str) -> Result<LazyFrame, IdsError> {
     // Get environment variables for configuration
     let low_memory = std::env::var("IDS_LOW_MEMORY")
@@ -224,6 +232,7 @@ pub fn scan_optimized_parquet(path: &str) -> Result<LazyFrame, IdsError> {
 }
 
 /// Prepare an optimized LazyFrame for querying a specific PNR
+#[cfg(feature = "polars_backend")]
 pub fn prepare_pnr_query(lf: &LazyFrame, pnr: &str, columns: &[&str]) -> LazyFrame {
     // Create a simpler version without the API that might not be available
     lf.clone()
@@ -232,6 +241,7 @@ pub fn prepare_pnr_query(lf: &LazyFrame, pnr: &str, columns: &[&str]) -> LazyFra
 }
 
 /// Create an adaptive LazyFrame based on available system resources
+#[cfg(feature = "polars_backend")]
 pub fn create_adaptive_lazy_frame(lf: LazyFrame) -> LazyFrame {
     // Get available memory
     #[cfg(target_os = "linux")]

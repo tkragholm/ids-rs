@@ -1,8 +1,9 @@
 mod data_store;
+pub use data_store::{DataStore, CacheKey};
+
 pub mod arrow_backend;
 pub mod time_varying_backend;
 
-pub use data_store::{DataStore, CacheKey};
 pub use arrow_backend::ArrowBackend;
 pub use time_varying_backend::TimeVaryingBackend;
 

@@ -2,9 +2,9 @@
 // Use the store module instead.
 
 pub use crate::store::{
-    arrow_backend::ArrowBackend,
-    time_varying_backend::TimeVaryingBackend,
-    data_store::{DataStore, CacheKey},
+    ArrowBackend,
+    TimeVaryingBackend,
+    DataStore, CacheKey,
 };
 
 // Re-export the Storage trait for backwards compatibility

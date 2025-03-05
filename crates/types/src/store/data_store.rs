@@ -3,14 +3,13 @@ use std::sync::Arc;
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use dashmap::DashMap;
-use hashbrown::HashMap;
 
 use crate::{
     error::IdsError,
     family::FamilyRelations,
     models::{Covariate, CovariateType, TimeVaryingValue},
     traits::Store,
-    store::{ArrowBackend, TimeVaryingBackend, Backend},
+    store::{ArrowBackend, TimeVaryingBackend},
 };
 
 /// Cache key for covariate lookups
