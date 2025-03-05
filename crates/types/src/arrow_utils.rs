@@ -400,6 +400,39 @@ impl ArrowValue for f64 {
 pub struct ArrowUtils;
 
 impl ArrowUtils {
+    /// Find PNR column index in a batch
+    pub fn find_pnr_index(&self, batch: &RecordBatch) -> Result<Option<usize>, IdsError> {
+        // Check common PNR column names
+        for name in &["PNR", "pnr", "Pnr", "CPR", "cpr", "Cpr", "id", "ID", "Id"] {
+            // The index_of function returns a Result, not an Option
+            match batch.schema().index_of(name) {
+                Ok(idx) => {
+                    // Verify it's a string column
+                    if matches!(batch.schema().field(idx).data_type(), DataType::Utf8) {
+                        return Ok(Some(idx));
+                    }
+                },
+                Err(_) => continue, // Column name not found, try the next one
+            }
+        }
+        
+        // No PNR column found
+        Ok(None)
+    }
+    
+    /// Filter a batch by a boolean mask
+    pub fn filter_batch_by_mask(&self, batch: &RecordBatch, mask: &[bool]) -> Result<Option<RecordBatch>, IdsError> {
+        // Create a BooleanArray from the mask
+        let mask_array = BooleanArray::from(mask.to_vec());
+        
+        // Apply the filter
+        match filter_record_batch(batch, &mask_array) {
+            Ok(filtered) if filtered.num_rows() > 0 => Ok(Some(filtered)),
+            Ok(_) => Ok(None), // Empty result
+            Err(e) => Err(IdsError::invalid_operation(format!("Failed to filter batch: {}", e))),
+        }
+    }
+    
     /// Create a new empty batch with the given schema
     #[must_use] pub fn create_empty_batch(schema: ArrowSchema) -> RecordBatch {
         let fields = schema.fields();

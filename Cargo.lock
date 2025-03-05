@@ -1113,6 +1113,7 @@ dependencies = [
  "log4rs",
  "serde_json",
  "smallvec",
+ "thiserror 1.0.69",
  "types",
 ]
 

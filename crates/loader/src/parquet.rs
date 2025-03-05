@@ -130,8 +130,14 @@ pub fn read_parquet(
         }
     };
 
-    // Increase batch size for better performance
-    let batch_size = 16384; // Doubled from original 8192
+    // Get batch size from environment variable or use a larger default
+    // This allows tuning based on server capabilities
+    let batch_size = std::env::var("IDS_BATCH_SIZE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(65536); // 4x larger than previous default
+    
+    log::info!("Using batch size of {} rows for Parquet loading", batch_size);
 
     // Create the reader
     let reader = match schema {
@@ -196,9 +202,15 @@ pub fn read_parquet(
         })?,
     };
 
-    // Determine optimal number of worker threads based on available CPUs
-    let num_workers = num_cpus::get().clamp(2, 16); // At least 2, at most 16
-    log::debug!("Using {} worker threads for batch processing", num_workers);
+    // Get number of worker threads from environment variable or use all available CPUs
+    // This allows scaling to high-core servers without artificial limits
+    let num_workers = std::env::var("IDS_MAX_THREADS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or_else(|| num_cpus::get())
+        .max(2); // At least 2 workers for parallelism
+    
+    log::info!("Using {} worker threads for Parquet batch processing", num_workers);
 
     // Set up a parallel processing pipeline for batches
     // Using a work-stealing queue for dynamic load balancing across workers
@@ -369,6 +381,7 @@ pub fn read_parquet(
     log::info!("Successfully read {} batches from {}", batches.len(), path.display());
     Ok(batches)
 }
+
 
 /// Filter a list of batches by a date range
 /// 

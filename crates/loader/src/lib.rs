@@ -79,6 +79,18 @@ impl LoaderProgress {
     pub fn finish_main(&self, msg: &str) {
         self.main_pb.finish_with_message(msg.to_string());
     }
+    
+    /// Creates a progress bar for tracking parallel operations
+    pub fn create_main_progress(&self, total: u64, operation_name: String) -> ProgressBar {
+        let style = ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.green/blue} {pos}/{len} ({percent}%) {msg}")
+            .unwrap();
+
+        let pb = self.multi_progress.add(ProgressBar::new(total));
+        pb.set_style(style);
+        pb.set_prefix(operation_name);
+        pb
+    }
 }
 
 pub trait StoreLoader {

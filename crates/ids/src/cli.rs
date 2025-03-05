@@ -1,7 +1,10 @@
 use clap::{Parser, Subcommand};
 
 /// Subcommands for the Config command
-#[derive(Subcommand)]
+/// 
+/// These commands handle configuration-related tasks like generating
+/// default configuration files for covariates.
+#[derive(Subcommand, Debug, Clone)]
 pub enum ConfigCommands {
     /// Generate a default configuration file for covariates
     GenerateCovariates {
@@ -15,7 +18,11 @@ pub enum ConfigCommands {
     }
 }
 
-#[derive(Parser)]
+/// Main CLI configuration for the IDS tool
+/// 
+/// This struct defines the top-level command-line interface for the IDS (Incidence Density Sampling)
+/// tool. It handles global options that apply to all subcommands, such as the output directory.
+#[derive(Parser, Debug, Clone)]
 #[command(
     author,
     version,
@@ -31,7 +38,11 @@ pub struct Cli {
     pub command: Commands,
 }
 
-#[derive(Subcommand)]
+/// Subcommands for the IDS tool
+/// 
+/// These commands represent the main functionality of the IDS toolkit,
+/// including data generation, sampling, and balance analysis.
+#[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
     /// Generate synthetic register data for research purposes
     GenerateRegisters {

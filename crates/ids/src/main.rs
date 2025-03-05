@@ -1,6 +1,5 @@
-mod cli;
-mod main_run;
+use ids::run;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    main_run::run()
+    run()
 }

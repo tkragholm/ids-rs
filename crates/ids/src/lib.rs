@@ -1,96 +1,140 @@
 pub mod cli;
-pub mod main_run;
+pub mod commands;
+pub mod config;
+pub mod error;
+pub mod utils;
 
-// Export CLI types that may be used by other crates
+// Re-export key types for convenient access
 pub use cli::{Cli, Commands, ConfigCommands};
+pub use error::{IdsError, IdsResult};
 
-use std::path::Path;
-use std::fs;
-use log::info;
-use core::utils::configure_logging_with_level;
+use clap::Parser;
+use env_logger;
+use indicatif::MultiProgress;
+use indicatif_log_bridge::LogWrapper;
+use log;
+use std::process;
 
-// Create output directories
-pub fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let base_path = Path::new(output_dir);
-
-    // Create main output directory and log directory
-    fs::create_dir_all(base_path)?;
-    fs::create_dir_all(base_path.join("log"))?;
-
-    // Create plots directory for visualizations
-    fs::create_dir_all(base_path.join("plots"))?;
-    
-    // Create report directory for HTML reports
-    fs::create_dir_all(base_path.join("report"))?;
-
-    // Create register subdirectories for data storage
-    let register_dirs = ["akm", "bef", "ind", "uddf"];
-    for dir in &register_dirs {
-        fs::create_dir_all(base_path.join(dir))?;
-    }
-
-    info!("Created output directories in {}", output_dir);
-    Ok(())
-}
-
-// Configure logging with directory
-pub fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let log_path = format!("{output_dir}/log/cli.log");
-
-    // Use more restrictive logging in the console to reduce terminal noise
-    // Only show warnings and errors in the console
-    let log_level = log::LevelFilter::Warn;
-    
-    // This will send logs to both console and file, but we're setting
-    // the overall level to Warn to reduce console output
-    configure_logging_with_level(Some(&log_path), log_level)?;
-    
-    Ok(())
-}
-
-/// Generate structured reports from balance results and matched pairs data
+/// Main entry function for the library
 /// 
-/// This function demonstrates the use of the structured output manager
-/// to create a more organized, web-friendly output structure.
-/// 
-/// # Arguments
-/// * `balance_results` - The balance calculation results
-/// * `matched_pairs` - The matched pairs data
-/// * `output_dir` - The directory to save reports to
+/// This is the main entry point for the application. It parses command line arguments,
+/// sets up logging, and dispatches to the appropriate command handler.
 /// 
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>` - Success or error
-pub fn generate_structured_reports(
-    balance_results: &covariates::balance::results::BalanceResults,
-    matched_pairs: &[covariates::matched_pairs::record::MatchedPairRecord],
-    output_dir: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    use covariates::reporting::StructuredOutputManager;
-    use core::utils::console::ConsoleOutput;
-    use std::time::Instant;
+pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+    // Check for the most common command line mistake - missing space after --family-file
+    for arg in std::env::args() {
+        if arg.starts_with("--family-file") && arg != "--family-file" {
+            eprintln!(
+                "ERROR: Detected possible command line issue. You provided '{arg}' without a space."
+            );
+            eprintln!("       Did you mean to write: --family-file {}", &arg[13..]);
+            eprintln!(
+                "       Check other parameters too. Put a space between each flag and its value."
+            );
+            process::exit(1);
+        }
+    }
+
+    // Initialize logging system with progress bars
+    // Create a custom environment with a modified default filter
+    // This allows us to control the logger behavior more precisely
+    let env = env_logger::Env::default().filter_or("RUST_LOG", "warn");
+
+    // Build the logger with our custom env settings
+    let logger = env_logger::Builder::from_env(env)
+        .format_timestamp(Some(env_logger::TimestampPrecision::Seconds))
+        .format_module_path(false) // Make logs cleaner
+        .build();
+
+    // Get the filter level to properly set max log level
+    let level = logger.filter();
+
+    // Create a MultiProgress for use with the LogWrapper
+    let multi = MultiProgress::new();
+
+    // Connect logger with progress bars to prevent progress bars from being interrupted by logs
+    if let Err(e) = LogWrapper::new(multi, logger).try_init() {
+        eprintln!("Warning: Failed to initialize logger: {e}");
+    }
+
+    // Set the global max log level
+    log::set_max_level(level);
+
+    // Parse command line arguments
+    let cli = match Cli::try_parse() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{e}");
+            eprintln!("\nNOTE: Make sure there is a space between each flag and its value!");
+            eprintln!("Example: --family-file data/registers/family.parquet");
+            process::exit(1);
+        }
+    };
+
+    // Create output directories and configure logging
+    utils::setup_directories(&cli.output_dir)?;
+    utils::configure_logging_with_dir(&cli.output_dir)?;
+
+    // Execute the requested command
+    let result = match &cli.command {
+        Commands::Config { command } => commands::handle_config_command(command),
+        Commands::GenerateRegisters {
+            output_dir,
+            num_records,
+            num_cases,
+            start_year,
+            end_year,
+            seed,
+        } => commands::handle_generate_registers(
+            output_dir,
+            *num_records,
+            *num_cases,
+            *start_year,
+            *end_year,
+            *seed,
+        ),
+        Commands::Sample {
+            input,
+            controls,
+            birth_window,
+            parent_window,
+        } => commands::handle_sampling(
+            input,
+            *controls,
+            *birth_window,
+            *parent_window,
+            &cli.output_dir,
+        ),
+        Commands::CheckBalance {
+            matches_file,
+            covariate_dir,
+            family_file,
+            akm_dir,
+            bef_dir,
+            ind_dir,
+            uddf_dir,
+            structured,
+        } => {
+            let config = commands::balance::BalanceCheckConfig {
+                matches_file,
+                covariate_dir: covariate_dir.as_deref(),
+                output_dir: &cli.output_dir,
+                family_file: family_file.as_deref(),
+                akm_dir: akm_dir.as_deref(),
+                bef_dir: bef_dir.as_deref(),
+                ind_dir: ind_dir.as_deref(),
+                uddf_dir: uddf_dir.as_deref(),
+                generate_structured_output: *structured,
+            };
+            commands::handle_balance_check(&config)
+        }
+    };
     
-    // Create structured output manager
-    ConsoleOutput::subsection("Generating Structured Reports");
-    let start_time = Instant::now();
-    
-    let output_manager = StructuredOutputManager::new(output_dir)?
-        .with_runtime_info("command", "generate-structured-reports")
-        .with_runtime_info("timestamp", chrono::Local::now().to_string());
-    
-    // Output balance results
-    output_manager.output_balance_results(balance_results, None)?;
-    
-    // Output matched pairs data
-    output_manager.output_matched_pairs(matched_pairs, None)?;
-    
-    // Generate HTML reports
-    output_manager.generate_index_html()?;
-    output_manager.generate_data_quality_report()?;
-    
-    // Log completion
-    ConsoleOutput::success(&format!("Generated structured reports in {} seconds", 
-        start_time.elapsed().as_secs()));
-    ConsoleOutput::info(&format!("Reports available at: {output_dir}/report/"));
-    
-    Ok(())
+    // Convert custom error to standard Box<dyn std::error::Error>
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => Err(Box::new(e))
+    }
 }
