@@ -32,7 +32,7 @@ impl TranslationMaps {
         match Self::load_from_files() {
             Ok(maps) => {
                 log::info!("Successfully loaded translation maps from files");
-                return Ok(maps);
+                Ok(maps)
             }
             Err(e) => {
                 log::warn!(
