@@ -113,17 +113,17 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             ind_dir,
             uddf_dir,
             structured,
-        } => handle_balance_check(
+        } => handle_balance_check(BalanceCheckConfig {
             matches_file,
-            covariate_dir.as_deref(),
-            &cli.output_dir,
-            family_file.as_deref(),
-            akm_dir.as_deref(),
-            bef_dir.as_deref(),
-            ind_dir.as_deref(),
-            uddf_dir.as_deref(),
-            *structured,
-        ),
+            covariate_dir: covariate_dir.as_deref(),
+            output_dir: &cli.output_dir,
+            family_file: family_file.as_deref(),
+            akm_dir: akm_dir.as_deref(),
+            bef_dir: bef_dir.as_deref(),
+            ind_dir: ind_dir.as_deref(),
+            uddf_dir: uddf_dir.as_deref(),
+            generate_structured_output: *structured,
+        }),
     }
 }
 
@@ -408,17 +408,20 @@ fn process_sampling_results(
     Ok(())
 }
 
-fn handle_balance_check(
-    matches_file: &str,
-    covariate_dir: Option<&str>,
-    output_dir: &str,
-    family_file: Option<&str>,
-    akm_dir: Option<&str>,
-    bef_dir: Option<&str>,
-    ind_dir: Option<&str>,
-    uddf_dir: Option<&str>,
+/// Configuration for balance check
+struct BalanceCheckConfig<'a> {
+    matches_file: &'a str,
+    covariate_dir: Option<&'a str>,
+    output_dir: &'a str,
+    family_file: Option<&'a str>,
+    akm_dir: Option<&'a str>,
+    bef_dir: Option<&'a str>,
+    ind_dir: Option<&'a str>,
+    uddf_dir: Option<&'a str>,
     generate_structured_output: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+}
+
+fn handle_balance_check(config: BalanceCheckConfig) -> Result<(), Box<dyn std::error::Error>> {
     use core::utils::console::{format_duration_short, ConsoleOutput};
     use covariates::balance::BalanceChecker;
     use loader::ParquetLoader;
@@ -429,7 +432,7 @@ fn handle_balance_check(
 
     // Step 1: Load matched pairs
     ConsoleOutput::subsection("Loading Matched Pairs");
-    let matches_path = Path::new(matches_file);
+    let matches_path = Path::new(config.matches_file);
     if !matches_path.exists() {
         ConsoleOutput::error(&format!(
             "Matched pairs file not found: {}",
@@ -543,9 +546,9 @@ fn handle_balance_check(
             
             // As a last resort, if covariate_dir is specified, try there
             // but ONLY if the path doesn't already have directory components
-            if let Some(base_dir) = covariate_dir {
+            if let Some(base_dir) = config.covariate_dir {
                 // Don't do this if the family path already has directory components
-                if !family_obj.parent().is_some_and(|p| p != Path::new("")) {
+                if family_obj.parent().is_none_or(|p| p == Path::new("")) {
                     let cov_path = Path::new(base_dir).join(family_obj.file_name().unwrap_or_default());
                     let cov_str = cov_path.to_string_lossy().to_string();
                     
@@ -572,7 +575,7 @@ fn handle_balance_check(
             log::debug!("Using absolute path for {}: {}", register_type, path);
             check_path_exists(path, &format!("{} (absolute)", register_type));
             path.to_string()
-        } else if let Some(base_dir) = covariate_dir {
+        } else if let Some(base_dir) = config.covariate_dir {
             // Check if the path already starts with the base_dir to avoid duplication
             if path.contains(base_dir) {
                 log::debug!("Path already contains base_dir ({}): {}", base_dir, path);
@@ -611,35 +614,35 @@ fn handle_balance_check(
         }
     };
 
-    if let Some(path) = family_file {
+    if let Some(path) = config.family_file {
         let normalized_path = normalize_path(path, "family");
         custom_paths.insert("family".to_string(), normalized_path.clone());
         ConsoleOutput::key_value("Using custom family file", &normalized_path);
         has_custom_paths = true;
     }
 
-    if let Some(path) = akm_dir {
+    if let Some(path) = config.akm_dir {
         let normalized_path = normalize_path(path, "akm");
         custom_paths.insert("akm".to_string(), normalized_path.clone());
         ConsoleOutput::key_value("Using custom AKM directory", &normalized_path);
         has_custom_paths = true;
     }
 
-    if let Some(path) = bef_dir {
+    if let Some(path) = config.bef_dir {
         let normalized_path = normalize_path(path, "bef");
         custom_paths.insert("bef".to_string(), normalized_path.clone());
         ConsoleOutput::key_value("Using custom BEF directory", &normalized_path);
         has_custom_paths = true;
     }
 
-    if let Some(path) = ind_dir {
+    if let Some(path) = config.ind_dir {
         let normalized_path = normalize_path(path, "ind");
         custom_paths.insert("ind".to_string(), normalized_path.clone());
         ConsoleOutput::key_value("Using custom IND directory", &normalized_path);
         has_custom_paths = true;
     }
 
-    if let Some(path) = uddf_dir {
+    if let Some(path) = config.uddf_dir {
         let normalized_path = normalize_path(path, "uddf");
         custom_paths.insert("uddf".to_string(), normalized_path.clone());
         ConsoleOutput::key_value("Using custom UDDF directory", &normalized_path);
@@ -653,7 +656,7 @@ fn handle_balance_check(
     // Attempt to load the data based on what paths we have
     let arrow_store_result = if has_custom_paths {
         // If we have custom paths, use them regardless of whether covariate_dir is provided
-        let base_dir = match covariate_dir {
+        let base_dir = match config.covariate_dir {
             Some(dir) => {
                 ConsoleOutput::info(&format!("Using base directory: {}", dir));
                 log::debug!("Using base directory with custom paths: {}", dir);
@@ -877,7 +880,7 @@ fn handle_balance_check(
         }
 
         loader_result
-    } else if let Some(cov_dir) = covariate_dir {
+    } else if let Some(cov_dir) = config.covariate_dir {
         // Check if the directory exists and contains register data
         let cov_dir_path = Path::new(cov_dir);
         if !cov_dir_path.exists() || !cov_dir_path.is_dir() {
@@ -1042,22 +1045,22 @@ fn handle_balance_check(
 
             // Save results
             ConsoleOutput::subsection("Saving Results");
-            let save_path = Path::new(output_dir).join("covariate_balance.csv");
+            let save_path = Path::new(config.output_dir).join("covariate_balance.csv");
 
             // Create a comprehensive report
             use covariates::reporting::ComprehensiveReport;
             let balance_results_copy = balance_results.clone();
             let report = ComprehensiveReport::new(balance_results);
-            report.save_to_files(Path::new(output_dir))?;
+            report.save_to_files(Path::new(config.output_dir))?;
 
             ConsoleOutput::success(&format!("Saved balance results to {}", save_path.display()));
 
             // If structured output is enabled, generate it
-            if generate_structured_output {
+            if config.generate_structured_output {
                 // Load the original matched pair records for structured reports
                 let matched_pair_records =
                     match load_matched_pair_records(Path::new(
-                        matches_file,
+                        config.matches_file,
                     )) {
                         Ok(records) => records,
                         Err(e) => {
@@ -1073,12 +1076,12 @@ fn handle_balance_check(
                 match generate_structured_reports(
                     &balance_results_copy,
                     &matched_pair_records,
-                    output_dir,
+                    config.output_dir,
                 ) {
                     Ok(_) => {
                         ConsoleOutput::success(&format!(
                             "Generated structured reports in {}/report/",
-                            output_dir
+                            config.output_dir
                         ));
                     }
                     Err(e) => {
@@ -1092,7 +1095,7 @@ fn handle_balance_check(
 
             // Generate plots
             ConsoleOutput::subsection("Generating Visualizations");
-            let plots_dir = Path::new(output_dir).join("plots");
+            let plots_dir = Path::new(config.output_dir).join("plots");
             fs::create_dir_all(&plots_dir)?;
 
             // Generate plots using the report
@@ -1114,11 +1117,11 @@ fn handle_balance_check(
     // Summary
     let total_time = start.elapsed();
     ConsoleOutput::section("Summary");
-    ConsoleOutput::key_value("Matched pairs file", matches_file);
-    if let Some(cov_dir) = covariate_dir {
+    ConsoleOutput::key_value("Matched pairs file", config.matches_file);
+    if let Some(cov_dir) = config.covariate_dir {
         ConsoleOutput::key_value("Covariate directory", cov_dir);
     }
-    ConsoleOutput::key_value("Output directory", output_dir);
+    ConsoleOutput::key_value("Output directory", config.output_dir);
     ConsoleOutput::key_value("Total execution time", &format_duration_short(total_time));
 
     if use_diagnostic_mode {
