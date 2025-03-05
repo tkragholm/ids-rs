@@ -21,6 +21,12 @@ use crate::{
 /// 4. Loads files in parallel
 pub struct ParallelLoader;
 
+impl Default for ParallelLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ParallelLoader {
     /// Create a new ParallelLoader instance
     pub fn new() -> Self {

@@ -400,7 +400,7 @@ fn process_batch(
 
 /// Filter a RecordBatch by a set of PNRs
 fn filter_batch_by_pnr(batch: &RecordBatch, pnr_set: &HashSet<String>) -> Option<RecordBatch> {
-    use arrow::array::{Array, StringArray, UInt32Array};
+    use arrow::array::{Array, StringArray};
     use arrow::compute::filter_record_batch;
     
     // Find PNR column in batch

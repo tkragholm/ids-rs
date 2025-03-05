@@ -4,7 +4,6 @@ mod file;
 pub use custom_path::CustomPathReader;
 pub use file::FileReader;
 
-use crate::schema;
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use std::path::Path;

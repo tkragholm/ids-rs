@@ -226,6 +226,12 @@ impl StoreLoader for PolarsLoader {
 pub struct PolarsLoader;
 
 #[cfg(not(feature = "polars_backend"))]
+impl Default for PolarsLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PolarsLoader {
     pub fn new() -> Self {
         Self

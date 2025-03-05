@@ -3,7 +3,7 @@ use crate::schema;
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use types::error::IdsError;
 
 /// Reader for accessing data with custom paths

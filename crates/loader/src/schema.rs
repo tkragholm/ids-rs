@@ -1,5 +1,4 @@
 use arrow_schema::{DataType, Field, Schema};
-use std::sync::Arc;
 
 /// Defines the schema for Annual Register (AKM) data
 ///
