@@ -5,7 +5,6 @@ edition.workspace = true
 
 [features]
 default = []
-polars_backend = ["polars", "polars-arrow", "lazy_static"]
 schema_json = []
 
 [dependencies]
@@ -27,7 +26,3 @@ num_cpus = "1.16.0"
 hashbrown.workspace = true
 regex = "1.10.3"
 lazy_static = { version = "1.4.0", optional = true }
-
-# Optional Polars dependencies
-polars = { version = "0.46.0", optional = true, features = ["lazy", "parquet", "dtype-date", "strings", "temporal"] }
-polars-arrow = { version = "0.46.0", optional = true }

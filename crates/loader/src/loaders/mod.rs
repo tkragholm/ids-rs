@@ -1,7 +1,5 @@
-mod parquet;
 mod parallel;
-mod polars;
+mod parquet;
 
-pub use parquet::ParquetLoader;
 pub use parallel::ParallelLoader;
-pub use polars::PolarsLoader;
+pub use parquet::ParquetLoader;
