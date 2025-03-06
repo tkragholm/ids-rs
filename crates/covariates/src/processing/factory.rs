@@ -2,7 +2,6 @@ use anyhow::Result;
 use std::collections::HashMap;
 use types::models::{Covariate, CovariateType};
 use types::traits::{CovariateProcessor, VariableType};
-use types::traits::processing::LegacyCovariateProcessor;
 use types::translation::{TranslationMaps, TranslationType};
 
 use crate::core::config::{CovariateTypeConfig, CovariateVariableConfig, CovariatesConfig};

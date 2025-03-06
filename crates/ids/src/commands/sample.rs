@@ -1,4 +1,4 @@
-use crate::core::{IdsError, IdsResult};
+use crate::core::IdsResult;
 use core::sampler::IncidenceDensitySampler;
 use core::utils::console::{format_duration_short, ConsoleOutput};
 use core::utils::{load_records, validate_csv_format, MatchingCriteria};

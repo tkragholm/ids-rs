@@ -1,7 +1,6 @@
 use types::error::{IdsError, Result};
 use types::models::{Covariate, CovariateType};
 use types::traits::CovariateProcessor;
-use types::traits::processing::LegacyCovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;

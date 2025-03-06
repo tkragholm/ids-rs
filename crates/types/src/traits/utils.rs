@@ -82,7 +82,22 @@ pub trait DateHelpers {
 }
 
 /// Implementation of DateHelpers for i32 (days since epoch)
+///
+/// This implementation safely converts an integer representing days since the Common Era
+/// into a NaiveDate, using the safer `from_num_days_from_ce_opt` method
+/// that returns an Option rather than panicking.
 impl DateHelpers for i32 {
+    /// Convert days since epoch to NaiveDate
+    ///
+    /// # Returns
+    /// * `Result<NaiveDate>` - The date as a NaiveDate or an error
+    ///
+    /// # Errors
+    /// Returns a date_conversion error if the integer value doesn't represent a valid date
+    /// 
+    /// # Safety
+    /// Uses the non-panicking from_num_days_from_ce_opt method rather than the deprecated
+    /// from_num_days_from_ce method for improved safety.
     fn to_naive_date(&self) -> Result<NaiveDate> {
         NaiveDate::from_num_days_from_ce_opt(*self)
             .ok_or_else(|| IdsError::date_conversion(format!("Invalid days since epoch: {}", self)))

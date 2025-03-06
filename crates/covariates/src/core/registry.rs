@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use types::models::CovariateType;
 use types::traits::{CovariateProcessor};
-use types::traits::processing::LegacyCovariateProcessor;
 use types::translation::TranslationMaps;
 
 use crate::core::config::CovariatesConfig;

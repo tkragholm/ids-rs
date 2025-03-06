@@ -96,7 +96,7 @@ impl DataStore {
     /// Add AKM (labor market) data
     pub fn add_akm_data(&mut self, year: i32, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_akm_data(year, batches);
+            backend.add_akm_data(year, batches)?;
             Ok(())
         } else {
             Err(IdsError::invalid_operation(
@@ -112,7 +112,7 @@ impl DataStore {
         batches: Vec<RecordBatch>,
     ) -> Result<(), IdsError> {
         if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_bef_data(period, batches);
+            backend.add_bef_data(period, batches)?;
             Ok(())
         } else {
             Err(IdsError::invalid_operation(
@@ -124,7 +124,7 @@ impl DataStore {
     /// Add IND (income) data
     pub fn add_ind_data(&mut self, year: i32, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_ind_data(year, batches);
+            backend.add_ind_data(year, batches)?;
             Ok(())
         } else {
             Err(IdsError::invalid_operation(
@@ -140,7 +140,7 @@ impl DataStore {
         batches: Vec<RecordBatch>,
     ) -> Result<(), IdsError> {
         if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_uddf_data(period, batches);
+            backend.add_uddf_data(period, batches)?;
             Ok(())
         } else {
             Err(IdsError::invalid_operation(

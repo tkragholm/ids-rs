@@ -5,7 +5,6 @@ use hashbrown::HashMap;
 use log;
 
 use crate::{
-    arrow::access::ArrowAccess,
     arrow::utils::ArrowUtils,
     error::{IdsError, Result},
     family::{FamilyRelations, FamilyStore},
