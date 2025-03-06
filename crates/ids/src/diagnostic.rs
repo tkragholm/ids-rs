@@ -1,5 +1,5 @@
 use covariates::balance::BalanceChecker;
-use types::storage::ArrowBackend;
+use types::storage::arrow::backend::ArrowBackend;
 
 /// Extension trait for BalanceChecker to provide diagnostic capabilities
 pub trait BalanceCheckerDiagnostic {

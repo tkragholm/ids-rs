@@ -1,4 +1,4 @@
-use types::{error::IdsError, storage::ArrowBackend as ArrowStore};
+use types::{error::IdsError, storage::arrow::backend::ArrowBackend as ArrowStore};
 use std::sync::Arc;
 use super::BalanceChecker;
 use crate::balance::{legacy_cache::CovariateCache, metrics::BalanceMetrics};

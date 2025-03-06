@@ -15,7 +15,7 @@ use std::{collections::HashMap, sync::Arc};
 use types::{
     error::IdsError,
     models::{Covariate, CovariateType},
-    storage::ArrowBackend as ArrowStore,
+    storage::arrow::backend::ArrowBackend as ArrowStore,
 };
 
 // Re-export important types and the builder
@@ -54,7 +54,7 @@ impl BalanceChecker {
         date: NaiveDate,
     ) -> Result<Option<Covariate>, IdsError> {
         let key = CacheKey::new(pnr, covariate_type, date);
-        self.cache.get_or_load(&*self.store, key)
+        self.cache.get_or_load(&*self.store, key)?
             .map_err(|e| IdsError::invalid_operation(format!("Failed to get covariate for PNR {}: {}", pnr, e)))
     }
 

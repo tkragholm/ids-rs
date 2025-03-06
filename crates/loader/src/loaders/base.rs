@@ -1,5 +1,5 @@
 use types::error::IdsError;
-use types::storage::ArrowBackend as ArrowStore;
+use types::storage::arrow::backend::ArrowBackend as ArrowStore;
 
 use crate::config::RegisterPathConfig;
 

@@ -4,6 +4,7 @@ use chrono::NaiveDate;
 use hashbrown::HashMap;
 use log;
 
+// Note: For initial phase, we'll keep original imports, to be updated in next phase
 use crate::{
     arrow::access::ArrowAccess,
     arrow::utils::ArrowUtils,
@@ -117,7 +118,7 @@ impl ArrowBackend {
         }
     }
 
-    pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) {
+    pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -131,9 +132,10 @@ impl ArrowBackend {
         }
 
         self.akm_data.insert(year, batches);
+        Ok(())
     }
 
-    pub fn add_bef_data(&mut self, period: String, mut batches: Vec<RecordBatch>) {
+    pub fn add_bef_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -147,9 +149,10 @@ impl ArrowBackend {
         }
 
         self.bef_data.insert(period, batches);
+        Ok(())
     }
 
-    pub fn add_ind_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) {
+    pub fn add_ind_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -163,9 +166,10 @@ impl ArrowBackend {
         }
 
         self.ind_data.insert(year, batches);
+        Ok(())
     }
 
-    pub fn add_uddf_data(&mut self, period: String, mut batches: Vec<RecordBatch>) {
+    pub fn add_uddf_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -179,6 +183,13 @@ impl ArrowBackend {
         }
 
         self.uddf_data.insert(period, batches);
+        Ok(())
+    }
+    
+    /// Add family data to the backend
+    pub fn add_family_data(&mut self, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
+        // Load family relations using existing implementation
+        self.load_family_relations(batches)
     }
 
     fn get_education(&self, pnr: &str, date: NaiveDate) -> Result<Option<Covariate>, IdsError> {

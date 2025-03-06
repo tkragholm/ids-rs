@@ -20,11 +20,11 @@ pub fn logging_error<T: std::fmt::Display>(msg: T) -> IdsError {
 }
 
 // Simplified helper for converting errors with context
-pub fn with_context<T, E>(result: std::result::Result<T, E>, context: &str) -> Result<T>
+pub fn with_context<T, E>(result: std::result::Result<T, E>, context: String) -> Result<T>
 where
     E: std::fmt::Display + 'static,
 {
-    result.with_context(|| context)
+    result.with_context(move || context)
 }
 
 #[cfg(test)]

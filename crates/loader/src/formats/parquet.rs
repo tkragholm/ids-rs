@@ -1,17 +1,15 @@
 use crate::ui::LoaderProgress;
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
-use indicatif::ProgressBar;
 
 use crossbeam_channel::bounded;
 use crossbeam_deque::{Injector, Steal, Worker};
 use parking_lot::Mutex;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use parquet::arrow::ProjectionMask;
-use rayon::prelude::*;
+// use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::thread;
 use arrow::array::{Array, StringArray};
@@ -138,13 +136,18 @@ pub fn read_parquet(
                 Some(pnr_column) => {
                     // Convert column to strings
                     // Try to cast to string array
-                    let pnr_strings = pnr_column.as_any().downcast_ref::<StringArray>()
-                        .unwrap_or_else(|| {
+                    let pnr_strings = match pnr_column.as_any().downcast_ref::<StringArray>() {
+                        Some(arr) => arr,
+                        None => {
                             log::warn!("Could not cast PNR column to StringArray");
-                            &StringArray::from(vec![""])
-                        });
+                            // Create a string array once and reuse it
+                            static EMPTY_ARRAY: once_cell::sync::Lazy<StringArray> = 
+                                once_cell::sync::Lazy::new(|| StringArray::from(vec![""]));
+                            &EMPTY_ARRAY
+                        }
+                    };
                     
-                    let pnr_vec: Vec<bool> = (0..pnr_strings.len())
+                    let _pnr_vec: Vec<bool> = (0..pnr_strings.len())
                         .map(|i| {
                             let pnr = pnr_strings.value(i);
                             pnr_filter.contains(pnr)

@@ -32,7 +32,7 @@ pub trait BalanceCheckerDiagnostics {
 impl BalanceCheckerDiagnostics for BalanceChecker {
     /// Create a new checker with an empty store (for diagnostic mode)
     fn new_diagnostic() -> Self {
-        let empty_store = types::storage::ArrowBackend::new_empty();
+        let empty_store = types::storage::arrow::backend::ArrowBackend::new_empty();
 
         // Create a checker with an empty store but with a cache that simulates having some data
         // Create a checker builder
@@ -49,7 +49,7 @@ impl BalanceCheckerDiagnostics for BalanceChecker {
 
     /// Create a new diagnostic checker using actual PNRs from matched pairs
     fn new_diagnostic_with_pnrs(pnrs: Vec<String>) -> Self {
-        let empty_store = types::storage::ArrowBackend::new_empty();
+        let empty_store = types::storage::arrow::backend::ArrowBackend::new_empty();
 
         // Create a checker with an empty store but with a cache that simulates having some data
         let checker = Self {

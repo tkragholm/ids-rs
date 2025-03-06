@@ -184,7 +184,7 @@ impl IncidenceDensitySampler {
         println!("{}", "=".repeat(text.len()).blue());
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(dead_code, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn format_percentage(value: f64, total: f64) -> String {
         format!(
             "{:.1}% ({}/{})",

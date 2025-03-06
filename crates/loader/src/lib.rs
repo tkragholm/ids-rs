@@ -64,6 +64,7 @@ pub use types::{
     error::IdsError,
     family::FamilyRelations,
     models::*,
-    storage::{ArrowBackend as ArrowStore, DataStore as UnifiedStore},
+    storage::arrow::backend::ArrowBackend as ArrowStore,
+    store::DataStore as UnifiedStore,
     traits::Store,
 };

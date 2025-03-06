@@ -1,4 +1,4 @@
-use crate::error::IdsError;
+use crate::error::{IdsError, Result};
 use arrow::array::{
     Array, BooleanArray, Date32Array, Float64Array, Int32Array, StringArray,
 };
@@ -9,38 +9,77 @@ use chrono::{Days, NaiveDate};
 use log;
 
 /// Trait for accessing Arrow data
+///
+/// This trait provides a standardized interface for working with Arrow data,
+/// including type-safe accessors, filtering, and validation operations.
 pub trait ArrowAccess {
     /// Find the index of a PNR in a batch
-    fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>, IdsError>;
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to search
+    /// * `pnr` - The PNR value to find
+    ///
+    /// # Returns
+    /// An option containing the index if found
+    fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>>;
 
     /// Get a value from a specific column and index
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to access
+    /// * `column` - The column name
+    /// * `index` - The row index
+    ///
+    /// # Returns
+    /// An option containing the value if it exists and is valid
     fn get_value<T: ArrowValue>(
         &self,
         batch: &RecordBatch,
         column: &str,
         index: usize,
-    ) -> Result<Option<T>, IdsError>;
+    ) -> Result<Option<T>>;
 
     /// Get a string array from a batch
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to access
+    /// * `column_name` - The column name
+    ///
+    /// # Returns
+    /// A reference to the string array
     fn get_string_array<'a>(
         &self,
         batch: &'a RecordBatch,
         column_name: &str,
-    ) -> Result<&'a StringArray, IdsError>;
+    ) -> Result<&'a StringArray>;
 
     /// Get a date array from a batch
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to access
+    /// * `column_name` - The column name
+    ///
+    /// # Returns
+    /// A reference to the date array
     fn get_date_array<'a>(
         &self,
         batch: &'a RecordBatch,
         column_name: &str,
-    ) -> Result<&'a Date32Array, IdsError>;
+    ) -> Result<&'a Date32Array>;
 
     /// Get array data from a batch column
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to access
+    /// * `column_name` - The column name
+    ///
+    /// # Returns
+    /// The array data
     fn get_array_data(
         &self,
         batch: &RecordBatch,
         column_name: &str,
-    ) -> Result<arrow::array::ArrayData, IdsError>;
+    ) -> Result<arrow::array::ArrayData>;
     
     /// Get Unix epoch (1970-01-01) date safely
     ///
@@ -49,7 +88,7 @@ pub trait ArrowAccess {
     ///
     /// # Errors
     /// Returns an error if the date 1970-01-01 cannot be created
-    fn get_unix_epoch(&self) -> Result<NaiveDate, IdsError>;
+    fn get_unix_epoch(&self) -> Result<NaiveDate>;
     
     /// Convert a NaiveDate to days since Unix epoch safely
     ///
@@ -62,61 +101,115 @@ pub trait ArrowAccess {
     /// # Errors
     /// Returns an error if the Unix epoch date can't be created or if the result would
     /// overflow an i32
-    fn date_to_days_since_epoch(&self, date: NaiveDate) -> Result<i32, IdsError>;
+    fn date_to_days_since_epoch(&self, date: NaiveDate) -> Result<i32>;
 
     /// Convert a date32 value to NaiveDate
-    fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate, IdsError>;
+    ///
+    /// # Arguments
+    /// * `days_since_epoch` - The number of days since Unix epoch
+    ///
+    /// # Returns
+    /// A NaiveDate
+    fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate>;
 
     /// Filter a batch by a condition on a column
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to filter
+    /// * `column` - The column name to filter on
+    /// * `value` - The value to match
+    ///
+    /// # Returns
+    /// An option containing the filtered batch if any rows match
     fn filter_batch_by_column(
         &self,
         batch: &RecordBatch,
         column: &str,
         value: &str,
-    ) -> Result<Option<RecordBatch>, IdsError>;
+    ) -> Result<Option<RecordBatch>>;
 
     /// Filter a batch by date range
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to filter
+    /// * `date_column` - The column name containing dates
+    /// * `start_date` - The minimum date (inclusive)
+    /// * `end_date` - The maximum date (inclusive), if specified
+    ///
+    /// # Returns
+    /// An option containing the filtered batch if any rows match
     fn filter_batch_by_date_range(
         &self,
         batch: &RecordBatch,
         date_column: &str,
         start_date: NaiveDate,
         end_date: Option<NaiveDate>,
-    ) -> Result<Option<RecordBatch>, IdsError>;
+    ) -> Result<Option<RecordBatch>>;
 
     /// Sort a batch by a column
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to sort
+    /// * `column` - The column name to sort by
+    /// * `ascending` - Whether to sort in ascending order
+    ///
+    /// # Returns
+    /// The sorted batch
     fn sort_batch_by_column(
         &self,
         batch: &RecordBatch,
         column: &str,
         ascending: bool,
-    ) -> Result<RecordBatch, IdsError>;
+    ) -> Result<RecordBatch>;
 
     /// Validate a batch's data fully
-    fn validate_batch(&self, batch: &RecordBatch) -> Result<(), IdsError>;
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to validate
+    ///
+    /// # Returns
+    /// Ok if the batch is valid
+    fn validate_batch(&self, batch: &RecordBatch) -> Result<()>;
 }
 
 /// Trait for types that can be extracted from Arrow arrays
+///
+/// This trait allows for type-safe access to Arrow array data,
+/// with conversions to Rust native types.
 pub trait ArrowValue: Sized {
     /// The Arrow array type this value comes from
     type ArrayType: Array;
 
     /// Convert from array at index to this type
+    ///
+    /// # Arguments
+    /// * `array` - The source array
+    /// * `index` - The index to access
+    ///
+    /// # Returns
+    /// An option containing the value if it exists and is valid
     fn from_array(array: &Self::ArrayType, index: usize) -> Option<Self>;
 
     /// Get the array from a column
+    ///
+    /// # Arguments
+    /// * `batch` - The record batch to access
+    /// * `column` - The column name
+    ///
+    /// # Returns
+    /// A reference to the typed array
     fn get_array<'a>(batch: &'a RecordBatch, column: &str)
-        -> Result<&'a Self::ArrayType, IdsError>;
+        -> Result<&'a Self::ArrayType>;
 }
 
 // Default implementation of ArrowAccess
 impl<T> ArrowAccess for T {
-    fn get_unix_epoch(&self) -> Result<NaiveDate, IdsError> {
+    fn get_unix_epoch(&self) -> Result<NaiveDate> {
         NaiveDate::from_ymd_opt(1970, 1, 1)
             .ok_or_else(|| IdsError::invalid_date("Failed to create Unix epoch date (1970-01-01)"))
     }
     
-    fn date_to_days_since_epoch(&self, date: NaiveDate) -> Result<i32, IdsError> {
+    fn date_to_days_since_epoch(&self, date: NaiveDate) -> Result<i32> {
         let unix_epoch = self.get_unix_epoch()?;
         let days = date.signed_duration_since(unix_epoch).num_days();
         
@@ -128,9 +221,9 @@ impl<T> ArrowAccess for T {
         })
     }
     
-    fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>, IdsError> {
+    fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>> {
         // First try to get column with exact name "PNR"
-        if let Ok(pnr_array) = self.get_string_array()?)?)batch, "PNR") {
+        if let Ok(pnr_array) = self.get_string_array(batch, "PNR") {
             // First check for exact match
             for i in 0..pnr_array.len() {
                 if pnr_array.is_valid(i) && pnr_array.value(i) == pnr {
@@ -149,7 +242,7 @@ impl<T> ArrowAccess for T {
         }
         
         // If PNR column not found or no match, try looking for "pnr" (lowercase)
-        if let Ok(pnr_array) = self.get_string_array()?)?)batch, "pnr") {
+        if let Ok(pnr_array) = self.get_string_array(batch, "pnr") {
             // Try exact match first
             for i in 0..pnr_array.len() {
                 if pnr_array.is_valid(i) && pnr_array.value(i) == pnr {
@@ -178,7 +271,7 @@ impl<T> ArrowAccess for T {
         batch: &RecordBatch,
         column: &str,
         index: usize,
-    ) -> Result<Option<V>, IdsError> {
+    ) -> Result<Option<V>> {
         let array = V::get_array(batch, column)?;
         Ok(V::from_array(array, index))
     }
@@ -187,7 +280,7 @@ impl<T> ArrowAccess for T {
         &self,
         batch: &'a RecordBatch,
         column_name: &str,
-    ) -> Result<&'a StringArray, IdsError> {
+    ) -> Result<&'a StringArray> {
         batch
             .column_by_name(column_name)
             .ok_or_else(|| IdsError::missing_data(format!("{column_name} column not found")))?
@@ -200,7 +293,7 @@ impl<T> ArrowAccess for T {
         &self,
         batch: &'a RecordBatch,
         column_name: &str,
-    ) -> Result<&'a Date32Array, IdsError> {
+    ) -> Result<&'a Date32Array> {
         batch
             .column_by_name(column_name)
             .ok_or_else(|| IdsError::missing_data(format!("{column_name} column not found")))?
@@ -213,14 +306,14 @@ impl<T> ArrowAccess for T {
         &self,
         batch: &RecordBatch,
         column_name: &str,
-    ) -> Result<arrow::array::ArrayData, IdsError> {
+    ) -> Result<arrow::array::ArrayData> {
         Ok(batch
             .column_by_name(column_name)
             .ok_or_else(|| IdsError::missing_data(format!("{column_name} column not found")))?
             .to_data())
     }
 
-    fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate, IdsError> {
+    fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate> {
         let epoch = self.get_unix_epoch()?;
 
         // Validate range for reasonable dates (roughly 70 years before/after epoch)
@@ -250,8 +343,8 @@ impl<T> ArrowAccess for T {
         batch: &RecordBatch,
         column: &str,
         value: &str,
-    ) -> Result<Option<RecordBatch>, IdsError> {
-        let array = self.get_string_array()?)?)batch, column)?;
+    ) -> Result<Option<RecordBatch>> {
+        let array = self.get_string_array(batch, column)?;
 
         #[allow(clippy::needless_range_loop)]
         let mut mask = vec![false; array.len()];
@@ -281,7 +374,7 @@ impl<T> ArrowAccess for T {
         date_column: &str,
         start_date: NaiveDate,
         end_date: Option<NaiveDate>,
-    ) -> Result<Option<RecordBatch>, IdsError> {
+    ) -> Result<Option<RecordBatch>> {
         let date_array = self.get_date_array(batch, date_column)?;
         let array_data = date_array.to_data();
 
@@ -338,13 +431,13 @@ impl<T> ArrowAccess for T {
         _batch: &RecordBatch,
         _column: &str,
         _ascending: bool,
-    ) -> Result<RecordBatch, IdsError> {
+    ) -> Result<RecordBatch> {
         Err(IdsError::invalid_operation(
             "Sorting is not fully implemented in this version",
         ))
     }
 
-    fn validate_batch(&self, batch: &RecordBatch) -> Result<(), IdsError> {
+    fn validate_batch(&self, batch: &RecordBatch) -> Result<()> {
         // Simply validate basic batch properties since schema.validate() doesn't exist anymore
         if batch.num_rows() > 0 && batch.column(0).len() != batch.num_rows() {
             return Err(IdsError::invalid_format("Invalid batch data: column length mismatch"));
@@ -368,7 +461,7 @@ impl ArrowValue for String {
     fn get_array<'a>(
         batch: &'a RecordBatch,
         column: &str,
-    ) -> Result<&'a Self::ArrayType, IdsError> {
+    ) -> Result<&'a Self::ArrayType> {
         batch
             .column_by_name(column)
             .ok_or_else(|| IdsError::missing_data(format!("{column} column not found")))?
@@ -392,7 +485,7 @@ impl ArrowValue for i32 {
     fn get_array<'a>(
         batch: &'a RecordBatch,
         column: &str,
-    ) -> Result<&'a Self::ArrayType, IdsError> {
+    ) -> Result<&'a Self::ArrayType> {
         batch
             .column_by_name(column)
             .ok_or_else(|| IdsError::missing_data(format!("{column} column not found")))?
@@ -416,7 +509,7 @@ impl ArrowValue for f64 {
     fn get_array<'a>(
         batch: &'a RecordBatch,
         column: &str,
-    ) -> Result<&'a Self::ArrayType, IdsError> {
+    ) -> Result<&'a Self::ArrayType> {
         batch
             .column_by_name(column)
             .ok_or_else(|| IdsError::missing_data(format!("{column} column not found")))?

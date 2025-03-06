@@ -13,7 +13,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 
 use std::path::Path;
-use types::pnr::PnrPool;
+use types::models::pnr::PnrPool;
 
 /// Generator for synthetic register data that simulates Nordic administrative registers
 /// 
@@ -50,7 +50,7 @@ impl RegisterGenerator {
 
         // Initialize the generator
         Ok(Self {
-            pnr_pool: PnrPool::new(config.total_records, &mut rng),
+            pnr_pool: PnrPool::new(config.total_records, &mut rng)?,
             config,
             rng,
             progress: MultiProgress::new(),
