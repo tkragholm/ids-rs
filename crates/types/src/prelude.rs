@@ -78,8 +78,10 @@ pub use crate::traits::{
 };
 
 // Legacy traits (for backward compatibility)
+// The following legacy traits are used for backward compatibility
+// but are not intended to be used in new code
 #[doc(hidden)]
-#[allow(deprecated)]
+#[allow(deprecated, unused_imports)]
 pub use crate::traits::{
     access::LegacyStore,
     LegacyStoreExt,

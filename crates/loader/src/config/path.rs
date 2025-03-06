@@ -12,6 +12,7 @@ use types::error::IdsError;
 ///
 /// # Errors
 /// Returns an error if the base path doesn't exist
+#[allow(dead_code)]
 pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf>, IdsError> {
     if !base_path.exists() {
         return Err(IdsError::io_error(
@@ -81,6 +82,7 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
 ///
 /// # Errors
 /// Returns an error if the base path doesn't exist
+#[allow(dead_code)]
 pub fn resolve_paths(
     base_path: &str, 
     paths: &HashMap<String, String>
@@ -135,6 +137,7 @@ pub fn resolve_paths(
 ///
 /// # Errors
 /// Returns an error if any of the paths don't exist
+#[allow(dead_code)]
 pub fn validate_paths(paths: &HashMap<String, PathBuf>) -> Result<(), IdsError> {
     let mut invalid_paths = Vec::new();
 

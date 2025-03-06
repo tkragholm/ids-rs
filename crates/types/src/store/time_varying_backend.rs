@@ -43,7 +43,7 @@ impl TimeVaryingBackend {
         self.data.get(pnr).and_then(|values| {
             values
                 .iter()
-                .filter(|v| v.date <= date && v.value.get_type() == covariate_type)
+                .filter(|v| v.date <= date && v.value.type_() == covariate_type)
                 .max_by_key(|v| v.date)
                 .map(|v| v.value.clone())
         })
@@ -63,7 +63,7 @@ impl TimeVaryingBackend {
                     .write_record([
                         &value.pnr,
                         &value.date.to_string(),
-                        &format!("{:?}", value.value.get_type()),
+                        &format!("{:?}", value.value.type_()),
                         &format!("{:?}", value.value),
                     ])
                     .map_err(IdsError::Csv)?;

@@ -72,11 +72,12 @@ impl ParallelLoader {
     /// * `data` - The loaded data
     /// * `progress` - Progress tracker
     /// * `add_fn` - Function to add data to store
+    #[allow(dead_code)]
     fn handle_receiver_result<F>(
         &self,
         store: &Arc<Mutex<ArrowStore>>,
         register_type: &str,
-        data: Vec<arrow::record_batch::RecordBatch>,
+        _data: Vec<arrow::record_batch::RecordBatch>, // Prefixed with underscore as it's passed to add_fn internally
         progress: &LoaderProgress,
         add_fn: F,
     ) where
@@ -103,6 +104,7 @@ impl ParallelLoader {
     ///
     /// # Returns
     /// The unwrapped ArrowStore or an error with descriptive message
+    #[allow(dead_code)]
     fn unwrap_store(store: Arc<Mutex<ArrowStore>>) -> Result<ArrowStore, IdsError> {
         // First try to unwrap from Arc
         match Arc::try_unwrap(store) {

@@ -161,4 +161,5 @@ pub trait LegacyStore: Store {
 }
 
 // Automatically implement LegacyStore for any type that implements Store
+#[allow(deprecated)]
 impl<T: Store> LegacyStore for T {}

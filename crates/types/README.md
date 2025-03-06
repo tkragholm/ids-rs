@@ -29,12 +29,32 @@ use types::models::{Covariate, CovariateType};
 use types::traits::CovariateProcessor;
 ```
 
+## Feature Flags
+
+The crate includes several feature flags to allow you to include only the functionality you need:
+
+| Feature Flag | Default | Description | Dependencies |
+|--------------|---------|-------------|--------------|
+| `arrow-integration` | Yes | Integration with Apache Arrow | arrow, arrow-array, arrow-schema |
+| `serde-support` | Yes | Serialization/deserialization via serde | serde, serde_json |
+| `chrono-nightly` | No | Enables nightly chrono features for improved date handling | chrono/nightly |
+| `polars-integration` | No | Integration with the polars DataFrame library | polars |
+| `logging` | Yes | Logging functionality | log, env_logger |
+
+Enable or disable features in your Cargo.toml:
+
+```toml
+[dependencies]
+types = { version = "0.2.0", default-features = false, features = ["arrow-integration"] }
+```
+
 ## Dependencies
 
-- Arrow ecosystem (arrow-array, arrow-schema, arrow-select)
-- Serde for serialization
+- Arrow ecosystem (arrow-array, arrow-schema, arrow-select) - optional with `arrow-integration` feature
+- Serde for serialization - optional with `serde-support` feature
 - Chrono for date handling
 - Collection types (dashmap, hashbrown) for performant data structures
+- Logging (log, env_logger) - optional with `logging` feature
 
 ## Refactoring Plan
 

@@ -63,7 +63,7 @@ impl DataStore {
     fn store_in_cache(&self, pnr: &str, covariate: Covariate, date: NaiveDate) {
         let key = CacheKey {
             pnr: pnr.to_string(),
-            covariate_type: covariate.get_type(),
+            covariate_type: covariate.type_(),
             date,
         };
         self.cache.insert(key, covariate);

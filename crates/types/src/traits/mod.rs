@@ -361,6 +361,7 @@ pub trait LegacyStoreExt: Store {
 }
 
 // Automatically implement LegacyStoreExt for any type that implements Store
+#[allow(deprecated)]
 impl<T: Store> LegacyStoreExt for T {}
 
 /// Legacy compatibility trait for the FamilyAccess interface
@@ -396,6 +397,7 @@ pub trait LegacyFamilyAccess: FamilyAccess {
 }
 
 // Automatically implement LegacyFamilyAccess for any type that implements FamilyAccess
+#[allow(deprecated)]
 impl<T: FamilyAccess> LegacyFamilyAccess for T {}
 
 /// Legacy compatibility trait for the TimeVaryingAccess interface
@@ -419,4 +421,5 @@ pub trait LegacyTimeVaryingAccess<T>: TimeVaryingAccess<T> {
 }
 
 // Automatically implement LegacyTimeVaryingAccess for any type that implements TimeVaryingAccess
+#[allow(deprecated)]
 impl<T, A: TimeVaryingAccess<T>> LegacyTimeVaryingAccess<T> for A {}

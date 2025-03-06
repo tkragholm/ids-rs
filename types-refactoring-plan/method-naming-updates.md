@@ -112,6 +112,17 @@ The refactoring was thoroughly tested:
 2. Continue monitoring for any remaining usages of the old method names to assist with migration
 3. Update any documentation that refers to the old method names
 
+## Additional Implementation Notes
+
+We've completed additional updates that weren't covered by the initial script:
+
+1. Updated `data_store.rs` to use `type_()` method instead of `get_type()` in the cache key creation
+2. Updated `time_varying_backend.rs` to use `type_()` method instead of `get_type()` in:
+   - The filter condition for getting latest value
+   - The CSV export functionality
+
+These changes ensure that the modern method naming conventions are used consistently throughout the codebase, including in storage backends and data access layers.
+
 ## Conclusion
 
 The method naming standardization has been successfully implemented across the codebase, moving the API design in line with modern Rust conventions while maintaining backward compatibility. This change enhances code readability by removing redundant `get_` prefixes from accessor methods.

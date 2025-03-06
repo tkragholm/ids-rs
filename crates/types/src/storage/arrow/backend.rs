@@ -2,7 +2,9 @@ use arrow::array::{Array, StringArray};
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
 use hashbrown::HashMap;
+use lasso::{Rodeo, Spur, ThreadedRodeo}; // Add string interning support
 use log;
+use std::sync::Arc;
 
 // Updated imports for new module structure
 use crate::{
@@ -10,7 +12,7 @@ use crate::{
     family::{FamilyRelations, FamilyStore},
     models::{Covariate, CovariateType, TimeVaryingValue},
     storage::arrow::access::ArrowAccess,
-    storage::arrow::convert::ArrowType, 
+    storage::arrow::convert::ArrowType,
     storage::arrow::utils::ArrowUtils,
     traits::Store,
     translation::TranslationMaps,
@@ -25,12 +27,18 @@ pub struct ArrowBackend {
     ind_data: HashMap<i32, Vec<RecordBatch>>,
     uddf_data: HashMap<String, Vec<RecordBatch>>,
     translations: TranslationMaps,
-    
+
     // Performance optimization: Cache for PNR to batch/index mapping
     pnr_index_cache: HashMap<(String, String), (usize, usize)>, // (register_type, pnr) -> (batch_idx, row_idx)
-    
+
     // Performance optimization: Pre-computed date mapping for periods
     period_date_cache: HashMap<String, NaiveDate>, // period string -> date
+
+    // Performance optimization: String interning for frequently used strings
+    string_interner: Arc<ThreadedRodeo>, // Thread-safe string interner
+
+    // Performance optimization: Cache common column indices for hot paths
+    column_indices: HashMap<(String, String), usize>, // (register_type, column_name) -> index
 }
 
 impl ArrowBackend {
@@ -45,6 +53,35 @@ impl ArrowBackend {
         let translations =
             TranslationMaps::new().map_err(|e| IdsError::invalid_format(format!("{e}")))?;
 
+        // Initialize thread-safe string interner with a reasonable capacity
+        let string_interner = Arc::new(ThreadedRodeo::default());
+
+        // Pre-intern common strings used in the codebase
+        let common_strings = [
+            "PNR",
+            "HFAUDD",
+            "PERINDKIALT_13",
+            "DKK",
+            "ANTPERSF",
+            "KOM",
+            "FAMILIE_TYPE",
+            "STATSB",
+            "akm",
+            "bef",
+            "ind",
+            "uddf",
+            "M",
+            "F",
+            "nuclear",
+            "single",
+            "married",
+            "divorced",
+        ];
+
+        for s in common_strings {
+            let _ = string_interner.get_or_intern(s);
+        }
+
         Ok(Self {
             family_data: HashMap::new(),
             akm_data: HashMap::new(),
@@ -54,13 +91,15 @@ impl ArrowBackend {
             translations,
             pnr_index_cache: HashMap::new(),
             period_date_cache: HashMap::new(),
+            string_interner,
+            column_indices: HashMap::new(),
         })
     }
 
     /// Create a new empty ArrowBackend, used for diagnostic mode when data loading fails
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// This function will panic if it fails to create valid dates for the synthetic data.
     /// Since this is only used for diagnostic purposes and uses carefully constructed date values,
     /// the panics would indicate a serious programming error rather than a runtime condition.
@@ -72,6 +111,36 @@ impl ArrowBackend {
         let bef_data = HashMap::new();
         let pnr_index_cache = HashMap::new();
         let mut period_date_cache = HashMap::new();
+        let column_indices = HashMap::new();
+
+        // Initialize thread-safe string interner with a reasonable capacity
+        let string_interner = Arc::new(ThreadedRodeo::default());
+
+        // Pre-intern common strings that will be used in diagnostic mode
+        let common_strings = [
+            "PNR",
+            "HFAUDD",
+            "PERINDKIALT_13",
+            "DKK",
+            "ANTPERSF",
+            "KOM",
+            "FAMILIE_TYPE",
+            "STATSB",
+            "akm",
+            "bef",
+            "ind",
+            "uddf",
+            "M",
+            "F",
+            "nuclear",
+            "single",
+            "married",
+            "divorced",
+        ];
+
+        for s in common_strings {
+            let _ = string_interner.get_or_intern(s);
+        }
 
         // Add synthetic relationships and data for debugging in diagnostic mode
         for i in 0..100 {
@@ -83,7 +152,7 @@ impl ArrowBackend {
             let year = 1990 + (i % 30);
             let month = 1 + (i % 12) as u32;
             let day = 1 + (i % 28) as u32; // Always ≤ 28 to avoid invalid dates
-            
+
             let father_year = 1950 + (i % 30);
             let mother_year = 1955 + (i % 30);
 
@@ -91,12 +160,28 @@ impl ArrowBackend {
             // We explicitly document the panics here since this is diagnostic code only
             let birth_date = chrono::NaiveDate::from_ymd_opt(year, month, day)
                 .expect("Invalid synthetic birth date constructed in diagnostic mode");
-                
+
             let father_birth_date = chrono::NaiveDate::from_ymd_opt(father_year, month, day)
                 .expect("Invalid synthetic father birth date constructed in diagnostic mode");
-                
+
             let mother_birth_date = chrono::NaiveDate::from_ymd_opt(mother_year, month, day)
                 .expect("Invalid synthetic mother birth date constructed in diagnostic mode");
+
+            // Create interned strings for IDs to reduce allocations
+            let father_id = format!("F{i:06}");
+            let mother_id = format!("M{i:06}");
+            let family_id = format!("FAM{i:06}");
+            let control_father_id = format!("F{:06}", i + 1000);
+            let control_mother_id = format!("M{:06}", i + 1000);
+            let control_family_id = format!("FAM{:06}", i + 1000);
+
+            // Intern all the strings
+            string_interner.get_or_intern(&father_id);
+            string_interner.get_or_intern(&mother_id);
+            string_interner.get_or_intern(&family_id);
+            string_interner.get_or_intern(&control_father_id);
+            string_interner.get_or_intern(&control_mother_id);
+            string_interner.get_or_intern(&control_family_id);
 
             // Add family relations for cases and controls
             family_data.insert(
@@ -104,11 +189,11 @@ impl ArrowBackend {
                 FamilyRelations {
                     pnr: case_id.clone(),
                     birth_date,
-                    father_id: Some(format!("F{i:06}")),
+                    father_id: Some(father_id.clone()),
                     father_birth_date: Some(father_birth_date),
-                    mother_id: Some(format!("M{i:06}")),
+                    mother_id: Some(mother_id.clone()),
                     mother_birth_date: Some(mother_birth_date),
-                    family_id: Some(format!("FAM{i:06}")),
+                    family_id: Some(family_id.clone()),
                 },
             );
 
@@ -117,11 +202,11 @@ impl ArrowBackend {
                 FamilyRelations {
                     pnr: control_id.clone(),
                     birth_date,
-                    father_id: Some(format!("F{:06}", i + 1000)),
+                    father_id: Some(control_father_id.clone()),
                     father_birth_date: Some(father_birth_date),
-                    mother_id: Some(format!("M{:06}", i + 1000)),
+                    mother_id: Some(control_mother_id.clone()),
                     mother_birth_date: Some(mother_birth_date),
-                    family_id: Some(format!("FAM{:06}", i + 1000)),
+                    family_id: Some(control_family_id.clone()),
                 },
             );
         }
@@ -133,7 +218,7 @@ impl ArrowBackend {
             let date = NaiveDate::from_ymd_opt(year, 12, 31)
                 .expect("Invalid date in new_empty period initialization");
             period_date_cache.insert(period, date);
-            
+
             // Add quarterly periods
             for quarter in 1..=4 {
                 let month = quarter * 3;
@@ -153,7 +238,54 @@ impl ArrowBackend {
             translations: TranslationMaps::new_empty(),
             pnr_index_cache,
             period_date_cache,
+            string_interner,
+            column_indices,
         }
+    }
+
+    /// Cache column indices for a specific register and batch
+    ///
+    /// This method builds a cache of column indices for faster lookup
+    /// of common columns in hot paths.
+    ///
+    /// # Arguments
+    /// * `register_type` - The register type (e.g., "akm", "bef")
+    /// * `batch` - A representative batch to extract schema from
+    ///
+    /// # Returns
+    /// * `std::result::Result<(), IdsError>` - Success or an error
+    ///
+    /// # Errors
+    /// Returns an error if column lookup fails
+    fn cache_column_indices(
+        &mut self,
+        register_type: &str,
+        batch: &RecordBatch,
+    ) -> std::result::Result<(), IdsError> {
+        // Common column names to cache for each register type
+        let columns_to_cache = match register_type {
+            "akm" => vec!["PNR", "JOBKODE", "LPR"],
+            "bef" => vec!["PNR", "ANTPERSF", "KOM", "FAMILIE_TYPE", "STATSB"],
+            "ind" => vec!["PNR", "PERINDKIALT_13"],
+            "uddf" => vec!["PNR", "HFAUDD"],
+            _ => vec!["PNR"],
+        };
+
+        // Cache each column index
+        let schema = batch.schema();
+        for col in columns_to_cache {
+            // Use original string for index lookup
+            if let Ok(idx) = schema.index_of(col) {
+                // Store in cache
+                self.column_indices
+                    .insert((register_type.to_string(), col.to_string()), idx);
+
+                // Also intern the string for future use
+                self.string_interner.get_or_intern(col);
+            }
+        }
+
+        Ok(())
     }
 
     /// Add AKM (labor market) data to the backend
@@ -170,7 +302,11 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if batch validation fails
-    pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
+    pub fn add_akm_data(
+        &mut self,
+        year: i32,
+        mut batches: Vec<RecordBatch>,
+    ) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -182,7 +318,12 @@ impl ArrowBackend {
         for batch in &mut batches {
             let _ = ArrowUtils::align_batch_buffers(batch);
         }
-        
+
+        // Cache column indices for faster access if batches aren't empty
+        if !batches.is_empty() {
+            self.cache_column_indices("akm", &batches[0])?;
+        }
+
         // Build PNR index cache for faster lookups
         self.build_pnr_index_cache("akm", &batches)?;
 
@@ -190,7 +331,7 @@ impl ArrowBackend {
         self.akm_data.insert(year, batches);
         Ok(())
     }
-    
+
     /// Build PNR index cache for a specific register type and batch set
     ///
     /// This method builds an index cache that maps PNRs to batch and row indices
@@ -205,30 +346,32 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if the PNR column cannot be found or accessed
-    fn build_pnr_index_cache(&mut self, register_type: &str, batches: &[RecordBatch]) -> std::result::Result<(), IdsError> {
+    fn build_pnr_index_cache(
+        &mut self,
+        register_type: &str,
+        batches: &[RecordBatch],
+    ) -> std::result::Result<(), IdsError> {
         for (batch_idx, batch) in batches.iter().enumerate() {
             // Skip if the batch doesn't have a PNR column
             if !batch.schema().fields().iter().any(|f| f.name() == "PNR") {
                 continue;
             }
-            
+
             let pnr_idx = batch.schema().index_of("PNR")?;
             let pnr_array = batch.column(pnr_idx);
-            
+
             if let Some(string_array) = pnr_array.as_any().downcast_ref::<StringArray>() {
                 for row_idx in 0..string_array.len() {
                     if !string_array.is_null(row_idx) {
                         let pnr = string_array.value(row_idx).to_string();
                         // Store the mapping: (register_type, pnr) -> (batch_idx, row_idx)
-                        self.pnr_index_cache.insert(
-                            (register_type.to_string(), pnr),
-                            (batch_idx, row_idx)
-                        );
+                        self.pnr_index_cache
+                            .insert((register_type.to_string(), pnr), (batch_idx, row_idx));
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -246,7 +389,11 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if batch validation fails
-    pub fn add_bef_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
+    pub fn add_bef_data(
+        &mut self,
+        period: String,
+        mut batches: Vec<RecordBatch>,
+    ) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -258,13 +405,20 @@ impl ArrowBackend {
         for batch in &mut batches {
             let _ = ArrowUtils::align_batch_buffers(batch);
         }
-        
+
+        // Cache column indices for faster access if batches aren't empty
+        if !batches.is_empty() {
+            self.cache_column_indices("bef", &batches[0])?;
+        }
+
         // Build PNR index cache for faster lookups
         self.build_pnr_index_cache("bef", &batches)?;
-        
+
         // Pre-compute period date for faster period lookups
         self.add_period_to_cache(&period)?;
 
+        // Intern the period for future use
+        self.string_interner.get_or_intern(&period);
         self.bef_data.insert(period, batches);
         Ok(())
     }
@@ -283,7 +437,11 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if batch validation fails
-    pub fn add_ind_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
+    pub fn add_ind_data(
+        &mut self,
+        year: i32,
+        mut batches: Vec<RecordBatch>,
+    ) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -295,7 +453,12 @@ impl ArrowBackend {
         for batch in &mut batches {
             let _ = ArrowUtils::align_batch_buffers(batch);
         }
-        
+
+        // Cache column indices for faster access if batches aren't empty
+        if !batches.is_empty() {
+            self.cache_column_indices("ind", &batches[0])?;
+        }
+
         // Build PNR index cache for faster lookups
         self.build_pnr_index_cache("ind", &batches)?;
 
@@ -317,7 +480,11 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if batch validation fails
-    pub fn add_uddf_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
+    pub fn add_uddf_data(
+        &mut self,
+        period: String,
+        mut batches: Vec<RecordBatch>,
+    ) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -329,17 +496,24 @@ impl ArrowBackend {
         for batch in &mut batches {
             let _ = ArrowUtils::align_batch_buffers(batch);
         }
-        
+
+        // Cache column indices for faster access if batches aren't empty
+        if !batches.is_empty() {
+            self.cache_column_indices("uddf", &batches[0])?;
+        }
+
         // Build PNR index cache for faster lookups
         self.build_pnr_index_cache("uddf", &batches)?;
-        
+
         // Pre-compute period date for faster period lookups
         self.add_period_to_cache(&period)?;
 
+        // Intern the period for future use
+        self.string_interner.get_or_intern(&period);
         self.uddf_data.insert(period, batches);
         Ok(())
     }
-    
+
     /// Add a period to the date cache for faster lookups
     ///
     /// This method parses a period string like "201903" and adds a mapping
@@ -358,37 +532,41 @@ impl ArrowBackend {
         if self.period_date_cache.contains_key(period) {
             return Ok(());
         }
-        
+
         // Parse period into year and month
         if period.len() < 4 {
-            return Err(IdsError::invalid_format(
-                format!("Period string too short: {}", period)
-            ));
+            return Err(IdsError::invalid_format(format!(
+                "Period string too short: {}",
+                period
+            )));
         }
-        
-        let year: i32 = period[0..4].parse().map_err(|_| {
-            IdsError::invalid_format(format!("Invalid year in period: {}", period))
-        })?;
-        
+
+        let year: i32 = period[0..4]
+            .parse()
+            .map_err(|_| IdsError::invalid_format(format!("Invalid year in period: {}", period)))?;
+
         let month: u32 = if period.len() >= 6 {
             period[4..6].parse().unwrap_or(12) // Default to December
         } else {
             12 // Default to December
         };
-        
+
         let day = 1; // Always use the first day of the month
-        
+
         // Create date and add to cache
         let date = NaiveDate::from_ymd_opt(year, month, day).ok_or_else(|| {
             IdsError::invalid_format(format!("Invalid date for period: {}", period))
         })?;
-        
+
         self.period_date_cache.insert(period.to_string(), date);
         Ok(())
     }
-    
+
     /// Add family data to the backend
-    pub fn add_family_data(&mut self, batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
+    pub fn add_family_data(
+        &mut self,
+        batches: Vec<RecordBatch>,
+    ) -> std::result::Result<(), IdsError> {
         // Load family relations using existing implementation
         self.load_family_relations(batches)
     }
@@ -404,7 +582,11 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if data access fails
-    fn get_education(&self, pnr: &str, date: NaiveDate) -> std::result::Result<Option<Covariate>, IdsError> {
+    fn get_education(
+        &self,
+        pnr: &str,
+        date: NaiveDate,
+    ) -> std::result::Result<Option<Covariate>, IdsError> {
         // Find the closest UDDF data period before the given date using optimized closest period lookup
         let period = self.find_closest_period(date, &self.uddf_data)?;
 
@@ -413,8 +595,10 @@ impl ArrowBackend {
                 // Search through batches with the cached index if available
                 for (batch_idx, batch) in batches.iter().enumerate() {
                     // Use optimized PNR index lookup with cache
-                    if let Some(idx) = self.find_pnr_index_with_cache(batch, pnr, "uddf", batch_idx)? {
-                        // Use optimized array data access
+                    if let Some(idx) =
+                        self.find_pnr_index_with_cache(batch, pnr, "uddf", batch_idx)?
+                    {
+                        // Get string array for education level
                         let hfaudd_array = self.get_string_array(batch, "HFAUDD")?;
 
                         if !hfaudd_array.is_null(idx) {
@@ -439,7 +623,11 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if data access fails
-    fn get_income(&self, pnr: &str, date: NaiveDate) -> std::result::Result<Option<Covariate>, IdsError> {
+    fn get_income(
+        &self,
+        pnr: &str,
+        date: NaiveDate,
+    ) -> std::result::Result<Option<Covariate>, IdsError> {
         use chrono::Datelike;
         let year = date.year();
         if let Some(batches) = self.ind_data.get(&year) {
@@ -447,17 +635,25 @@ impl ArrowBackend {
             for (batch_idx, batch) in batches.iter().enumerate() {
                 // Use optimized PNR index lookup with cache
                 if let Some(idx) = self.find_pnr_index_with_cache(batch, pnr, "ind", batch_idx)? {
-                    // Optimized direct access to values
-                    let column = batch.column(batch.schema().index_of("PERINDKIALT_13")?);
-                    let array = column.as_any().downcast_ref::<arrow::array::Float64Array>()
-                        .ok_or_else(|| IdsError::data_loading("Income column not a float array".to_string()))?;
-                    let amount = if array.is_null(idx) { None } else { Some(array.value(idx)) };
+                    // Get income column directly
+                    let col_idx = batch.schema().index_of("PERINDKIALT_13")?;
+                    let column = batch.column(col_idx);
+
+                    let array = column
+                        .as_any()
+                        .downcast_ref::<arrow::array::Float64Array>()
+                        .ok_or_else(|| {
+                            IdsError::data_loading("Income column not a float array".to_string())
+                        })?;
+                    let amount = if array.is_null(idx) {
+                        None
+                    } else {
+                        Some(array.value(idx))
+                    };
                     if let Some(amount) = amount {
-                        return Ok(Some(Covariate::income(
-                            amount,
-                            "DKK",
-                            "PERINDKIALT_13",
-                        ).build()));
+                        return Ok(Some(
+                            Covariate::income(amount, "DKK", "PERINDKIALT_13").build(),
+                        ));
                     }
                 }
             }
@@ -476,84 +672,140 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if data access fails
-    fn get_demographics(&self, pnr: &str, date: NaiveDate) -> std::result::Result<Option<Covariate>, IdsError> {
+    fn get_demographics(
+        &self,
+        pnr: &str,
+        date: NaiveDate,
+    ) -> std::result::Result<Option<Covariate>, IdsError> {
         // Use optimized period lookup with cache
         let period = self.find_closest_period(date, &self.bef_data)?;
 
         if let Some(period_str) = period {
             if let Some(batches) = self.bef_data.get(period_str) {
+                // Fetch cached column indices
+                let family_size_key = ("bef".to_string(), "ANTPERSF".to_string());
+                let kom_key = ("bef".to_string(), "KOM".to_string());
+                let family_type_key = ("bef".to_string(), "FAMILIE_TYPE".to_string());
+                let statsb_key = ("bef".to_string(), "STATSB".to_string());
+
                 // Search through batches with the cached index if available
                 for (batch_idx, batch) in batches.iter().enumerate() {
                     // Use optimized PNR index lookup with cache
-                    if let Some(idx) = self.find_pnr_index_with_cache(batch, pnr, "bef", batch_idx)? {
-                        // Optimized - prefetch all column indices in one block to reduce lookups
-                        let schema = batch.schema();
-                        let family_size_idx = schema.index_of("ANTPERSF")?;
-                        let kom_idx = schema.index_of("KOM")?;
-                        let family_type_idx = schema.index_of("FAMILIE_TYPE")?;
-                        let statsb_idx = schema.index_of("STATSB")?;
-                        
-                        // Get columns directly
+                    if let Some(idx) =
+                        self.find_pnr_index_with_cache(batch, pnr, "bef", batch_idx)?
+                    {
+                        // Get column indices from cache when available for hot paths
+                        let family_size_idx =
+                            if let Some(&idx) = self.column_indices.get(&family_size_key) {
+                                idx
+                            } else {
+                                batch.schema().index_of("ANTPERSF")?
+                            };
+
+                        let kom_idx = if let Some(&idx) = self.column_indices.get(&kom_key) {
+                            idx
+                        } else {
+                            batch.schema().index_of("KOM")?
+                        };
+
+                        let family_type_idx =
+                            if let Some(&idx) = self.column_indices.get(&family_type_key) {
+                                idx
+                            } else {
+                                batch.schema().index_of("FAMILIE_TYPE")?
+                            };
+
+                        let statsb_idx = if let Some(&idx) = self.column_indices.get(&statsb_key) {
+                            idx
+                        } else {
+                            batch.schema().index_of("STATSB")?
+                        };
+
+                        // Get columns directly with efficient index access
                         let family_size_col = batch.column(family_size_idx);
                         let kom_col = batch.column(kom_idx);
                         let family_col = batch.column(family_type_idx);
                         let statsb_col = batch.column(statsb_idx);
-                        
+
                         // Extract values with optimized null checking
-                        let family_size: Option<i32> = if family_size_col.is_null(idx) { 
-                            None 
+                        let family_size: Option<i32> = if family_size_col.is_null(idx) {
+                            None
                         } else {
-                            let array = family_size_col.as_any().downcast_ref::<arrow::array::Int32Array>()
-                                .ok_or_else(|| IdsError::data_loading("ANTPERSF not an int32 array".to_string()))?;
+                            let array = family_size_col
+                                .as_any()
+                                .downcast_ref::<arrow::array::Int32Array>()
+                                .ok_or_else(|| {
+                                    IdsError::data_loading(
+                                        "ANTPERSF not an int32 array".to_string(),
+                                    )
+                                })?;
                             Some(array.value(idx))
                         };
-                        
-                        let municipality: Option<i32> = if kom_col.is_null(idx) { 
-                            None 
+
+                        let municipality: Option<i32> = if kom_col.is_null(idx) {
+                            None
                         } else {
-                            let array = kom_col.as_any().downcast_ref::<arrow::array::Int32Array>()
-                                .ok_or_else(|| IdsError::data_loading("KOM not an int32 array".to_string()))?;
+                            let array = kom_col
+                                .as_any()
+                                .downcast_ref::<arrow::array::Int32Array>()
+                                .ok_or_else(|| {
+                                    IdsError::data_loading("KOM not an int32 array".to_string())
+                                })?;
                             Some(array.value(idx))
                         };
-                        
+
                         let family_type: Option<i32> = if family_col.is_null(idx) {
                             None
                         } else {
-                            let array = family_col.as_any().downcast_ref::<arrow::array::Int32Array>()
-                                .ok_or_else(|| IdsError::data_loading("FAMILIE_TYPE not an int32 array".to_string()))?;
+                            let array = family_col
+                                .as_any()
+                                .downcast_ref::<arrow::array::Int32Array>()
+                                .ok_or_else(|| {
+                                    IdsError::data_loading(
+                                        "FAMILIE_TYPE not an int32 array".to_string(),
+                                    )
+                                })?;
                             Some(array.value(idx))
                         };
 
                         let statsb: Option<String> = if statsb_col.is_null(idx) {
                             None
                         } else {
-                            let array = statsb_col.as_any().downcast_ref::<arrow::array::StringArray>()
-                                .ok_or_else(|| IdsError::data_loading("STATSB not a string array".to_string()))?;
-                            Some(array.value(idx).to_string())
+                            let array = statsb_col
+                                .as_any()
+                                .downcast_ref::<arrow::array::StringArray>()
+                                .ok_or_else(|| {
+                                    IdsError::data_loading("STATSB not a string array".to_string())
+                                })?;
+
+                            // Use string interning for frequently repeated values
+                            let value = array.value(idx);
+                            // Intern the string but return the original value
+                            self.string_interner.get_or_intern(value);
+                            Some(value.to_string())
                         };
 
                         if let (Some(family_size), Some(municipality), Some(family_type)) =
                             (family_size, municipality, family_type)
                         {
-                            let mut builder = Covariate::demographics(
-                                family_size,
-                                municipality,
-                                family_type.to_string(),
-                            );
+                            let family_type_str = family_type.to_string();
+
+                            // Pre-allocate builder to reduce allocations
+                            let mut builder =
+                                Covariate::demographics(family_size, municipality, family_type_str);
 
                             // Add citizenship if available
                             if let Some(statsb) = statsb {
+                                // Pass string directly from string interner
                                 builder = builder.with_citizenship(statsb.clone());
-                                
-                                // Add translated value to metadata
+
+                                // Add translated value to metadata if available
                                 if let Some(translated) = self
                                     .translations
                                     .translate(crate::translation::TranslationType::Statsb, &statsb)
                                 {
-                                    builder = builder.with_metadata(
-                                        "statsb_translated",
-                                        translated,
-                                    );
+                                    builder =
+                                        builder.with_metadata("statsb_translated", translated);
                                 }
                             }
 
@@ -590,9 +842,8 @@ impl ArrowBackend {
             ));
         }
 
-        RecordBatch::try_new(batch.schema(), columns).map_err(|e| {
-            IdsError::invalid_operation(format!("Failed to create sliced batch: {e}"))
-        })
+        RecordBatch::try_new(batch.schema(), columns)
+            .map_err(|e| IdsError::invalid_operation(format!("Failed to create sliced batch: {e}")))
     }
 
     /// Create an optimized string array
@@ -605,7 +856,7 @@ impl ArrowBackend {
 
     /// Find the closest period for a date
     ///
-    /// This method finds the most specific period (e.g., "202303" over "2023") 
+    /// This method finds the most specific period (e.g., "202303" over "2023")
     /// that is before or equal to the target date.
     ///
     /// # Arguments
@@ -625,7 +876,7 @@ impl ArrowBackend {
         // Track the closest period we've found
         let mut closest_period: Option<&String> = None;
         let mut closest_date: Option<NaiveDate> = None;
-        
+
         // Fast path - use our cache for date comparisons
         for period in data.keys() {
             // Get the period date from cache or compute it
@@ -636,12 +887,12 @@ impl ArrowBackend {
                 if period.len() < 4 {
                     continue;
                 }
-                
+
                 let year: i32 = match period[0..4].parse() {
                     Ok(y) => y,
                     Err(_) => continue, // Skip invalid year format
                 };
-                
+
                 let month: u32 = if period.len() > 5 {
                     match period[4..6].parse() {
                         Ok(m) => m,
@@ -650,13 +901,13 @@ impl ArrowBackend {
                 } else {
                     12 // Default to December when no month specified
                 };
-                
+
                 match NaiveDate::from_ymd_opt(year, month, 1) {
                     Some(pd) => pd,
                     None => continue, // Skip invalid dates
                 }
             };
-            
+
             // Only consider periods before or equal to the target date
             if period_date <= date {
                 // First period or a more recent period than what we've found so far
@@ -671,7 +922,7 @@ impl ArrowBackend {
                 }
             }
         }
-        
+
         Ok(closest_period)
     }
 
@@ -716,7 +967,10 @@ impl Store for ArrowBackend {
         self.family_data.get(pnr)
     }
 
-    fn load_data(&mut self, _data: Vec<TimeVaryingValue<Covariate>>) -> std::result::Result<(), IdsError> {
+    fn load_data(
+        &mut self,
+        _data: Vec<TimeVaryingValue<Covariate>>,
+    ) -> std::result::Result<(), IdsError> {
         Err(IdsError::invalid_operation(
             "Cannot load time-varying data into Arrow store",
         ))
@@ -734,7 +988,7 @@ impl Store for ArrowBackend {
 // Helper methods for data access and optimization
 impl ArrowBackend {
     /// Find the index of a PNR in a batch using cached indices when available
-    /// 
+    ///
     /// This method first checks the PNR index cache before falling back to a linear scan
     /// of the batch. The cache provides O(1) lookups for previously indexed PNRs.
     ///
@@ -748,24 +1002,28 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if the PNR column cannot be accessed
-    fn find_pnr_index_with_cache(&self, 
-                               batch: &RecordBatch, 
-                               pnr: &str, 
-                               register_type: &str, 
-                               batch_idx: usize) 
-                              -> std::result::Result<Option<usize>, IdsError> {
+    fn find_pnr_index_with_cache(
+        &self,
+        batch: &RecordBatch,
+        pnr: &str,
+        register_type: &str,
+        batch_idx: usize,
+    ) -> std::result::Result<Option<usize>, IdsError> {
         // First check if we have this PNR in our index cache
-        if let Some(&(cached_batch_idx, row_idx)) = self.pnr_index_cache.get(&(register_type.to_string(), pnr.to_string())) {
+        if let Some(&(cached_batch_idx, row_idx)) = self
+            .pnr_index_cache
+            .get(&(register_type.to_string(), pnr.to_string()))
+        {
             // Only use cache if the batch index matches
             if cached_batch_idx == batch_idx {
                 return Ok(Some(row_idx));
             }
         }
-        
+
         // Fall back to standard search if not found in cache
         self.find_pnr_index(batch, pnr)
     }
-    
+
     /// Find the index of a PNR in a batch
     ///
     /// This is the basic implementation without using the cache.
@@ -779,14 +1037,28 @@ impl ArrowBackend {
     ///
     /// # Errors
     /// Returns an error if the PNR column cannot be accessed
-    fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> std::result::Result<Option<usize>, IdsError> {
-        if !batch.schema().fields().iter().any(|f| f.name() == "PNR") {
+    fn find_pnr_index(
+        &self,
+        batch: &RecordBatch,
+        pnr: &str,
+    ) -> std::result::Result<Option<usize>, IdsError> {
+        // Use cached column index for PNR if available
+        let pnr_idx = if let Some(&idx) = self
+            .column_indices
+            .get(&("".to_string(), "PNR".to_string()))
+        {
+            idx
+        } else if batch.schema().fields().iter().any(|f| f.name() == "PNR") {
+            batch.schema().index_of("PNR")?
+        } else {
             return Ok(None);
-        }
-        
-        let pnr_idx = batch.schema().index_of("PNR")?;
+        };
+
         let pnr_array = batch.column(pnr_idx);
-        
+
+        // Intern commonly looked up PNRs
+        self.string_interner.get_or_intern(pnr);
+
         if let Some(string_array) = pnr_array.as_any().downcast_ref::<StringArray>() {
             // Use binary search if the array is large (>1000 elements)
             let len = string_array.len();
@@ -800,95 +1072,312 @@ impl ArrowBackend {
                     if !string_array.is_null(i) && !string_array.is_null(end - 1) {
                         let first = string_array.value(i);
                         let last = string_array.value(end - 1);
-                        
+
                         // Only search this chunk if the PNR might be in it (lexicographically between first and last)
-                        if (pnr >= first && pnr <= last) || 
+                        if (pnr >= first && pnr <= last) ||
                            // Special case for chunks that wrap around lexicographically
-                           (first > last && (pnr >= first || pnr <= last)) {
+                           (first > last && (pnr >= first || pnr <= last))
+                        {
                             // Linear search within this smaller chunk
                             for j in i..end {
-                                if !string_array.is_null(j) && string_array.value(j) == pnr {
-                                    return Ok(Some(j));
+                                if !string_array.is_null(j) {
+                                    // Use direct string comparison as it's more efficient for small chunks
+                                    if string_array.value(j) == pnr {
+                                        // Intern the found PNR for future lookups
+                                        self.string_interner.get_or_intern(pnr);
+                                        return Ok(Some(j));
+                                    }
                                 }
                             }
                         }
                     }
                     i += chunk_size;
                 }
-                
+
                 // Not found in any chunk
                 return Ok(None);
             } else {
                 // Linear scan for small arrays
                 for i in 0..string_array.len() {
-                    if !string_array.is_null(i) && string_array.value(i) == pnr {
-                        return Ok(Some(i));
+                    if !string_array.is_null(i) {
+                        // Use direct string comparison for small arrays
+                        if string_array.value(i) == pnr {
+                            // Intern the found PNR for future lookups
+                            self.string_interner.get_or_intern(pnr);
+                            return Ok(Some(i));
+                        }
                     }
                 }
             }
         }
-        
+
         Ok(None)
     }
-    
-    // Helper method to get a string array from a column
-    fn get_string_array<'a>(&self, batch: &'a RecordBatch, column_name: &str) -> std::result::Result<&'a StringArray, IdsError> {
-        let col_idx = batch.schema().index_of(column_name)?;
+
+    // Helper method to get a string array from a column using the cache when available
+    fn get_string_array<'a>(
+        &self,
+        batch: &'a RecordBatch,
+        column_name: &str,
+    ) -> std::result::Result<&'a StringArray, IdsError> {
+        // First check if we have the column index in our cache
+        let register_type = if column_name == "HFAUDD" {
+            "uddf"
+        } else if column_name == "PERINDKIALT_13" {
+            "ind"
+        } else if ["ANTPERSF", "KOM", "FAMILIE_TYPE", "STATSB"].contains(&column_name) {
+            "bef"
+        } else if ["JOBKODE", "LPR"].contains(&column_name) {
+            "akm"
+        } else {
+            "" // Unknown register type
+        };
+
+        let col_idx = if !register_type.is_empty() {
+            // Try to get from cache first
+            if let Some(&idx) = self
+                .column_indices
+                .get(&(register_type.to_string(), column_name.to_string()))
+            {
+                idx
+            } else {
+                // Fall back to schema lookup
+                batch.schema().index_of(column_name)?
+            }
+        } else {
+            // Direct schema lookup for non-cached columns
+            batch.schema().index_of(column_name)?
+        };
+
         let array = batch.column(col_idx);
-        
-        array.as_any().downcast_ref::<StringArray>()
-            .ok_or_else(move || IdsError::data_loading(format!("Column {} is not a string array", column_name)))
+
+        array
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(move || {
+                IdsError::data_loading(format!("Column {} is not a string array", column_name))
+            })
     }
-    
+
     fn validate_batch(&self, batch: &RecordBatch) -> std::result::Result<(), IdsError> {
         // Implementation to validate batch structure
         if batch.num_rows() == 0 {
             return Err(IdsError::data_loading("Empty batch".to_string()));
         }
-        
+
         Ok(())
+    }
+
+    /// Run benchmarks and collect performance metrics
+    ///
+    /// This function executes a set of microbenchmarks to measure the performance
+    /// of critical operations and returns the results as a map of operation names
+    /// to durations in nanoseconds.
+    ///
+    /// # Returns
+    /// * `HashMap<String, u128>` - Map of operation names to durations in nanoseconds
+    #[cfg(test)]
+    pub fn run_performance_benchmarks(&self) -> HashMap<String, u128> {
+        use std::time::{Duration, Instant};
+
+        let mut results = HashMap::new();
+
+        // Benchmark string interning
+        let mut total_duration = Duration::new(0, 0);
+        let iterations = 1000;
+
+        for i in 0..iterations {
+            let test_str = format!("test_string_{}", i);
+            let start = Instant::now();
+            let _ = self.string_interner.get_or_intern(&test_str);
+            total_duration += start.elapsed();
+        }
+
+        results.insert(
+            "string_interning_ns".to_string(),
+            total_duration.as_nanos() / iterations as u128,
+        );
+
+        // Benchmark column index cache
+        if !self.column_indices.is_empty() {
+            let mut total_duration = Duration::new(0, 0);
+            let iterations = 1000;
+
+            // Get a sample key
+            let sample_key = self.column_indices.keys().next().unwrap().clone();
+
+            for _ in 0..iterations {
+                let start = Instant::now();
+                let _ = self.column_indices.get(&sample_key);
+                total_duration += start.elapsed();
+            }
+
+            results.insert(
+                "column_cache_lookup_ns".to_string(),
+                total_duration.as_nanos() / iterations as u128,
+            );
+        }
+
+        // Benchmark period date cache
+        if !self.period_date_cache.is_empty() {
+            let mut total_duration = Duration::new(0, 0);
+            let iterations = 1000;
+
+            // Get a sample key
+            let sample_key = self.period_date_cache.keys().next().unwrap().clone();
+
+            for _ in 0..iterations {
+                let start = Instant::now();
+                let _ = self.period_date_cache.get(&sample_key);
+                total_duration += start.elapsed();
+            }
+
+            results.insert(
+                "period_cache_lookup_ns".to_string(),
+                total_duration.as_nanos() / iterations as u128,
+            );
+        }
+
+        // Return all performance metrics
+        results
     }
 }
 
 // Implement ArrowAccess for ArrowBackend
 impl ArrowAccess for ArrowBackend {
-    fn get_value<T: ArrowType>(&self, _column: &str, _row: usize) -> std::result::Result<T, IdsError> {
-        Err(IdsError::invalid_operation(
-            format!("ArrowBackend does not implement direct get_value. Use get_covariate instead.")
-        ))
+    fn get_value<T: ArrowType>(
+        &self,
+        _column: &str,
+        _row: usize,
+    ) -> std::result::Result<T, IdsError> {
+        Err(IdsError::invalid_operation(format!(
+            "ArrowBackend does not implement direct get_value. Use get_covariate instead."
+        )))
     }
-    
-    fn get_optional_value<T: ArrowType>(&self, _column: &str, _row: usize) -> std::result::Result<Option<T>, IdsError> {
-        Err(IdsError::invalid_operation(
-            format!("ArrowBackend does not implement direct get_optional_value. Use get_covariate instead.")
-        ))
+
+    fn get_optional_value<T: ArrowType>(
+        &self,
+        _column: &str,
+        _row: usize,
+    ) -> std::result::Result<Option<T>, IdsError> {
+        Err(IdsError::invalid_operation(format!(
+            "ArrowBackend does not implement direct get_optional_value. Use get_covariate instead."
+        )))
     }
-    
+    fn get_column(&self, _column: &str) -> std::result::Result<arrow::array::ArrayRef, IdsError> {
+        Err(IdsError::invalid_operation(format!(
+            "ArrowBackend does not implement direct get_column. Use get_covariate instead."
+        )))
+    }
+
     fn has_column(&self, _column: &str) -> bool {
         false // This implementation doesn't provide direct column access
     }
-    
+
     fn row_count(&self) -> usize {
         0 // This implementation doesn't provide direct row access
     }
-    
+
     fn column_names(&self) -> Vec<String> {
         Vec::new() // This implementation doesn't provide direct column access
     }
-    
+
     fn schema(&self) -> arrow::datatypes::SchemaRef {
         // Create an empty schema for compatibility
+        use arrow::datatypes::{Field, Schema};
         use std::sync::Arc;
-        use arrow::datatypes::{Schema, Field};
-        
+
         // Create an empty schema with explicitly typed empty vector
         let empty_fields: Vec<Field> = vec![];
         Arc::new(Schema::new(empty_fields))
     }
-    
-    fn get_column(&self, _column: &str) -> std::result::Result<arrow::array::ArrayRef, IdsError> {
-        Err(IdsError::invalid_operation(
-            format!("ArrowBackend does not implement direct get_column. Use get_covariate instead.")
-        ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_array::{Int32Array, StringArray};
+    use arrow_schema::{DataType, Field, Schema};
+    use std::sync::Arc;
+
+    fn create_test_batch() -> RecordBatch {
+        let schema = Schema::new(vec![
+            Field::new("PNR", DataType::Utf8, false),
+            Field::new("ANTPERSF", DataType::Int32, false),
+            Field::new("KOM", DataType::Int32, false),
+            Field::new("FAMILIE_TYPE", DataType::Int32, false),
+            Field::new("STATSB", DataType::Utf8, true),
+        ]);
+
+        let id_array = Arc::new(StringArray::from(vec![
+            "0123456789",
+            "1234567890",
+            "2345678901",
+            "3456789012",
+            "4567890123",
+        ]));
+        let family_size_array = Arc::new(Int32Array::from(vec![2, 3, 4, 1, 5]));
+        let kom_array = Arc::new(Int32Array::from(vec![101, 102, 103, 104, 105]));
+        let family_type_array = Arc::new(Int32Array::from(vec![1, 2, 3, 1, 2]));
+        let statsb_array = Arc::new(StringArray::from(vec![
+            Some("DK"),
+            Some("SE"),
+            Some("NO"),
+            Some("DK"),
+            Some("FI"),
+        ]));
+
+        RecordBatch::try_new(
+            Arc::new(schema),
+            vec![
+                id_array,
+                family_size_array,
+                kom_array,
+                family_type_array,
+                statsb_array,
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_string_interning_optimizations() {
+        // Create a backend
+        let mut backend = ArrowBackend::new().unwrap();
+
+        // Add some test data
+        let period = "202301".to_string();
+        let batches = vec![create_test_batch()];
+
+        // Add the data to trigger optimizations
+        backend.add_bef_data(period, batches).unwrap();
+
+        // Look up a PNR
+        let pnr = "0123456789";
+        let date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+
+        // First lookup should populate caches
+        let _ = backend.get_demographics(pnr, date).unwrap();
+
+        // Run the benchmarks
+        let metrics = backend.run_performance_benchmarks();
+
+        // Verify we have expected metrics
+        assert!(metrics.contains_key("string_interning_ns"));
+        assert!(metrics.contains_key("column_cache_lookup_ns"));
+        assert!(metrics.contains_key("period_cache_lookup_ns"));
+
+        // Metrics should be reasonably fast
+        assert!(
+            metrics["string_interning_ns"] < 1000,
+            "String interning should be less than 1000ns"
+        );
+        assert!(
+            metrics["column_cache_lookup_ns"] < 100,
+            "Column cache lookup should be less than 100ns"
+        );
+
+        // Print metrics for debugging
+        println!("Performance metrics: {:?}", metrics);
     }
 }

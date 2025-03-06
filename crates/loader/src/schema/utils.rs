@@ -11,6 +11,7 @@ use arrow_schema::{Field, Schema};
 /// # Returns
 /// A vector of Field objects from the schema
 #[must_use]
+#[allow(dead_code)]
 pub fn schema_to_fields(schema: &Schema) -> Vec<Field> {
     schema.fields().iter().map(|f| f.as_ref().clone()).collect()
 }
@@ -24,6 +25,7 @@ pub fn schema_to_fields(schema: &Schema) -> Vec<Field> {
 /// # Returns
 /// True if the field exists, false otherwise
 #[must_use]
+#[allow(dead_code)]
 pub fn schema_has_field(schema: &Schema, field_name: &str) -> bool {
     schema.field_with_name(field_name).is_ok()
 }
@@ -37,6 +39,7 @@ pub fn schema_has_field(schema: &Schema, field_name: &str) -> bool {
 /// # Returns
 /// The position of the field, or None if it doesn't exist
 #[must_use]
+#[allow(dead_code)]
 pub fn schema_field_position(schema: &Schema, field_name: &str) -> Option<usize> {
     schema.fields().iter().position(|f| f.name() == field_name)
 }

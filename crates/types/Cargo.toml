@@ -24,6 +24,7 @@ color-eyre = "0.6.2"
 dashmap.workspace = true
 rand.workspace = true
 csv.workspace = true
+lasso = { version = "0.7.2", features = ["multi-threaded"] }  # String interning support for performance
 
 # Optional dependencies
 arrow = { workspace = true, optional = true }
@@ -42,4 +43,20 @@ criterion = "0.5"
 
 [[bench]]
 name = "arrow_access"
+harness = false
+
+[[bench]]
+name = "pnr_lookup"
+harness = false
+
+[[bench]]
+name = "covariate_processing"
+harness = false
+
+[[bench]]
+name = "date_handling"
+harness = false
+
+[[bench]]
+name = "arrow_backend"
 harness = false

@@ -13,6 +13,8 @@ use crate::schema;
 /// This reader is designed to work with data in custom locations.
 /// Instead of using conventional locations, it allows specifying exact file paths.
 pub struct CustomPathReader {
+    // The base path is used for building relative paths if needed
+    #[allow(dead_code)]
     base_path: PathBuf,
     akm_path: Option<PathBuf>,
     bef_path: Option<PathBuf>,
