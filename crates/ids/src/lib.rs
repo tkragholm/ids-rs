@@ -29,6 +29,8 @@ use std::process;
 /// - Command execution
 /// - File I/O operations
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+    // Install color-eyre for better error reporting
+    color_eyre::install()?;
     // Check for the most common command line mistake - missing space after --family-file
     for arg in std::env::args() {
         if arg.starts_with("--family-file") && arg != "--family-file" {

@@ -60,8 +60,16 @@ impl CovariateProcessorRegistry {
         };
         
         // Create and register processors for all covariate types
-        for processor in factory.create_all_processors() {
-            registry.register(processor);
+        match factory.create_all_processors() {
+            Ok(processors) => {
+                for processor in processors {
+                    registry.register(processor);
+                }
+            },
+            Err(e) => {
+                // Log the error but continue with empty registry
+                log::warn!("Failed to create processors: {}", e);
+            }
         }
         
         registry

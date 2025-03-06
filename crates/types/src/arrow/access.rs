@@ -41,6 +41,28 @@ pub trait ArrowAccess {
         batch: &RecordBatch,
         column_name: &str,
     ) -> Result<arrow::array::ArrayData, IdsError>;
+    
+    /// Get Unix epoch (1970-01-01) date safely
+    ///
+    /// # Returns
+    /// The Unix epoch date
+    ///
+    /// # Errors
+    /// Returns an error if the date 1970-01-01 cannot be created
+    fn get_unix_epoch(&self) -> Result<NaiveDate, IdsError>;
+    
+    /// Convert a NaiveDate to days since Unix epoch safely
+    ///
+    /// # Arguments
+    /// * `date` - The date to convert
+    ///
+    /// # Returns
+    /// Number of days since Unix epoch as i32
+    ///
+    /// # Errors
+    /// Returns an error if the Unix epoch date can't be created or if the result would
+    /// overflow an i32
+    fn date_to_days_since_epoch(&self, date: NaiveDate) -> Result<i32, IdsError>;
 
     /// Convert a date32 value to NaiveDate
     fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate, IdsError>;
@@ -89,6 +111,23 @@ pub trait ArrowValue: Sized {
 
 // Default implementation of ArrowAccess
 impl<T> ArrowAccess for T {
+    fn get_unix_epoch(&self) -> Result<NaiveDate, IdsError> {
+        NaiveDate::from_ymd_opt(1970, 1, 1)
+            .ok_or_else(|| IdsError::invalid_date("Failed to create Unix epoch date (1970-01-01)"))
+    }
+    
+    fn date_to_days_since_epoch(&self, date: NaiveDate) -> Result<i32, IdsError> {
+        let unix_epoch = self.get_unix_epoch()?;
+        let days = date.signed_duration_since(unix_epoch).num_days();
+        
+        // Safely convert to i32, checking for overflow
+        i32::try_from(days).map_err(|_| {
+            IdsError::invalid_date(
+                format!("Date conversion overflow: days since epoch ({days}) exceeds i32 range")
+            )
+        })
+    }
+    
     fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>, IdsError> {
         // First try to get column with exact name "PNR"
         if let Ok(pnr_array) = self.get_string_array(batch, "PNR") {
@@ -182,9 +221,9 @@ impl<T> ArrowAccess for T {
     }
 
     fn convert_date32_to_naive_date(&self, days_since_epoch: i32) -> Result<NaiveDate, IdsError> {
-        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1)
-            .ok_or_else(|| IdsError::invalid_date("Invalid epoch date".to_string()))?;
+        let epoch = self.get_unix_epoch()?;
 
+        // Validate range for reasonable dates (roughly 70 years before/after epoch)
         if !(-25567..=25567).contains(&days_since_epoch) {
             return Err(IdsError::invalid_date(format!(
                 "Date value {days_since_epoch} is outside reasonable range"
@@ -235,6 +274,7 @@ impl<T> ArrowAccess for T {
         }
     }
 
+
     fn filter_batch_by_date_range(
         &self,
         batch: &RecordBatch,
@@ -245,8 +285,8 @@ impl<T> ArrowAccess for T {
         let date_array = self.get_date_array(batch, date_column)?;
         let array_data = date_array.to_data();
 
-        let start_days =
-            (start_date - NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()).num_days() as i32;
+        // Convert start date to days since epoch
+        let start_days = self.date_to_days_since_epoch(start_date)?;
 
         // Directly access array data for better performance
         #[allow(clippy::needless_range_loop)]
@@ -260,8 +300,10 @@ impl<T> ArrowAccess for T {
 
         let mut bool_array = BooleanArray::from(mask);
 
+        // If an end date is specified, apply that filter too
         if let Some(end) = end_date {
-            let end_days = (end - NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()).num_days() as i32;
+            // Convert end date to days since epoch
+            let end_days = self.date_to_days_since_epoch(end)?;
 
             // Create end date filter
             #[allow(clippy::needless_range_loop)]
@@ -275,6 +317,7 @@ impl<T> ArrowAccess for T {
 
             let end_bool_array = BooleanArray::from(end_mask);
 
+            // Combine start and end date filters with AND operation
             bool_array = and(&bool_array, &end_bool_array).map_err(|e| {
                 IdsError::invalid_operation(format!("Failed to combine date filters: {e}"))
             })?;

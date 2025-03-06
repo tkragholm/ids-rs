@@ -48,9 +48,18 @@ impl ArrowUtils {
     }
     
     /// Create a new empty batch with the given schema
-    #[must_use] 
-    pub fn create_empty_batch(schema: ArrowSchema) -> RecordBatch {
-        let fields = schema.fields();
+    /// 
+    /// # Arguments
+    /// * `schema` - The schema for the empty batch
+    /// 
+    /// # Returns
+    /// A new empty RecordBatch with the provided schema
+    /// 
+    /// # Errors
+    /// Returns an error if the empty batch cannot be created
+    pub fn create_empty_batch(schema: ArrowSchema) -> Result<RecordBatch, IdsError> {
+        let schema_arc = Arc::new(schema);
+        let fields = schema_arc.fields();
         let columns = fields
             .iter()
             .map(|field| match field.data_type() {
@@ -68,14 +77,49 @@ impl ArrowUtils {
             })
             .collect();
 
-        RecordBatch::try_new(Arc::new(schema), columns).unwrap()
+        let fields_len = fields.len();
+        RecordBatch::try_new(schema_arc, columns)
+            .map_err(|err| {
+                IdsError::Anyhow(
+                    anyhow::Error::new(err)
+                        .context(format!("Failed to create empty batch with {} fields", fields_len))
+                )
+            })
     }
 
-    /// Convert NaiveDate to days since epoch (for Date32 arrays)
-    #[must_use] 
-    pub fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
-        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-        (date - epoch).num_days() as i32
+    /// Get Unix epoch (1970-01-01) date safely
+    ///
+    /// # Returns
+    /// A Result containing the Unix epoch date
+    ///
+    /// # Errors
+    /// Returns an error if the date 1970-01-01 cannot be created
+    pub fn get_unix_epoch() -> Result<NaiveDate, IdsError> {
+        NaiveDate::from_ymd_opt(1970, 1, 1)
+            .ok_or_else(|| IdsError::invalid_date("Failed to create Unix epoch date (1970-01-01)"))
+    }
+
+    /// Convert NaiveDate to days since epoch (for Date32 arrays) safely
+    ///
+    /// # Arguments
+    /// * `date` - The date to convert
+    ///
+    /// # Returns
+    /// Number of days since Unix epoch as i32
+    ///
+    /// # Errors
+    /// Returns an error if the Unix epoch date can't be created or if the result would
+    /// overflow an i32
+    pub fn date_to_days_since_epoch(date: NaiveDate) -> Result<i32, IdsError> {
+        let epoch = Self::get_unix_epoch()?;
+        let days = date.signed_duration_since(epoch).num_days();
+        
+        // Safely convert to i32, checking for overflow
+        i32::try_from(days).map_err(|_| {
+            IdsError::invalid_date(
+                format!("Date conversion overflow: days since epoch ({days}) exceeds i32 range")
+            )
+        })
     }
 
     /// Concatenate multiple batches with the same schema
@@ -178,8 +222,16 @@ impl ArrowUtils {
     }
 
     /// Align a batch's buffers for better memory performance
-    #[must_use] 
-    pub fn align_batch_buffers(batch: &RecordBatch) -> RecordBatch {
+    /// 
+    /// # Arguments
+    /// * `batch` - The record batch to align
+    /// 
+    /// # Returns
+    /// A new record batch with aligned buffers
+    /// 
+    /// # Errors
+    /// Returns an error if the aligned batch cannot be created
+    pub fn align_batch_buffers(batch: &RecordBatch) -> Result<RecordBatch, IdsError> {
         let columns: Vec<Arc<dyn Array>> = batch
             .columns()
             .iter()
@@ -190,7 +242,13 @@ impl ArrowUtils {
             })
             .collect();
 
-        RecordBatch::try_new(batch.schema(), columns).expect("Failed to create aligned batch")
+        RecordBatch::try_new(batch.schema(), columns)
+            .map_err(|err| {
+                IdsError::Anyhow(
+                    anyhow::Error::new(err)
+                        .context("Failed to create aligned batch")
+                )
+            })
     }
 
     /// Create a sliced array for zero-copy operations

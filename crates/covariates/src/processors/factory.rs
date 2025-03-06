@@ -321,26 +321,56 @@ impl ProcessorFactory {
     }
 
     /// Create all processors for all covariate types
-    pub fn create_all_processors(&self) -> Vec<Box<dyn CovariateProcessor>> {
-        self.config
+    pub fn create_all_processors(&self) -> anyhow::Result<Vec<Box<dyn CovariateProcessor>>> {
+        // Early validation - check if configuration is valid
+        if self.config.covariate_types.is_empty() {
+            return Err(anyhow::anyhow!("No covariate types defined in configuration"));
+        }
+        
+        // Log what we're creating
+        log::debug!("Creating processors for {} covariate types", self.config.covariate_types.len());
+        
+        // Create processors
+        let processors = self.config
             .covariate_types
             .iter()
             .map(|config| {
+                // Log each processor being created
+                log::trace!("Creating processor for {}", config.name);
                 Box::new(ConfigurableProcessor::new(config)) as Box<dyn CovariateProcessor>
             })
-            .collect()
+            .collect();
+            
+        Ok(processors)
     }
 
     /// Create processors for all variables in a specific covariate type
     pub fn create_variable_processors_for_type(
         &self,
         covariate_type: CovariateType,
-    ) -> Vec<Box<dyn CovariateProcessor>> {
+    ) -> anyhow::Result<Vec<Box<dyn CovariateProcessor>>> {
         if let Some(covariate_config) = self.config.get_covariate_type(covariate_type) {
-            covariate_config
+            // Check if we have variables defined
+            if covariate_config.variables.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "No variables defined for covariate type {:?}", covariate_type
+                ).context(format!("Configuration for {}", covariate_config.name)));
+            }
+            
+            // Log what we're creating
+            log::debug!(
+                "Creating processors for {} variables of type {:?}", 
+                covariate_config.variables.len(), 
+                covariate_type
+            );
+            
+            // Create variable processors
+            let processors = covariate_config
                 .variables
                 .iter()
                 .map(|var_config| {
+                    log::trace!("Creating processor for variable {}", var_config.name);
+                    
                     if let Some(translation_maps) = &self.translation_maps {
                         Box::new(ConfigurableVariableProcessor::with_translation_maps(
                             var_config,
@@ -354,9 +384,14 @@ impl ProcessorFactory {
                         )) as Box<dyn CovariateProcessor>
                     }
                 })
-                .collect()
+                .collect();
+                
+            Ok(processors)
         } else {
-            vec![]
+            // No configuration for this type
+            Err(anyhow::anyhow!(
+                "No configuration found for covariate type {:?}", covariate_type
+            ))
         }
     }
 }
@@ -364,6 +399,7 @@ impl ProcessorFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use crate::config::CovariatesConfig;
     use types::models::{Covariate, DemographicExtras};
 
@@ -415,12 +451,12 @@ mod tests {
     }
 
     #[test]
-    fn test_create_all_processors() {
+    fn test_create_all_processors() -> Result<()> {
         let config = CovariatesConfig::default_config();
         let factory = ProcessorFactory::new(config);
 
         // Create all processors
-        let processors = factory.create_all_processors();
+        let processors = factory.create_all_processors()?;
 
         // Should have one processor for each covariate type
         assert_eq!(processors.len(), 4);
@@ -432,15 +468,33 @@ mod tests {
         assert!(types.contains(&CovariateType::Income));
         assert!(types.contains(&CovariateType::Education));
         assert!(types.contains(&CovariateType::Occupation));
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_empty_config_returns_error() {
+        let config = CovariatesConfig {
+            covariate_types: vec![], // Empty config
+        };
+        let factory = ProcessorFactory::new(config);
+        
+        // Should return an error because the config is empty
+        let result = factory.create_all_processors();
+        assert!(result.is_err());
+        
+        // Check error message contains useful information
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("No covariate types defined"));
     }
 
     #[test]
-    fn test_create_variable_processors_for_type() {
+    fn test_create_variable_processors_for_type() -> Result<()> {
         let config = CovariatesConfig::default_config();
         let factory = ProcessorFactory::new(config);
 
         // Create all processors for Demographics
-        let processors = factory.create_variable_processors_for_type(CovariateType::Demographics);
+        let processors = factory.create_variable_processors_for_type(CovariateType::Demographics)?;
 
         // Should have the correct number of processors
         assert_eq!(processors.len(), 8); // 8 demographic variables
@@ -452,5 +506,29 @@ mod tests {
         assert!(variable_names.contains(&"Family Size"));
         assert!(variable_names.contains(&"Family Type"));
         assert!(variable_names.contains(&"Gender"));
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_invalid_covariate_type_returns_error() {
+        let config = CovariatesConfig::default_config();
+        let factory = ProcessorFactory::new(config);
+        
+        // Create a test config that only has Demographics defined
+        let reduced_config = CovariatesConfig {
+            covariate_types: vec![
+                config.covariate_types[0].clone(), // Just Demographics
+            ],
+        };
+        let reduced_factory = ProcessorFactory::new(reduced_config);
+        
+        // Should return error for a non-existent type
+        let result = reduced_factory.create_variable_processors_for_type(CovariateType::Occupation);
+        assert!(result.is_err());
+        
+        // Check error message contains the missing type
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Occupation"));
     }
 }

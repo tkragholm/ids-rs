@@ -243,14 +243,24 @@ pub fn read_parquet(
                 'worker_loop: loop {
                     // Check local queue first
                     if let Some(batch) = local_worker.pop() {
-                        process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter);
+                        if let Err(e) = process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter) {
+                            // Store the error and break out of the worker loop
+                            let mut error = error_result.lock();
+                            *error = Some(format!("Error processing batch: {}", e));
+                            break 'worker_loop;
+                        }
                         continue;
                     }
                     
                     // Check global queue next
                     match global_injector.steal() {
                         Steal::Success(batch) => {
-                            process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter);
+                            if let Err(e) = process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter) {
+                                // Store the error and break out of the worker loop
+                                let mut error = error_result.lock();
+                                *error = Some(format!("Error processing batch: {}", e));
+                                break 'worker_loop;
+                            }
                             continue;
                         }
                         Steal::Empty => {
@@ -258,7 +268,12 @@ pub fn read_parquet(
                             match receiver.try_recv() {
                                 Ok(batch_result) => match batch_result {
                                     Ok(batch) => {
-                                        process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter);
+                                        if let Err(e) = process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter) {
+                                            // Store the error and break out of the worker loop
+                                            let mut error = error_result.lock();
+                                            *error = Some(format!("Error processing batch: {}", e));
+                                            break 'worker_loop;
+                                        }
                                     }
                                     Err(error_msg) => {
                                         let mut error = error_result.lock();
@@ -271,7 +286,12 @@ pub fn read_parquet(
                                     match receiver.recv() {
                                         Ok(batch_result) => match batch_result {
                                             Ok(batch) => {
-                                                process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter);
+                                                if let Err(e) = process_batch(batch, &utils, &pb_clone, &batches_result, &error_result, &pnr_filter) {
+                                                    // Store the error and break out of the worker loop
+                                                    let mut error = error_result.lock();
+                                                    *error = Some(format!("Error processing batch: {}", e));
+                                                    break 'worker_loop;
+                                                }
                                             }
                                             Err(error_msg) => {
                                                 let mut error = error_result.lock();
@@ -368,13 +388,13 @@ fn process_batch(
     batches_result: &Arc<Mutex<Vec<RecordBatch>>>,
     _error_result: &Arc<Mutex<Option<String>>>,
     pnr_filter: &Option<HashSet<String>>,
-) {
+) -> Result<(), IdsError> {
     // Filter by PNR if needed
     let batch = if let Some(filter) = pnr_filter {
         // Apply PNR filtering
         match filter_batch_by_pnr(&batch, filter) {
             Some(filtered) => filtered,
-            None => return, // Skip this batch if it has no matching rows
+            None => return Ok(()), // Skip this batch if it has no matching rows
         }
     } else {
         batch
@@ -387,15 +407,17 @@ fn process_batch(
 
     // Optimize memory layout
     #[allow(clippy::unnecessary_mut_passed)]
-    let batch = ArrowUtils::align_batch_buffers(&batch);
+    let aligned_batch = ArrowUtils::align_batch_buffers(&batch)?;
 
     if let Some(pb) = pb {
-        pb.inc(batch.get_array_memory_size() as u64);
+        pb.inc(aligned_batch.get_array_memory_size() as u64);
     }
 
     // Add to results
     let mut batches = batches_result.lock();
-    batches.push(batch);
+    batches.push(aligned_batch);
+    
+    Ok(())
 }
 
 /// Filter a RecordBatch by a set of PNRs
@@ -587,5 +609,13 @@ pub fn filter_batches_by_date_range(
             },
         );
     
-    filtered_batches
+    // Flatten the result to handle the nested Results
+    filtered_batches.map(|batches_with_results| {
+        // Collect and propagate any errors
+        let mut flattened = Vec::with_capacity(batches_with_results.len());
+        for batch_result in batches_with_results {
+            flattened.push(batch_result?);
+        }
+        Ok(flattened)
+    })?
 }
