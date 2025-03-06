@@ -776,14 +776,14 @@ impl BalanceChecker {
         
         // Determine optimal chunk size based on number of items and available threads
         let num_threads = rayon::current_num_threads();
-        let items_per_thread = (data.len() + num_threads - 1) / num_threads;
+        let items_per_thread = data.len().div_ceil(num_threads);
         let chunk_size = items_per_thread.max(1).min(1000); // At least 1, at most 1000
         
         // Process data in parallel chunks
         data.par_chunks(chunk_size)
             .flat_map(|chunk| {
                 chunk.iter()
-                    .map(|item| processor(item))
+                    .map(&processor)
                     .collect::<Vec<Result<R, IdsError>>>()
             })
             .collect::<Result<Vec<R>, IdsError>>()
