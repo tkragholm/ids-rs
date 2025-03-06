@@ -64,7 +64,7 @@ impl CovariateProcessor for IncomeProcessor {
         match covariate.get_type() {
             CovariateType::Income => {
                 // Income type is the primary categorical value
-                covariate.get_income_type_code()
+                covariate.get_income_type_code().map(|s| s.to_string())
             },
             _ => None,
         }
@@ -131,7 +131,7 @@ impl IncomeVariableProcessor {
             name: "Currency".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| {
-                c.get_currency().map(|v| {
+                c.get_currency().clone().map(|v| {
                     let mut hash = 0.0;
                     for (i, b) in v.bytes().enumerate() {
                         hash += (b as f64) * (i + 1) as f64;
@@ -139,7 +139,7 @@ impl IncomeVariableProcessor {
                     hash
                 })
             },
-            categorical_accessor: Some(|c| c.get_currency()),
+            categorical_accessor: Some(|c| c.get_currency().map(|s| s.to_string())),
         }
     }
     
@@ -149,7 +149,7 @@ impl IncomeVariableProcessor {
             name: "Income Type".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| {
-                c.get_income_type_code().map(|v| {
+                c.get_income_type_code().clone().map(|v| {
                     let mut hash = 0.0;
                     for (i, b) in v.bytes().enumerate() {
                         hash += (b as f64) * (i + 1) as f64;
@@ -157,7 +157,7 @@ impl IncomeVariableProcessor {
                     hash
                 })
             },
-            categorical_accessor: Some(|c| c.get_income_type_code()),
+            categorical_accessor: Some(|c| c.get_income_type_code().map(|s| s.to_string())),
         }
     }
 }

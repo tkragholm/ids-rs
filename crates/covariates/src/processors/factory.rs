@@ -225,11 +225,11 @@ impl ConfigurableVariableProcessor {
                 }
 
                 // Return original value if translation failed
-                return Some(value.clone());
+                return Some(value.to_string());
             }
         }
 
-        raw_value.clone()
+        raw_value.map(|s| s.to_string())
     }
 }
 

@@ -61,7 +61,7 @@ impl CovariateProcessor for EducationProcessor {
         match covariate.get_type() {
             CovariateType::Education => {
                 // Education level is the primary categorical value
-                covariate.get_education_level()
+                covariate.get_education_level().map(|s| s.to_string())
             },
             _ => None,
         }
@@ -87,8 +87,8 @@ impl EducationVariableProcessor {
         Self {
             name: "Education Level".to_string(),
             variable_type: VariableType::Categorical,
-            accessor: |c| c.get_education_level().and_then(|v| v.parse::<f64>().ok()),
-            categorical_accessor: Some(|c| c.get_education_level()),
+            accessor: |c| c.get_education_level().clone().and_then(|v| v.parse::<f64>().ok()),
+            categorical_accessor: Some(|c| c.get_education_level().map(|s| s.to_string())),
         }
     }
     
@@ -98,7 +98,7 @@ impl EducationVariableProcessor {
             name: "ISCED Level".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| c.get_isced_code().and_then(|v| v.parse::<f64>().ok()),
-            categorical_accessor: Some(|c| c.get_isced_code()),
+            categorical_accessor: Some(|c| c.get_isced_code().map(|s| s.to_string())),
         }
     }
     

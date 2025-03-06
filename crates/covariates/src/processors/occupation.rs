@@ -69,7 +69,7 @@ impl CovariateProcessor for OccupationProcessor {
         match covariate.get_type() {
             CovariateType::Occupation => {
                 // Occupation code is the primary categorical value
-                covariate.get_occupation_code()
+                covariate.get_occupation_code().map(|s| s.to_string())
             },
             _ => None,
         }
@@ -96,7 +96,7 @@ impl OccupationVariableProcessor {
             name: "SOCIO13 Code".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| c.get_occupation_code().and_then(|v| v.parse::<f64>().ok()),
-            categorical_accessor: Some(|c| c.get_occupation_code()),
+            categorical_accessor: Some(|c| c.get_occupation_code().map(|s| s.to_string())),
         }
     }
     
@@ -125,7 +125,7 @@ impl OccupationVariableProcessor {
                     hash
                 })
             },
-            categorical_accessor: Some(|c| c.get_classification()),
+            categorical_accessor: Some(|c| c.get_classification().map(|s| s.to_string())),
         }
     }
     

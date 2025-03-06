@@ -14,12 +14,66 @@ use types::{
     storage::ArrowBackend as ArrowStore,
 };
 
+/// Performance metrics for cache analysis
+#[derive(Debug, Clone)]
+pub struct CachePerformanceMetrics {
+    pub total_entries: usize,
+    pub hit_ratio: f64,
+    pub memory_usage: usize,
+    pub access_pattern: String,
+}
+
 pub struct BalanceChecker {
     store: Arc<ArrowStore>,
     cache: CovariateCache,
     metrics: BalanceMetrics,
     //processor: ValueProcessor,
     results: Option<BalanceResults>,
+}
+
+/// Builder for BalanceChecker with configurable settings
+pub struct BalanceCheckerBuilder {
+    store: Option<ArrowStore>,
+    cache_capacity: usize,
+    debug_mode: bool,
+}
+
+impl BalanceCheckerBuilder {
+    pub fn new() -> Self {
+        Self {
+            store: None,
+            cache_capacity: 100_000, // Default cache capacity
+            debug_mode: false,
+        }
+    }
+    
+    pub fn with_store(mut self, store: ArrowStore) -> Self {
+        self.store = Some(store);
+        self
+    }
+    
+    pub fn with_cache_capacity(mut self, capacity: usize) -> Self {
+        self.cache_capacity = capacity;
+        self
+    }
+    
+    pub fn with_debug_mode(mut self, debug: bool) -> Self {
+        self.debug_mode = debug;
+        self
+    }
+    
+    pub fn build(self) -> Result<BalanceChecker, IdsError> {
+        let store = self.store.ok_or_else(|| 
+            IdsError::invalid_operation("Cannot build BalanceChecker without a store".to_string())
+        )?;
+        
+        Ok(BalanceChecker {
+            store: Arc::new(store),
+            cache: CovariateCache::new(self.cache_capacity),
+            metrics: BalanceMetrics::new(),
+            results: None,
+        })
+    }
 }
 
 impl BalanceChecker {
@@ -76,7 +130,7 @@ impl BalanceChecker {
     fn populate_diagnostic_cache(&self) {
         use chrono::NaiveDate;
         use log::debug;
-        use types::models::{Covariate, CovariateType, DemographicExtras};
+        use types::models::{Covariate, CovariateType};
 
         // Get real treatment dates to use
         let treatment_dates = [
@@ -129,75 +183,84 @@ impl BalanceChecker {
 
             // Use all ID formats to provide maximum coverage
             for id in &all_ids {
-                // Create demographic covariates with additional fields
-                let demographic_extras = DemographicExtras {
-                    civil_status: Some(format!("{}", "G".chars().nth(i % 4).unwrap_or('G'))),
-                    gender: Some(if i % 2 == 0 { "M".to_string() } else { "K".to_string() }),
-                    citizenship: Some("DK".to_string()),
-                    age: Some(20 + (i % 80) as i32),
-                    children_count: Some((i % 4) as i32),
-                };
-                
-                let demographic = Covariate::demographics_with_extras(
-                    3 + (i % 5) as i32,                // Family size 3-7
-                    101 + (i % 100) as i32,            // Municipality
-                    format!("{}", 1 + (i % 9)),        // Family type
-                    demographic_extras,
-                );
+                // Prepare common data that we'll use for each date
+                // Demographics data
+                let family_size = 3 + (i % 5) as i32;  // Family size 3-7
+                let municipality = 101 + (i % 100) as i32;  // Municipality
+                let family_type = format!("{}", 1 + (i % 9));  // Family type
+                let civil_status = format!("{}", "G".chars().nth(i % 4).unwrap_or('G'));
+                let gender = if i % 2 == 0 { "M".to_string() } else { "K".to_string() };
+                let citizenship = "DK".to_string();
+                let age = 20 + (i % 80) as i32;
+                let children_count = (i % 4) as i32;
 
-                // Create income covariates with additional fields
-                let income = Covariate::income_extended(
-                    250000.0 + (i as f64 * 1000.0),
-                    "DKK".to_string(),
-                    "PERINDKIALT_13".to_string(),
-                    Some(200000.0 + (i as f64 * 800.0)), // LOENMV_13
-                    Some(1 + (i % 5) as i32),            // BESKST13
-                );
+                // Income data
+                let income_amount = 250000.0 + (i as f64 * 1000.0);
+                let wage_income = 200000.0 + (i as f64 * 800.0); // LOENMV_13
+                let employment_status = 1 + (i % 5) as i32;      // BESKST13
 
-                // Create education covariates with ISCED codes
-                // Use realistic ISCED levels (1-8)
+                // Education data
+                let edu_level = 10 + (i % 20);
                 let isced_level = 1 + (i % 8);
-                let education = Covariate::education(
-                    format!("{}", 10 + (i % 20)),
-                    Some(format!("{}", isced_level)), // ISCED code (1-8)
-                    Some(3.5 + (i % 10) as f32 / 2.0),
-                );
+                let edu_years = 3.5 + (i % 10) as f32 / 2.0;
                 
-                // Create occupation covariates with all fields
-                // Common SOCIO13 codes: 131-135 (various types of employment)
-                //                      110-114 (self-employment categories)
-                //                      310-330 (education, pension, etc.)
+                // Occupation data
                 let socio13_codes = [
                     "110", "111", "112", "113", "114", "120", 
                     "131", "132", "133", "134", "135", "139", 
                     "210", "220", "310", "321", "322", "323", "330"
                 ];
                 let socio13_code = socio13_codes[i % socio13_codes.len()];
-                let occupation = Covariate::occupation_extended(
-                    socio13_code.to_string(),
-                    "SOCIO13".to_string(),
-                    Some(100 + (i % 50) as i32), // SOCIO
-                    Some(200 + (i % 30) as i32), // SOCIO02
-                    Some(10 + (i % 20) as i32),  // PRE_SOCIO
-                );
+                let socio = 100 + (i % 50) as i32; // SOCIO
+                let socio02 = 200 + (i % 30) as i32; // SOCIO02
+                let pre_socio = 10 + (i % 20) as i32; // PRE_SOCIO
 
                 // Add to cache for different dates including treatment dates
                 for date in &treatment_dates {
+                    // Create fresh builder instances for each date iteration
+                    
                     // Demographics
+                    let demographic = Covariate::demographics(
+                        family_size,
+                        municipality,
+                        family_type.clone(),
+                    )
+                    .with_civil_status(civil_status.clone())
+                    .with_gender(gender.clone())
+                    .with_citizenship(citizenship.clone())
+                    .with_age(age)
+                    .with_children_count(children_count);
                     let key = CacheKey::new(id, CovariateType::Demographics, *date);
-                    self.cache.insert(key, Some(demographic.clone()));
+                    self.cache.insert(key, Some(demographic.build()));
 
                     // Income
+                    let income = Covariate::income(
+                        income_amount,
+                        "DKK".to_string(),
+                        "PERINDKIALT_13".to_string()
+                    )
+                    .with_wage_income(wage_income)
+                    .with_employment_status(employment_status);
                     let key = CacheKey::new(id, CovariateType::Income, *date);
-                    self.cache.insert(key, Some(income.clone()));
+                    self.cache.insert(key, Some(income.build()));
 
                     // Education
+                    let education = Covariate::education(format!("{}", edu_level))
+                        .with_isced_code(format!("{}", isced_level))
+                        .with_years(edu_years);
                     let key = CacheKey::new(id, CovariateType::Education, *date);
-                    self.cache.insert(key, Some(education.clone()));
+                    self.cache.insert(key, Some(education.build()));
                     
-                    // Occupation (SOCIO13)
+                    // Occupation
+                    let occupation = Covariate::occupation(
+                        socio13_code.to_string(),
+                        "SOCIO13".to_string()
+                    )
+                    .with_socio(socio)
+                    .with_socio02(socio02)
+                    .with_pre_socio(pre_socio);
                     let key = CacheKey::new(id, CovariateType::Occupation, *date);
-                    self.cache.insert(key, Some(occupation.clone()));
+                    self.cache.insert(key, Some(occupation.build()));
                 }
             }
         }
@@ -308,21 +371,12 @@ impl BalanceChecker {
 
             // Create realistic covariates with some randomization
             for id in &all_ids {
-                // Create demographic covariates - non-zero values
-                let demographic = Covariate::demographics(
-                    2 + rng.random_range(1..=5),                // Family size 3-7
-                    100 + rng.random_range(1..=100),            // Municipality
-                    format!("{}", 1 + rng.random_range(1..=9)), // Family type
-                );
-
-                // Create income covariates - realistic values
-                let income = Covariate::income(
-                    200000.0 + rng.random_range(0..800000) as f64,
-                    "DKK".to_string(),
-                    "PERINDKIALT_13".to_string(),
-                );
-
-                // Create education covariates with level between 10-30
+                // Generate common components reused for each date
+                let family_size = 2 + rng.random_range(1..=5);                // Family size 3-7
+                let municipality = 100 + rng.random_range(1..=100);           // Municipality
+                let family_type = format!("{}", 1 + rng.random_range(1..=9)); // Family type
+                
+                let income_amount = 200000.0 + rng.random_range(0..800000) as f64;
                 let education_level = rng.random_range(10..=30);
                 
                 // Generate ISCED level (1-8), with higher levels less common
@@ -340,21 +394,20 @@ impl BalanceChecker {
                 // Weighted random selection for ISCED level
                 let mut cdf = 0.0;
                 let roll: f64 = rng.random();
-                let mut isced = 3; // Default to level 3 if selection fails
-                
-                for (level, weight) in &isced_distribution {
-                    cdf += weight;
-                    if roll <= cdf {
-                        isced = *level;
-                        break;
+                let isced = {
+                    let mut selected = 3; // Default to level 3 if selection fails
+                    for (level, weight) in &isced_distribution {
+                        cdf += weight;
+                        if roll <= cdf {
+                            selected = *level;
+                            break;
+                        }
                     }
-                }
+                    selected
+                };
                 
-                let education = Covariate::education(
-                    format!("{}", education_level),
-                    Some(format!("{}", isced)), // ISCED code as string
-                    Some(3.5 + (rng.random_range(0..10) as f32 / 2.0)),
-                );
+                // Generate education years based on ISCED level
+                let education_years = 3.5 + (rng.random_range(0..10) as f32 / 2.0);
                 
                 // Create occupation covariates with SOCIO13 codes
                 // Use values from the socio13.json mapping with weighted distribution
@@ -380,29 +433,42 @@ impl BalanceChecker {
                     }
                     selected
                 };
-                
-                let occupation = Covariate::occupation(
-                    socio13_code.to_string(),
-                    "SOCIO13".to_string(),
-                );
 
                 // Add to cache for different dates including treatment dates
                 for date in &treatment_dates {
+                    // Create fresh builders for each date
                     // Demographics
+                    let demographic = Covariate::demographics(
+                        family_size,
+                        municipality,
+                        family_type.clone(),
+                    );
                     let key = CacheKey::new(id, CovariateType::Demographics, *date);
-                    self.cache.insert(key, Some(demographic.clone()));
+                    self.cache.insert(key, Some(demographic.build()));
 
                     // Income
+                    let income = Covariate::income(
+                        income_amount,
+                        "DKK".to_string(),
+                        "PERINDKIALT_13".to_string(),
+                    );
                     let key = CacheKey::new(id, CovariateType::Income, *date);
-                    self.cache.insert(key, Some(income.clone()));
+                    self.cache.insert(key, Some(income.build()));
 
                     // Education
+                    let education = Covariate::education(format!("{}", education_level))
+                        .with_isced_code(format!("{}", isced))
+                        .with_years(education_years);
                     let key = CacheKey::new(id, CovariateType::Education, *date);
-                    self.cache.insert(key, Some(education.clone()));
+                    self.cache.insert(key, Some(education.build()));
                     
                     // Occupation (SOCIO13)
+                    let occupation = Covariate::occupation(
+                        socio13_code.to_string(),
+                        "SOCIO13".to_string(),
+                    );
                     let key = CacheKey::new(id, CovariateType::Occupation, *date);
-                    self.cache.insert(key, Some(occupation.clone()));
+                    self.cache.insert(key, Some(occupation.build()));
 
                     // Add more date coverage to increase chance of hits
                     // Generate data for each quarter of each year from 2008 to 2023
@@ -410,21 +476,35 @@ impl BalanceChecker {
                         for &month in &[3, 6, 9, 12] {
                             if let Some(extra_date) = NaiveDate::from_ymd_opt(year, month, 15) {
                                 if year != date.year() || month != date.month() {
-                                    // Add entries for quarterly snapshots
-                                    let key =
-                                        CacheKey::new(id, CovariateType::Demographics, extra_date);
-                                    self.cache.insert(key, Some(demographic.clone()));
+                                    // Add entries for quarterly snapshots - create fresh builders each time
+                                    let quarterly_demographic = Covariate::demographics(
+                                        family_size, 
+                                        municipality, 
+                                        family_type.clone()
+                                    );
+                                    let key = CacheKey::new(id, CovariateType::Demographics, extra_date);
+                                    self.cache.insert(key, Some(quarterly_demographic.build()));
 
+                                    let quarterly_income = Covariate::income(
+                                        income_amount,
+                                        "DKK".to_string(),
+                                        "PERINDKIALT_13".to_string(),
+                                    );
                                     let key = CacheKey::new(id, CovariateType::Income, extra_date);
-                                    self.cache.insert(key, Some(income.clone()));
+                                    self.cache.insert(key, Some(quarterly_income.build()));
 
-                                    let key =
-                                        CacheKey::new(id, CovariateType::Education, extra_date);
-                                    self.cache.insert(key, Some(education.clone()));
+                                    let quarterly_education = Covariate::education(format!("{}", education_level))
+                                        .with_isced_code(format!("{}", isced))
+                                        .with_years(education_years);
+                                    let key = CacheKey::new(id, CovariateType::Education, extra_date);
+                                    self.cache.insert(key, Some(quarterly_education.build()));
                                     
-                                    let key =
-                                        CacheKey::new(id, CovariateType::Occupation, extra_date);
-                                    self.cache.insert(key, Some(occupation.clone()));
+                                    let quarterly_occupation = Covariate::occupation(
+                                        socio13_code.to_string(),
+                                        "SOCIO13".to_string(),
+                                    );
+                                    let key = CacheKey::new(id, CovariateType::Occupation, extra_date);
+                                    self.cache.insert(key, Some(quarterly_occupation.build()));
                                 }
                             }
                         }
@@ -470,6 +550,7 @@ impl BalanceChecker {
     ) -> Result<Option<Covariate>, IdsError> {
         let key = CacheKey::new(pnr, covariate_type, date);
         self.cache.get_or_load(&*self.store, key)
+            .map_err(|e| IdsError::invalid_operation(format!("Failed to get covariate for PNR {}: {}", pnr, e)))
     }
 
     /// Prefetch data for multiple PNRs and covariates to improve performance
@@ -604,6 +685,7 @@ impl BalanceChecker {
 }
 
 impl BalanceChecker {
+    /// Calculate balance metrics for all covariate types
     fn add_all_balances(
         &self,
         results: &mut BalanceResults,
@@ -616,26 +698,114 @@ impl BalanceChecker {
         overall_pb.set_length(total_steps);
         
         overall_pb.set_message("Processing demographics...");
-        self.add_demographic_balance(results, cases, controls)?;
+        self.calculate_demographic_balance(results, cases, controls)?;
         overall_pb.inc(1);
 
         overall_pb.set_message("Processing income...");
-        self.add_income_balance(results, cases, controls)?;
+        self.calculate_income_balance(results, cases, controls)?;
         overall_pb.inc(1);
 
         overall_pb.set_message("Processing education...");
-        self.add_education_balance(results, cases, controls)?;
+        self.calculate_education_balance(results, cases, controls)?;
         overall_pb.inc(1);
         
         overall_pb.set_message("Processing occupation...");
-        self.add_occupation_balance(results, cases, controls)?;
+        self.calculate_occupation_balance(results, cases, controls)?;
         overall_pb.inc(1);
 
         Ok(())
     }
     
+    /// Analyze cache performance and provide detailed metrics
+    pub fn analyze_cache_performance(&self) -> CachePerformanceMetrics {
+        CachePerformanceMetrics {
+            total_entries: self.cache.len(),
+            hit_ratio: 0.0, // Would need to track hits/misses for this
+            memory_usage: self.estimate_memory_usage(),
+            access_pattern: "Unknown".to_string(),
+        }
+    }
+    
+    /// Estimate memory usage of the cached data
+    fn estimate_memory_usage(&self) -> usize {
+        // Rough estimate: average covariate size * number of covariates
+        // Plus overhead for cache structures
+        const AVG_COVARIATE_SIZE: usize = 256; // bytes
+        const CACHE_OVERHEAD: usize = 50; // bytes per entry
+        
+        self.cache.len() * (AVG_COVARIATE_SIZE + CACHE_OVERHEAD)
+    }
+    
+    /// Improved logging for balance analysis diagnostic information
+    pub fn log_diagnostic_information(&self) {
+        debug!("Balance checker diagnostic information:");
+        debug!("Cache size: {} entries", self.cache.len());
+        debug!("Estimated memory usage: {} bytes", self.estimate_memory_usage());
+        
+        if let Some(results) = &self.results {
+            debug!("Results summary: {} variables analyzed", results.summaries.len());
+            
+            // Log top 5 variables with highest standardized differences
+            let mut sorted_summaries: Vec<_> = results.summaries.iter().collect();
+            sorted_summaries.sort_by(|a, b| b.std_diff.abs().partial_cmp(&a.std_diff.abs()).unwrap());
+            
+            if !sorted_summaries.is_empty() {
+                debug!("Top variables with highest imbalance:");
+                for (i, summary) in sorted_summaries.iter().take(5).enumerate() {
+                    debug!(
+                        "  {}. {}: std_diff = {:.3}, case_mean = {:.2}, control_mean = {:.2}",
+                        i + 1, summary.variable, summary.std_diff, summary.mean_cases, summary.mean_controls
+                    );
+                }
+            }
+        }
+    }
+    
+    /// Process data in parallel with optimal chunk sizing and workload balancing
+    fn process_data_in_parallel<T, R, F>(
+        &self,
+        data: &[T],
+        processor: F,
+    ) -> Result<Vec<R>, IdsError>
+    where
+        T: Send + Sync,
+        R: Send,
+        F: Fn(&T) -> Result<R, IdsError> + Send + Sync,
+    {
+        use rayon::prelude::*;
+        
+        // Determine optimal chunk size based on number of items and available threads
+        let num_threads = rayon::current_num_threads();
+        let items_per_thread = (data.len() + num_threads - 1) / num_threads;
+        let chunk_size = items_per_thread.max(1).min(1000); // At least 1, at most 1000
+        
+        // Process data in parallel chunks
+        data.par_chunks(chunk_size)
+            .flat_map(|chunk| {
+                chunk.iter()
+                    .map(|item| processor(item))
+                    .collect::<Vec<Result<R, IdsError>>>()
+            })
+            .collect::<Result<Vec<R>, IdsError>>()
+    }
+    
+    /// Get or compute a value with caching
+    fn get_or_compute<K, V, F>(&self, _key: K, compute_fn: F) -> Result<V, IdsError>
+    where
+        K: std::hash::Hash + Eq + Clone,
+        V: Clone,
+        F: FnOnce() -> Result<V, IdsError>,
+    {
+        // This is a simplified implementation that doesn't use time-based caching
+        // This would need to be expanded with thread-safe storage in a real implementation
+        
+        // For now, we'll just compute the value directly
+        compute_fn()
+    }
+    
 
-    fn add_demographic_balance(
+    
+    fn calculate_demographic_balance(
         &self,
         results: &mut BalanceResults,
         cases: &[(String, NaiveDate)],
@@ -670,7 +840,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Family Type",
-            |covariate| covariate.get_family_type(),
+            |covariate| covariate.get_family_type().map(|s| s.to_string()),
         )?;
 
         for summary in summaries {
@@ -687,7 +857,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Civil Status",
-            |covariate| covariate.get_civil_status(),
+            |covariate| covariate.get_civil_status().map(|s| s.to_string()),
         )?;
 
         for summary in summaries {
@@ -702,7 +872,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Gender",
-            |covariate| covariate.get_gender(),
+            |covariate| covariate.get_gender().map(|s| s.to_string()),
         )?;
 
         for summary in summaries {
@@ -717,7 +887,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Citizenship",
-            |covariate| covariate.get_citizenship(),
+            |covariate| covariate.get_citizenship().map(|s| s.to_string()),
         )?;
 
         for summary in summaries {
@@ -752,7 +922,7 @@ impl BalanceChecker {
         Ok(())
     }
 
-    fn add_income_balance(
+    fn calculate_income_balance(
         &self,
         results: &mut BalanceResults,
         cases: &[(String, NaiveDate)],
@@ -817,7 +987,7 @@ impl BalanceChecker {
         Ok(())
     }
 
-    fn add_education_balance(
+    fn calculate_education_balance(
         &self,
         results: &mut BalanceResults,
         cases: &[(String, NaiveDate)],
@@ -830,7 +1000,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Education,
             "Education Level",
-            |covariate| covariate.get_education_level(),
+            |covariate| covariate.get_education_level().map(|s| s.to_string()),
         )?;
 
         for summary in summaries {
@@ -850,7 +1020,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Education,
             "ISCED Level",
-            |covariate| covariate.get_isced_code(),
+            |covariate| covariate.get_isced_code().map(|s| s.to_string()),
         )?;
 
         for summary in isced_summaries {
@@ -882,7 +1052,7 @@ impl BalanceChecker {
         Ok(())
     }
     
-    fn add_occupation_balance(
+    fn calculate_occupation_balance(
         &self,
         results: &mut BalanceResults,
         cases: &[(String, NaiveDate)],
@@ -895,7 +1065,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Occupation,
             "SOCIO13 Code",
-            |covariate| covariate.get_occupation_code(),
+            |covariate| covariate.get_occupation_code().map(|s| s.to_string()),
         )?;
 
         for summary in code_summaries {
@@ -915,7 +1085,7 @@ impl BalanceChecker {
             CovariateType::Occupation,
             "SOCIO13 Value",
             |covariate| {
-                covariate.get_occupation_code()
+                covariate.get_occupation_code().clone()
                     .and_then(|code| code.parse::<f64>().ok())
             },
         )?;
@@ -935,7 +1105,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Occupation,
             "Classification System",
-            |covariate| covariate.get_classification(),
+            |covariate| covariate.get_classification().map(|s| s.to_string()),
         )?;
 
         for summary in class_summaries {

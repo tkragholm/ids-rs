@@ -69,7 +69,7 @@ impl CovariateProcessor for DemographicsProcessor {
         match covariate.get_type() {
             CovariateType::Demographics => {
                 // Family type is always available in demographics
-                covariate.get_family_type()
+                covariate.get_family_type().map(|s| s.to_string())
             },
             _ => None,
         }
@@ -117,7 +117,7 @@ impl DemographicVariableProcessor {
             name: "Family Type".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| c.get_family_type().and_then(|v| v.parse::<f64>().ok()),
-            categorical_accessor: Some(|c| c.get_family_type()),
+            categorical_accessor: Some(|c| c.get_family_type().map(|s| s.to_string())),
         }
     }
     
@@ -127,7 +127,7 @@ impl DemographicVariableProcessor {
             name: "Civil Status".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| c.get_civil_status().map(|v| v.bytes().next().unwrap_or(0) as f64),
-            categorical_accessor: Some(|c| c.get_civil_status()),
+            categorical_accessor: Some(|c| c.get_civil_status().map(|s| s.to_string())),
         }
     }
     
@@ -137,7 +137,7 @@ impl DemographicVariableProcessor {
             name: "Gender".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| c.get_gender().map(|v| v.bytes().next().unwrap_or(0) as f64),
-            categorical_accessor: Some(|c| c.get_gender()),
+            categorical_accessor: Some(|c| c.get_gender().map(|s| s.to_string())),
         }
     }
     
@@ -147,7 +147,7 @@ impl DemographicVariableProcessor {
             name: "Citizenship".to_string(),
             variable_type: VariableType::Categorical,
             accessor: |c| {
-                c.get_citizenship().map(|v| {
+                c.get_citizenship().clone().map(|v| {
                     let mut hash = 0.0;
                     for (i, b) in v.bytes().enumerate() {
                         hash += (b as f64) * (i + 1) as f64;
@@ -155,7 +155,7 @@ impl DemographicVariableProcessor {
                     hash
                 })
             },
-            categorical_accessor: Some(|c| c.get_citizenship()),
+            categorical_accessor: Some(|c| c.get_citizenship().map(|s| s.to_string())),
         }
     }
     
