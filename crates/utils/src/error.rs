@@ -1,5 +1,5 @@
 // Re-export IdsError from the types crate
-pub use types::error::{ErrorContext as Context, IdsError, Result};
+pub use types::error::{LegacyErrorContext as Context, IdsError, Result};
 
 // Helper functions for specific error types
 pub fn date_parse_error<T: std::fmt::Display>(msg: T) -> IdsError {

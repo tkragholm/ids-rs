@@ -3,12 +3,15 @@ use thiserror::Error;
 pub use anyhow::{anyhow, Context, Result as AnyhowResultType};
 pub use color_eyre::{eyre::Report, Result as EyreResult};
 
-// New modules
+// Submodules
 mod context;
 mod conversion;
+mod macros;
+#[cfg(doc)]
+pub mod example; // Only included for documentation, not part of public API
 
 // Re-export from submodules
-pub use self::context::{ErrorContext, with_context, with_context_details};
+pub use self::context::{ErrorContext, LegacyErrorContext, with_context, with_context_details};
 
 /// The main error type for the IDS project
 /// 
@@ -26,6 +29,14 @@ pub enum IdsError {
     #[error("Arrow error: {0}")]
     Arrow(#[from] arrow::error::ArrowError),
     
+    /// Arrow error with detailed context information
+    #[error("Arrow error: {context}")]
+    ArrowWithContext {
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+        context: String,
+    },
+    
     #[error("Parquet error: {0}")]
     Parquet(#[from] parquet::errors::ParquetError),
     
@@ -41,6 +52,14 @@ pub enum IdsError {
     
     #[error("Data loading error: {0}")]
     DataLoading(String),
+    
+    /// Data access error with source and context
+    #[error("Data access error: {context}")]
+    DataAccess {
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+        context: String,
+    },
     
     #[error("Balance calculation error: {0}")]
     BalanceCalculation(String),
@@ -386,6 +405,46 @@ impl IdsError {
     pub fn missing_value(msg: impl ToString) -> Self {
         Self::MissingData(format!("Missing value: {}", msg.to_string()))
     }
+    
+    /// Create a data access error with source and context
+    ///
+    /// # Arguments
+    /// * `err` - The source error
+    /// * `context` - The context describing what was happening when the error occurred
+    ///
+    /// # Returns
+    /// A new `IdsError::DataAccess` with the provided source and context
+    #[must_use]
+    pub fn data_access<E, S>(err: E, context: S) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+        S: AsRef<str>,
+    {
+        Self::DataAccess {
+            source: Box::new(err),
+            context: context.as_ref().to_string(),
+        }
+    }
+    
+    /// Create an Arrow error with source and context
+    ///
+    /// # Arguments
+    /// * `err` - The source error
+    /// * `context` - The context describing what was happening when the error occurred
+    ///
+    /// # Returns
+    /// A new `IdsError::ArrowWithContext` with the provided source and context
+    #[must_use]
+    pub fn arrow<E, S>(err: E, context: S) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+        S: AsRef<str>,
+    {
+        Self::ArrowWithContext {
+            source: Box::new(err),
+            context: context.as_ref().to_string(),
+        }
+    }
 }
 
 /// Type alias for Result with IdsError
@@ -444,12 +503,16 @@ pub mod prelude {
         IdsError, 
         Result, 
         ErrorContext,
+        LegacyErrorContext,
         anyhow,
         AnyhowResultType,
         Context,
         Report,
-        EyreResult
+        EyreResult,
     };
+    
+    // Re-export macros defined at crate root
+    pub use crate::{ensure, try_with_context, bail};
     
     /// Re-export color_eyre's WrapErr trait for better error messages
     pub use color_eyre::eyre::WrapErr;

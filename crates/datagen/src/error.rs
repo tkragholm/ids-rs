@@ -1,5 +1,5 @@
 // Re-export from the types crate
-pub use types::error::{ErrorContext as Context, DataGenError, IdsError, Result};
+pub use types::error::{LegacyErrorContext as Context, DataGenError, IdsError, Result};
 
 // Simple alias for easier use within this crate
 pub type Error = IdsError;
