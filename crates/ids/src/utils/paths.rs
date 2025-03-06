@@ -12,6 +12,7 @@ use log;
 ///
 /// # Returns
 /// * String - The resolved path
+#[must_use]
 pub fn resolve_path(base_path: &str, path: &str) -> String {
     let path_obj = Path::new(path);
     
@@ -33,6 +34,7 @@ pub fn resolve_path(base_path: &str, path: &str) -> String {
 ///
 /// # Returns
 /// * bool - True if the path exists, false otherwise
+#[must_use]
 pub fn check_path_exists(path: &str, path_type: &str) -> bool {
     let path_obj = Path::new(path);
     let exists = path_obj.exists();
@@ -64,6 +66,7 @@ pub fn check_path_exists(path: &str, path_type: &str) -> bool {
 ///
 /// # Returns
 /// * String - The normalized path
+#[must_use]
 pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -> String {
     let path_obj = Path::new(path);
     let is_family = register_type == "family";
@@ -87,8 +90,8 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
 
         // Try direct absolute path first
         if family_obj.is_absolute() {
-            check_path_exists(&family_path, "family file (absolute)");
-            if Path::new(&family_path).exists() {
+            let exists = check_path_exists(&family_path, "family file (absolute)");
+            if exists {
                 log::info!("Found family file at absolute path: {}", family_path);
                 return family_path;
             }
@@ -100,8 +103,8 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
         let relative_path = current_dir.join(&family_path);
         let relative_str = relative_path.to_string_lossy().to_string();
 
-        check_path_exists(&relative_str, "family file (relative to current dir)");
-        if relative_path.exists() {
+        let exists = check_path_exists(&relative_str, "family file (relative to current dir)");
+        if exists {
             log::info!(
                 "Found family file relative to current dir: {}",
                 relative_str
@@ -117,8 +120,8 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
                 let cov_path = Path::new(base).join(family_obj.file_name().unwrap_or_default());
                 let cov_str = cov_path.to_string_lossy().to_string();
 
-                check_path_exists(&cov_str, "family file (in base dir)");
-                if cov_path.exists() {
+                let exists = check_path_exists(&cov_str, "family file (in base dir)");
+                if exists {
                     log::info!("Found family file in base dir: {}", cov_str);
                     return cov_str;
                 }
@@ -137,13 +140,13 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
     if path_obj.is_absolute() {
         // If the path is absolute, use it as-is
         log::debug!("Using absolute path for {}: {}", register_type, path);
-        check_path_exists(path, &format!("{register_type} (absolute)"));
+        let _ = check_path_exists(path, &format!("{register_type} (absolute)"));
         path.to_string()
     } else if let Some(base) = base_dir {
         // Check if the path already starts with the base_dir to avoid duplication
         if path.contains(base) {
             log::debug!("Path already contains base_dir ({}): {}", base, path);
-            check_path_exists(path, &format!("{register_type} (with base_dir)"));
+            let _ = check_path_exists(path, &format!("{register_type} (with base_dir)"));
             path.to_string()
         } else {
             let full_path = Path::new(base).join(path).to_string_lossy().to_string();
@@ -153,13 +156,13 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
                 path,
                 full_path
             );
-            check_path_exists(&full_path, &format!("{register_type} (combined)"));
+            let _ = check_path_exists(&full_path, &format!("{register_type} (combined)"));
             full_path
         }
     } else {
         // No base directory provided, use the path as-is
         log::debug!("Using path as-is (no base directory): {}", path);
-        check_path_exists(path, register_type);
+        let _ = check_path_exists(path, register_type);
         path.to_string()
     }
 }

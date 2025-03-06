@@ -20,6 +20,14 @@ use std::process;
 /// 
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>` - Success or error
+/// 
+/// # Errors
+/// May return errors during:
+/// - Command line parsing
+/// - Directory creation
+/// - Logging initialization
+/// - Command execution
+/// - File I/O operations
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Check for the most common command line mistake - missing space after --family-file
     for arg in std::env::args() {

@@ -18,6 +18,13 @@ use std::time::Instant;
 /// 
 /// # Returns
 /// * `IdsResult<()>` - Success or error
+/// 
+/// # Errors
+/// Returns an error if register generation fails due to:
+/// - Invalid configuration parameters
+/// - File I/O errors during data writing
+/// - Memory allocation issues with large datasets
+/// - Path resolution problems
 pub fn handle_generate_registers(
     output_dir: &str,
     num_records: usize,

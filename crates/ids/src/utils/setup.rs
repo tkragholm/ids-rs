@@ -13,6 +13,9 @@ use std::path::Path;
 ///
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>` - Success or error
+///
+/// # Errors
+/// Returns an error if directory creation fails due to filesystem issues
 pub fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     let base_path = Path::new(output_dir);
 
@@ -42,6 +45,9 @@ pub fn setup_directories(output_dir: &str) -> Result<(), Box<dyn std::error::Err
 ///
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>` - Success or error
+///
+/// # Errors
+/// Returns an error if log configuration fails, typically due to file permission issues
 pub fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Generate more obvious log path in current directory and output dir
     let current_log_path = "ids_cli.log"; // Log in current directory for easier discovery
@@ -65,11 +71,11 @@ pub fn configure_logging_with_dir(output_dir: &str) -> Result<(), Box<dyn std::e
 
     // Also configure legacy logging to maintain compatibility
     match core::utils::configure_logging_with_level(Some(&output_log_path), console_level) {
-        Ok(_) => {},
+        Ok(()) => {},
         Err(e) => {
             // Convert the error type
             return Err(Box::new(IdsError::other(format!(
-                "Failed to configure logging: {}", e
+                "Failed to configure logging: {e}"
             ))));
         }
     }

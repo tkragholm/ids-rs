@@ -12,6 +12,12 @@ use std::path::Path;
 /// 
 /// # Returns
 /// * `IdsResult<()>` - Success or error
+/// 
+/// # Errors
+/// Returns an error if configuration file generation fails due to:
+/// - File system issues (e.g., permission denied, disk full)
+/// - File already exists and `force` is not set
+/// - Serialization errors
 pub fn handle_config_command(cmd: &ConfigCommands) -> IdsResult<()> {
     match cmd {
         ConfigCommands::GenerateCovariates { output, force } => {
@@ -35,12 +41,10 @@ fn generate_covariates_config(output_path: &str, force: bool) -> IdsResult<()> {
     let output_file = Path::new(output_path);
     if output_file.exists() && !force {
         ConsoleOutput::error(&format!(
-            "Output file {} already exists. Use --force to overwrite.",
-            output_path
+            "Output file {output_path} already exists. Use --force to overwrite."
         ));
         return Err(crate::error::IdsError::config(format!(
-            "Output file {} already exists. Use --force to overwrite.",
-            output_path
+            "Output file {output_path} already exists. Use --force to overwrite."
         )));
     }
     

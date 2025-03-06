@@ -17,6 +17,12 @@ use std::time::Instant;
 /// 
 /// # Returns
 /// * `IdsResult<()>` - Success or error
+/// 
+/// # Errors
+/// Returns an error if report generation fails, typically due to:
+/// - File system issues when writing output files
+/// - Invalid or corrupt balance results data
+/// - Failure to create HTML templates
 pub fn generate_structured_reports(
     balance_results: &BalanceResults,
     matched_pairs: &[MatchedPairRecord],

@@ -19,6 +19,13 @@ use std::time::Instant;
 /// 
 /// # Returns
 /// * `IdsResult<()>` - Success or error
+/// 
+/// # Errors
+/// Returns an error if sampling fails due to:
+/// - Invalid input CSV format (missing required columns)
+/// - File I/O errors when reading input or writing output
+/// - Insufficient data to perform matching
+/// - Statistical analysis or plot generation failures
 pub fn handle_sampling(
     input: &str,
     controls: usize,
