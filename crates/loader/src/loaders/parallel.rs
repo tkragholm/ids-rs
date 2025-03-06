@@ -58,7 +58,7 @@ impl ParallelLoader {
         if let Ok(entries) = fs::read_dir(&base_dir) {
             for entry in entries.filter_map(Result::ok) {
                 let path = entry.path();
-                if path.extension().map_or(false, |ext| ext == "parquet") {
+                if path.extension().is_some_and(|ext| ext == "parquet") {
                     let filename = path.file_name().unwrap().to_string_lossy().to_string();
                     
                     if filename.starts_with("akm") {
@@ -98,7 +98,7 @@ impl ParallelLoader {
                                                     _ => {}
                                                 }
                                             }
-                                        } else if subpath.extension().map_or(false, |ext| ext == "parquet") {
+                                        } else if subpath.extension().is_some_and(|ext| ext == "parquet") {
                                             let filename = subpath.file_name().unwrap().to_string_lossy().to_string();
                                             if filename == "family.parquet" {
                                                 family_file = Some(subpath);
@@ -201,7 +201,7 @@ impl ParallelLoader {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.filter_map(Result::ok) {
                 let path = entry.path();
-                if path.extension().map_or(false, |ext| ext == "parquet") {
+                if path.extension().is_some_and(|ext| ext == "parquet") {
                     files.push(path);
                 }
             }
@@ -362,7 +362,7 @@ impl ParallelLoader {
                     continue; // Skip the family file we already loaded
                 }
                 
-                if path.extension().map_or(false, |ext| ext == "parquet") {
+                if path.extension().is_some_and(|ext| ext == "parquet") {
                     let filename = path.file_name().unwrap().to_string_lossy().to_string();
                     
                     if filename.starts_with("akm") {

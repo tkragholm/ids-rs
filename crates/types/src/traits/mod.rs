@@ -1,3 +1,10 @@
+//! Traits for the ids-rs codebase
+//!
+//! This module contains trait definitions that provide
+//! standardized interfaces for various components of the system.
+
+mod cacheable;
+
 use crate::{
     error::IdsError,
     family::relations::FamilyRelations,
@@ -5,7 +12,10 @@ use crate::{
 };
 use chrono::{Datelike, NaiveDate};
 
-// Add Store trait definition here directly
+// Re-export all traits
+pub use cacheable::Cacheable;
+
+// Store trait definition here directly
 /// Combined Store trait - both data and family access
 pub trait Store: Send + Sync {
     /// Get a covariate for a person at a specific date

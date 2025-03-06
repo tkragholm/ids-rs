@@ -15,7 +15,7 @@ pub use self::arrow::access::{ArrowAccess, ArrowValue};
 pub use self::error::IdsError;
 pub use self::family::FamilyRelations;
 pub use self::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};
-pub use self::traits::Store;
+pub use self::traits::{Cacheable, Store};
 
 // Re-exports for backwards compatibility
 pub use self::arrow as arrow_utils;

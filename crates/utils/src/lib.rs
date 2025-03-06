@@ -2,6 +2,7 @@ pub mod error;
 pub mod date;
 pub mod string;
 pub mod config;
+pub mod file_patterns;
 pub mod logging;
 
 // Re-export common utilities to make them easier to use
