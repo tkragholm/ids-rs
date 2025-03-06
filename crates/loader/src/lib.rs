@@ -1,9 +1,10 @@
 // Root modules with public re-exports
 mod config;
-mod formats;
+// All modules - make formats and registry public to support testing
+pub mod formats;
 mod loaders;
 mod readers;
-mod registry;
+pub mod registry;
 mod schema;
 mod ui;
 

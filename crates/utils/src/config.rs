@@ -74,7 +74,10 @@ mod tests {
 
     #[test]
     fn test_load_and_save_config() {
-        let mut temp_file = NamedTempFile::new().unwrap();
+        // Create a temp file with a .json extension
+        let temp_file_path = NamedTempFile::new().unwrap().path().with_extension("json");
+        let mut temp_file = std::fs::File::create(&temp_file_path).unwrap();
+        
         let test_config = TestConfig {
             name: "test".to_string(),
             value: 42,
@@ -89,7 +92,7 @@ mod tests {
         .unwrap();
 
         // Test loading config
-        let loaded_config: TestConfig = load_config(temp_file.path()).unwrap();
+        let loaded_config: TestConfig = load_config(&temp_file_path).unwrap();
         assert_eq!(loaded_config, test_config);
 
         // Test saving config
@@ -97,10 +100,10 @@ mod tests {
             name: "modified".to_string(),
             value: 99,
         };
-        save_config(&modified_config, temp_file.path()).unwrap();
+        save_config(&modified_config, &temp_file_path).unwrap();
 
         // Verify save worked by loading again
-        let reloaded_config: TestConfig = load_config(temp_file.path()).unwrap();
+        let reloaded_config: TestConfig = load_config(&temp_file_path).unwrap();
         assert_eq!(reloaded_config, modified_config);
     }
 
@@ -117,11 +120,14 @@ mod tests {
             value: 0,
         };
 
+        // Create default config - add file extension to make it work with the detection
+        let path_with_extension = path.with_extension("json");
+        
         // Create default config
-        create_default_config(&path, default_config.clone()).unwrap();
+        create_default_config(&path_with_extension, default_config.clone()).unwrap();
 
         // Verify it was created correctly
-        let loaded_config: TestConfig = load_config(&path).unwrap();
+        let loaded_config: TestConfig = load_config(&path_with_extension).unwrap();
         assert_eq!(loaded_config, default_config);
     }
 }

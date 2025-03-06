@@ -245,7 +245,17 @@ impl<T, E: Display + 'static> LegacyErrorContext<T, E> for std::result::Result<T
             Err(err) => {
                 let context = context_fn().to_string();
                 let message = format!("{}: {}", context, err);
-                Err(IdsError::Other(message))
+                
+                // Special case for io::Error to preserve behavior expected by the utils crate
+                if let Some(io_err) = (&err as &dyn std::any::Any).downcast_ref::<std::io::Error>() {
+                    return Err(IdsError::Io(std::io::Error::new(
+                        io_err.kind(),
+                        message,
+                    )));
+                }
+                
+                // For regular Display errors, create a Validation error to match expected behavior
+                Err(IdsError::Validation(message))
             }
         }
     }

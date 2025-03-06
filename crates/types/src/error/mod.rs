@@ -58,7 +58,7 @@ pub enum IdsError {
     DataLoading(String),
     
     /// Data access error with source and context
-    #[error("Data access error: {context}")]
+    #[error("Data access error: {context}. Source: {source}")]
     DataAccess {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,

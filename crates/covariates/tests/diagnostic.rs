@@ -2,7 +2,6 @@ use chrono::{Datelike, NaiveDate};
 use covariates::balance::BalanceChecker;
 use log::{debug, info};
 use rand::Rng;
-use std::sync::Arc;
 use types::models::{Covariate, CovariateType};
 
 /// Performance metrics for cache analysis
@@ -305,7 +304,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
             .expect("Invalid date 2023-09-15 - this is a static date that should never fail"), // More recent
     ];
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Show the first few PNRs we're using
     if !pnrs.is_empty() {
@@ -377,12 +376,12 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
         // Create realistic covariates with some randomization
         for id in &all_ids {
             // Generate common components reused for each date
-            let family_size = 2 + rng.gen_range(1..=5); // Family size 3-7
-            let municipality = 100 + rng.gen_range(1..=100); // Municipality
-            let family_type = format!("{}", 1 + rng.gen_range(1..=9)); // Family type
+            let family_size = 2 + rng.random_range(1..=5); // Family size 3-7
+            let municipality = 100 + rng.random_range(1..=100); // Municipality
+            let family_type = format!("{}", 1 + rng.random_range(1..=9)); // Family type
 
-            let income_amount = 200000.0 + rng.gen_range(0.0..800000.0);
-            let education_level = rng.gen_range(10..=30);
+            let income_amount = 200000.0 + rng.random_range(0.0..800000.0);
+            let education_level = rng.random_range(10..=30);
 
             // Generate ISCED level (1-8), with higher levels less common
             let isced_distribution: [(i32, f64); 8] = [
@@ -398,7 +397,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
 
             // Weighted random selection for ISCED level
             let mut cdf = 0.0;
-            let roll: f64 = rng.gen_range(0.0..1.0);
+            let roll: f64 = rng.random_range(0.0..1.0);
             let isced = {
                 let mut selected = 3; // Default to level 3 if selection fails
                 for (level, weight) in &isced_distribution {
@@ -412,7 +411,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
             };
 
             // Generate education years based on ISCED level
-            let education_years = 3.5 + (rng.gen_range(0.0..5.0) as f32);
+            let education_years = 3.5 + (rng.random_range(0.0..5.0) as f32);
 
             // Create occupation covariates with SOCIO13 codes
             // Use values from the socio13.json mapping with weighted distribution
@@ -440,7 +439,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
 
             // Weighted random selection for SOCIO13 code
             let mut socio_cdf = 0.0;
-            let socio_roll: f64 = rng.gen_range(0.0..1.0);
+            let socio_roll: f64 = rng.random_range(0.0..1.0);
             let socio13_code = {
                 let mut selected = "134"; // Default to employment at basic level
                 for (code, weight) in &socio13_codes {
