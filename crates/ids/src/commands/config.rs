@@ -62,7 +62,7 @@ fn generate_covariates_config(output_path: &str, force: bool) -> IdsResult<()> {
     
     // Write to file
     fs::write(output_path, json)?;
-    ConsoleOutput::success(&format!("Configuration written to {}", output_path));
+    ConsoleOutput::success(&format!("Configuration written to {output_path}"));
     
     Ok(())
 }

@@ -93,7 +93,7 @@ fn validate_and_load_data(input: &str) -> IdsResult<()> {
     }
 }
 
-/// Create and initialize the IncidenceDensitySampler
+/// Create and initialize the `IncidenceDensitySampler`
 /// 
 /// # Arguments
 /// * `input` - Path to the input CSV file

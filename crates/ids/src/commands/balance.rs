@@ -33,6 +33,13 @@ pub struct BalanceCheckConfig<'a> {
 /// 
 /// # Returns
 /// * `IdsResult<()>` - Success or error
+///
+/// # Errors
+/// Returns an error if balance checking fails due to:
+/// - Missing files or directories
+/// - Failed data loading
+/// - Invalid covariate processing
+/// - CSV or report generation failures
 pub fn handle_balance_check(config: &BalanceCheckConfig) -> IdsResult<()> {
     ConsoleOutput::section("Covariate Balance Analysis");
 
@@ -72,10 +79,9 @@ pub fn handle_balance_check(config: &BalanceCheckConfig) -> IdsResult<()> {
             all_unique_pnrs.insert(control_pnr.clone());
         }
     }
-    let unique_pnrs_vec: Vec<String> = all_unique_pnrs.into_iter().collect();
 
     ConsoleOutput::key_value("Matched pairs loaded", &matched_pairs.len().to_string());
-    ConsoleOutput::key_value("Unique PNRs found", &unique_pnrs_vec.len().to_string());
+    ConsoleOutput::key_value("Unique PNRs found", &all_unique_pnrs.len().to_string());
     ConsoleOutput::key_value("Loading time", &format_duration_short(loading_time));
 
     // Step 2: Set up custom paths with proper resolution
@@ -131,9 +137,9 @@ pub fn handle_balance_check(config: &BalanceCheckConfig) -> IdsResult<()> {
     let loader = ParquetLoader::new();
     let load_start = Instant::now();
 
-    ConsoleOutput::info(&format!("Loading register data from: {}", base_path));
+    ConsoleOutput::info(&format!("Loading register data from: {base_path}"));
     for (register, path) in &custom_paths {
-        ConsoleOutput::info(&format!("Using custom {} path: {}", register, path));
+        ConsoleOutput::info(&format!("Using custom {register} path: {path}"));
     }
 
     // Load data with the ParquetLoader
@@ -246,7 +252,7 @@ pub fn handle_balance_check(config: &BalanceCheckConfig) -> IdsResult<()> {
     // The CSV is already saved by the comprehensive report in the save_to_files method
     // So we don't need to separately save the metrics
     let csv_path = format!("{}/report/covariate_balance.csv", config.output_dir);
-    ConsoleOutput::info(&format!("Balance metrics saved to {}", csv_path));
+    ConsoleOutput::info(&format!("Balance metrics saved to {csv_path}"));
 
     // Generate structured reports if requested
     if config.generate_structured_output {

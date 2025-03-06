@@ -51,8 +51,7 @@ impl std::error::Error for IdsError {
             Self::Io(e) => Some(e),
             Self::LogInit(e) => Some(e),
             Self::Covariate(e) => Some(e.as_ref()),
-            Self::Types(e) => Some(e),
-            Self::Datagen(e) => Some(e),
+            Self::Types(e) | Self::Datagen(e) => Some(e),
             Self::Serialization(e) => Some(e),
             _ => None,
         }
@@ -194,7 +193,7 @@ impl IdsError {
 // Result type alias for convenience
 pub type IdsResult<T> = Result<T, IdsError>;
 
-/// Trait to convert any error to IdsError
+/// Trait to convert any error to `IdsError`
 ///
 /// # Errors
 /// Returns an `IdsError` with a message that combines the provided message and the original error
