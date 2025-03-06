@@ -45,21 +45,21 @@ impl CovariateProcessor for EducationProcessor {
     }
 
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
-        if covariate.get_type() != CovariateType::Education {
+        if covariate.type_() != CovariateType::Education {
             return None;
         }
 
         // Example implementation for education years
-        covariate.get_education_years().map(|years| years as f64)
+        covariate.education_years().map(|years| years as f64)
     }
 
     fn process_categorical(&self, covariate: &Covariate) -> Option<String> {
-        if covariate.get_type() != CovariateType::Education {
+        if covariate.type_() != CovariateType::Education {
             return None;
         }
 
         // Example implementation for education level
-        covariate.get_education_level().clone()
+        covariate.education_level().clone()
     }
 }
 

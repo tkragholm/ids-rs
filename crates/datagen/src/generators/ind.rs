@@ -17,12 +17,13 @@ impl super::RegisterGenerator {
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
                 .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-                .unwrap(),
+                .map_err(|e| DataGenError::Generation(format!("Failed to set progress bar template: {}", e)))?,
         );
         pb.set_message("Generating IND records...");
 
         // Create income distribution (log-normal for realistic income distribution)
-        let income_dist = LogNormal::new(12.5, 0.5).unwrap(); // Parameters for realistic Danish income levels
+        let income_dist = LogNormal::new(12.5, 0.5)
+            .map_err(|e| DataGenError::Generation(format!("Failed to create income distribution: {}", e)))?;
 
         let schema = Arc::new(Schema::new(vec![
             Field::new("PNR", DataType::Utf8, false),

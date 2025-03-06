@@ -240,7 +240,7 @@ impl CategoricalProcessor {
         F: Fn(&Covariate) -> Option<String> + Send + Sync,
     {
         // Get covariate from store, update cache metrics
-        let covariate_result = checker.get_covariate(pnr, covariate_type, date);
+        let covariate_result = checker.covariate(pnr, covariate_type, date);
 
         if covariate_result.is_ok() {
             let lookup_time = start.elapsed();

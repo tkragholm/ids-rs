@@ -162,7 +162,7 @@ impl DataStore {
 }
 
 impl Store for DataStore {
-    fn get_covariate(
+    fn covariate(
         &self,
         pnr: &str,
         covariate_type: CovariateType,
@@ -174,7 +174,7 @@ impl Store for DataStore {
         }
 
         // If not in cache, get from backend
-        let result = self.backend.get_covariate(pnr, covariate_type, date)?;
+        let result = self.backend.covariate(pnr, covariate_type, date)?;
 
         // Store in cache if found
         if let Some(ref covariate) = result {
@@ -184,8 +184,8 @@ impl Store for DataStore {
         Ok(result)
     }
 
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
-        self.backend.get_family_relations(pnr)
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
+        self.backend.family_relations(pnr)
     }
 
     fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError> {

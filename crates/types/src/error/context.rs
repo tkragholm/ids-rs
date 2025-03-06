@@ -99,8 +99,8 @@ fn map_error_type<E: StdError + Send + Sync + 'static>(error: E, context: &str) 
         // Float parsing errors
         IdsError::type_conversion(format!("{}: {}", context, error))
     } else if let Some(_json_err) = error_ref.downcast_ref::<serde_json::Error>() {
-        // JSON parsing errors - use a standard io error since we can't directly create a JSON error
-        IdsError::Json(serde_json::from_str::<serde_json::Value>(&format!("{{}}")).unwrap_err())
+        // JSON parsing errors - create a proper JSON error
+        IdsError::invalid_format(format!("{}: {}", context, error))
     } else {
         // For any other error type, use DataAccess with rich context
         IdsError::DataAccess {

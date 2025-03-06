@@ -40,6 +40,86 @@ impl ParallelLoader {
     pub const fn with_parallel(parallel: bool) -> Self {
         Self { parallel }
     }
+    
+    /// Lock the shared store and handle mutex errors
+    /// 
+    /// # Arguments
+    /// * `store` - The Arc<Mutex<ArrowStore>> to lock
+    /// * `register_type` - The type of register being processed (for error messages)
+    /// 
+    /// # Returns
+    /// A result containing the locked store guard or an error
+    fn lock_store<'a>(
+        &self,
+        store: &'a Arc<Mutex<ArrowStore>>,
+        register_type: &str,
+    ) -> Result<std::sync::MutexGuard<'a, ArrowStore>, IdsError> {
+        store.lock().map_err(|e| {
+            IdsError::invalid_operation(format!(
+                "Failed to lock store mutex for {} data: {}",
+                register_type, e
+            ))
+        })
+    }
+    
+    /// Handle receiver results with proper error handling
+    /// 
+    /// This consolidates common logic for handling register data from parallel processing
+    /// 
+    /// # Arguments
+    /// * `store` - The shared store 
+    /// * `register_type` - Type of register ("akm", "bef", etc.)
+    /// * `data` - The loaded data
+    /// * `progress` - Progress tracker
+    /// * `add_fn` - Function to add data to store
+    fn handle_receiver_result<F>(
+        &self,
+        store: &Arc<Mutex<ArrowStore>>,
+        register_type: &str,
+        data: Vec<arrow::record_batch::RecordBatch>,
+        progress: &LoaderProgress,
+        add_fn: F,
+    ) where
+        F: FnOnce(&mut ArrowStore) -> Result<(), IdsError>,
+    {
+        progress.set_main_message(&format!("Adding {} data to store", register_type.to_uppercase()));
+        
+        match self.lock_store(store, register_type) {
+            Ok(mut store_guard) => {
+                if let Err(e) = add_fn(&mut store_guard) {
+                    log::error!("Failed to add {} data: {}", register_type.to_uppercase(), e);
+                }
+            },
+            Err(e) => log::error!("{}", e),
+        }
+        
+        progress.inc_main();
+    }
+    
+    /// Safely unwrap store from Arc<Mutex<>> with comprehensive error handling
+    ///
+    /// # Arguments
+    /// * `store` - The Arc<Mutex<ArrowStore>> to unwrap
+    ///
+    /// # Returns
+    /// The unwrapped ArrowStore or an error with descriptive message
+    fn unwrap_store(store: Arc<Mutex<ArrowStore>>) -> Result<ArrowStore, IdsError> {
+        // First try to unwrap from Arc
+        match Arc::try_unwrap(store) {
+            Ok(mutex) => {
+                // Then try to get inner value from Mutex
+                mutex.into_inner().map_err(|e| {
+                    IdsError::invalid_operation(format!(
+                        "Failed to unwrap store from mutex: {}",
+                        e
+                    ))
+                })
+            },
+            Err(_) => Err(IdsError::invalid_operation(
+                "Failed to unwrap store from Arc - still referenced by other threads".to_string(),
+            )),
+        }
+    }
 }
 
 impl StoreLoader for ParallelLoader {
@@ -90,10 +170,15 @@ impl StoreLoader for ParallelLoader {
             // Load sequentially
             progress.set_main_message("Loading AKM data");
             if let Ok(akm_data) = registry::load_akm(&base_path, None) {
-                let mut store_guard = store.lock().unwrap();
-                let current_year = chrono::Local::now().year();
-                if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
-                    log::error!("Failed to add AKM data: {}", e);
+                match self.lock_store(&store, "AKM") {
+                    Ok(mut store_guard) => {
+                        let current_year = chrono::Local::now().year();
+                        if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
+                            log::error!("Failed to add AKM data: {}", e);
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    },
+                    Err(e) => log::error!("{}", e),
                 }
                 progress.inc_main();
             }
@@ -117,9 +202,14 @@ impl StoreLoader for ParallelLoader {
             // Load sequentially
             progress.set_main_message("Loading BEF data");
             if let Ok(bef_data) = registry::load_bef(&base_path, None) {
-                let mut store_guard = store.lock().unwrap();
-                if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
-                    log::error!("Failed to add BEF data: {}", e);
+                match self.lock_store(&store, "BEF") {
+                    Ok(mut store_guard) => {
+                        if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
+                            log::error!("Failed to add BEF data: {}", e);
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    },
+                    Err(e) => log::error!("{}", e),
                 }
                 progress.inc_main();
             }
@@ -143,10 +233,15 @@ impl StoreLoader for ParallelLoader {
             // Load sequentially
             progress.set_main_message("Loading IND data");
             if let Ok(ind_data) = registry::load_ind(&base_path, None) {
-                let mut store_guard = store.lock().unwrap();
-                let current_year = chrono::Local::now().year();
-                if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
-                    log::error!("Failed to add IND data: {}", e);
+                match self.lock_store(&store, "IND") {
+                    Ok(mut store_guard) => {
+                        let current_year = chrono::Local::now().year();
+                        if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
+                            log::error!("Failed to add IND data: {}", e);
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    },
+                    Err(e) => log::error!("{}", e),
                 }
                 progress.inc_main();
             }
@@ -170,9 +265,14 @@ impl StoreLoader for ParallelLoader {
             // Load sequentially
             progress.set_main_message("Loading UDDF data");
             if let Ok(uddf_data) = registry::load_uddf(&base_path, None) {
-                let mut store_guard = store.lock().unwrap();
-                if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data) {
-                    log::error!("Failed to add UDDF data: {}", e);
+                match self.lock_store(&store, "UDDF") {
+                    Ok(mut store_guard) => {
+                        if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data) {
+                            log::error!("Failed to add UDDF data: {}", e);
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    },
+                    Err(e) => log::error!("{}", e),
                 }
                 progress.inc_main();
             }

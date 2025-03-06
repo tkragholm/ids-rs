@@ -5,21 +5,41 @@ edition.workspace = true
 authors.workspace = true
 description.workspace = true
 
+[features]
+default = ["arrow-integration", "serde-support", "logging"]
+arrow-integration = ["arrow", "arrow-array", "arrow-schema", "arrow-select", "parquet"]
+serde-support = ["serde", "serde_json"]
+chrono-nightly = [] # Temporarily disabled due to workspace dependency conflicts
+polars-integration = ["polars"]
+logging = ["log"]
+parallel-processing = ["num_cpus"]
+
 [dependencies]
+# Core dependencies (always included)
+hashbrown.workspace = true
 chrono.workspace = true
-serde.workspace = true
-csv.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 color-eyre = "0.6.2"
-arrow.workspace = true
-arrow-array.workspace = true
-arrow-schema.workspace = true
-arrow-select.workspace = true
-parquet.workspace = true
 dashmap.workspace = true
 rand.workspace = true
-log.workspace = true
-serde_json.workspace = true
-hashbrown.workspace = true
+csv.workspace = true
+
+# Optional dependencies
+arrow = { workspace = true, optional = true }
+arrow-array = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
+arrow-select = { workspace = true, optional = true }
+parquet = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
 num_cpus = { version = "1.16.0", optional = true }
+polars = { version = "0.28", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "arrow_access"
+harness = false

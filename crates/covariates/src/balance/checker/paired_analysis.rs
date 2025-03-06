@@ -97,7 +97,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Demographics,
                         "Family Size",
-                        |cov| cov.get_family_size().map(|val| val as f64),
+                        |cov| cov.family_size().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -109,7 +109,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Demographics,
                         "Municipality",
-                        |cov| cov.get_municipality().map(|val| val as f64),
+                        |cov| cov.municipality().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -123,7 +123,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Demographics,
                         "Age",
-                        |cov| cov.get_age().map(|val| val as f64),
+                        |cov| cov.age().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -135,7 +135,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Demographics,
                         "Children Count",
-                        |cov| cov.get_children_count().map(|val| val as f64),
+                        |cov| cov.children_count().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -149,7 +149,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Income,
                         "Income",
-                        |cov| cov.get_income_amount(),
+                        |cov| cov.income_amount(),
                     ) {
                         batch_details.push(detail);
                     }
@@ -163,7 +163,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Income,
                         "Wage Income",
-                        |cov| cov.get_wage_income(),
+                        |cov| cov.wage_income(),
                     ) {
                         batch_details.push(detail);
                     }
@@ -175,7 +175,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Income,
                         "Employment Status",
-                        |cov| cov.get_employment_status().map(|val| val as f64),
+                        |cov| cov.employment_status().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -190,7 +190,7 @@ impl BalanceChecker {
                         CovariateType::Education,
                         "Education Level",
                         |cov| {
-                            cov.get_education_level()
+                            cov.education_level()
                                 .and_then(|level| level.parse::<f64>().ok())
                         },
                     ) {
@@ -205,7 +205,7 @@ impl BalanceChecker {
                         CovariateType::Education,
                         "ISCED Level",
                         |cov| {
-                            cov.get_isced_code()
+                            cov.isced_code()
                                 .and_then(|code| {
                                     // Extract the first character which should be the ISCED level
                                     if !code.is_empty() {
@@ -226,7 +226,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Education,
                         "Education Years",
-                        |cov| cov.get_education_years().map(|y| y as f64),
+                        |cov| cov.education_years().map(|y| y as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -243,7 +243,7 @@ impl BalanceChecker {
                         CovariateType::Occupation,
                         "SOCIO13 Value",
                         |cov| {
-                            cov.get_occupation_code()
+                            cov.occupation_code()
                                 .and_then(|code| code.parse::<f64>().ok())
                         },
                     ) {
@@ -259,7 +259,7 @@ impl BalanceChecker {
                         CovariateType::Occupation,
                         "Classification System",
                         |cov| {
-                            cov.get_classification().map(|class| {
+                            cov.classification().map(|class| {
                                 // Simple hash to create a numeric value for comparison
                                 let mut hash = 0.0;
                                 for (i, c) in class.chars().enumerate() {
@@ -281,7 +281,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Occupation,
                         "SOCIO",
-                        |cov| cov.get_socio().map(|val| val as f64),
+                        |cov| cov.socio().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -293,7 +293,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Occupation,
                         "SOCIO02",
-                        |cov| cov.get_socio02().map(|val| val as f64),
+                        |cov| cov.socio02().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -305,7 +305,7 @@ impl BalanceChecker {
                         *date,
                         CovariateType::Occupation,
                         "Previous Socioeconomic Status",
-                        |cov| cov.get_pre_socio().map(|val| val as f64),
+                        |cov| cov.pre_socio().map(|val| val as f64),
                     ) {
                         batch_details.push(detail);
                     }
@@ -348,12 +348,12 @@ impl BalanceChecker {
         value_extractor: impl Fn(&Covariate) -> Option<f64>,
     ) -> Result<Option<MatchedPairDetail>, IdsError> {
         let case_value = self
-            .get_covariate(case_pnr, covariate_type, date)?
+            .covariate(case_pnr, covariate_type, date)?
             .as_ref()
             .and_then(&value_extractor);
 
         let control_value = self
-            .get_covariate(control_pnr, covariate_type, date)?
+            .covariate(control_pnr, covariate_type, date)?
             .as_ref()
             .and_then(&value_extractor);
 

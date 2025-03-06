@@ -122,57 +122,57 @@ impl ConfigurableVariableProcessorImpl {
 
     /// Process a covariate value based on the accessor method name
     fn process_value(&self, covariate: &Covariate) -> Option<f64> {
-        if covariate.get_type() != self.covariate_type {
+        if covariate.type_() != self.covariate_type {
             return None;
         }
 
         match self.accessor.as_str() {
-            // Demographics accessors
-            "get_family_size" => covariate.get_family_size().map(|v| v as f64),
-            "get_municipality" => covariate.get_municipality().map(|v| v as f64),
-            "get_family_type" => covariate
-                .get_family_type()
+            // Demographics accessors - support both old and new method names
+            "get_family_size" | "family_size" => covariate.family_size().map(|v| v as f64),
+            "get_municipality" | "municipality" => covariate.municipality().map(|v| v as f64),
+            "get_family_type" | "family_type" => covariate
+                .family_type()
                 .and_then(|v| v.parse::<f64>().ok()),
-            "get_civil_status" => covariate
-                .get_civil_status()
-                .map(|v| v.bytes().next().unwrap_or(0) as f64), // Using unwrap_or which is safe
-            "get_gender" => covariate
-                .get_gender()
-                .map(|v| v.bytes().next().unwrap_or(0) as f64), // Using unwrap_or which is safe
-            "get_citizenship" => covariate.get_citizenship().map(|v| {
+            "get_civil_status" | "civil_status" => covariate
+                .civil_status()
+                .map(|v| v.bytes().next().unwrap_or(0) as f64), // unwrap_or(0) is safe - default to 0 if empty string
+            "get_gender" | "gender" => covariate
+                .gender()
+                .map(|v| v.bytes().next().unwrap_or(0) as f64), // unwrap_or(0) is safe - default to 0 if empty string
+            "get_citizenship" | "citizenship" => covariate.citizenship().map(|v| {
                 let mut hash = 0.0;
                 for (i, b) in v.bytes().enumerate() {
                     hash += (b as f64) * (i + 1) as f64;
                 }
                 hash
             }),
-            "get_age" => covariate.get_age().map(|v| v as f64),
-            "get_children_count" => covariate.get_children_count().map(|v| v as f64),
+            "get_age" | "age" => covariate.age().map(|v| v as f64),
+            "get_children_count" | "children_count" => covariate.children_count().map(|v| v as f64),
 
             // Income accessors
-            "get_income_amount" => covariate.get_income_amount(),
-            "get_wage_income" => covariate.get_wage_income(),
-            "get_employment_status" => covariate.get_employment_status().map(|v| v as f64),
+            "get_income_amount" | "income_amount" => covariate.income_amount(),
+            "get_wage_income" | "wage_income" => covariate.wage_income(),
+            "get_employment_status" | "employment_status" => covariate.employment_status().map(|v| v as f64),
 
             // Education accessors
-            "get_education_level" => covariate
-                .get_education_level()
+            "get_education_level" | "education_level" => covariate
+                .education_level()
                 .map(|v| self.categorical_to_numeric(&v)),
-            "get_isced_code" => covariate
-                .get_isced_code()
+            "get_isced_code" | "isced_code" => covariate
+                .isced_code()
                 .map(|v| self.categorical_to_numeric(&v)),
-            "get_education_years" => covariate.get_education_years().map(|v| v as f64),
+            "get_education_years" | "education_years" => covariate.education_years().map(|v| v as f64),
 
             // Occupation accessors
-            "get_occupation_code" => covariate
-                .get_occupation_code()
+            "get_occupation_code" | "occupation_code" => covariate
+                .occupation_code()
                 .map(|v| self.categorical_to_numeric(&v)),
-            "get_classification" => covariate
-                .get_classification()
+            "get_classification" | "classification" => covariate
+                .classification()
                 .map(|v| self.categorical_to_numeric(&v)),
-            "get_socio" => covariate.get_socio().map(|v| v as f64),
-            "get_socio02" => covariate.get_socio02().map(|v| v as f64),
-            "get_pre_socio" => covariate.get_pre_socio().map(|v| v as f64),
+            "get_socio" | "socio" => covariate.socio().map(|v| v as f64),
+            "get_socio02" | "socio02" => covariate.socio02().map(|v| v as f64),
+            "get_pre_socio" | "pre_socio" => covariate.pre_socio().map(|v| v as f64),
 
             // Unknown accessor
             _ => {
@@ -184,39 +184,39 @@ impl ConfigurableVariableProcessorImpl {
 
     /// Process a categorical value based on the accessor method name
     fn process_categorical_value(&self, covariate: &Covariate) -> Option<String> {
-        if covariate.get_type() != self.covariate_type {
+        if covariate.type_() != self.covariate_type {
             return None;
         }
 
         let raw_value = match self.accessor.as_str() {
-            // Demographics accessors
-            "get_family_size" => return covariate.get_family_size().map(|v| v.to_string()),
-            "get_municipality" => return covariate.get_municipality().map(|v| v.to_string()),
-            "get_family_type" => covariate.get_family_type(),
-            "get_civil_status" => covariate.get_civil_status(),
-            "get_gender" => covariate.get_gender(),
-            "get_citizenship" => covariate.get_citizenship(),
-            "get_age" => return covariate.get_age().map(|v| v.to_string()),
-            "get_children_count" => return covariate.get_children_count().map(|v| v.to_string()),
+            // Demographics accessors - support both old and new method names
+            "get_family_size" | "family_size" => return covariate.family_size().map(|v| v.to_string()),
+            "get_municipality" | "municipality" => return covariate.municipality().map(|v| v.to_string()),
+            "get_family_type" | "family_type" => covariate.family_type(),
+            "get_civil_status" | "civil_status" => covariate.civil_status(),
+            "get_gender" | "gender" => covariate.gender(),
+            "get_citizenship" | "citizenship" => covariate.citizenship(),
+            "get_age" | "age" => return covariate.age().map(|v| v.to_string()),
+            "get_children_count" | "children_count" => return covariate.children_count().map(|v| v.to_string()),
 
             // Income accessors
-            "get_income_amount" => return covariate.get_income_amount().map(|v| v.to_string()),
-            "get_wage_income" => return covariate.get_wage_income().map(|v| v.to_string()),
-            "get_employment_status" => {
-                return covariate.get_employment_status().map(|v| v.to_string())
+            "get_income_amount" | "income_amount" => return covariate.income_amount().map(|v| v.to_string()),
+            "get_wage_income" | "wage_income" => return covariate.wage_income().map(|v| v.to_string()),
+            "get_employment_status" | "employment_status" => {
+                return covariate.employment_status().map(|v| v.to_string())
             }
 
             // Education accessors
-            "get_education_level" => covariate.get_education_level(),
-            "get_isced_code" => covariate.get_isced_code(),
-            "get_education_years" => return covariate.get_education_years().map(|v| v.to_string()),
+            "get_education_level" | "education_level" => covariate.education_level(),
+            "get_isced_code" | "isced_code" => covariate.isced_code(),
+            "get_education_years" | "education_years" => return covariate.education_years().map(|v| v.to_string()),
 
             // Occupation accessors
-            "get_occupation_code" => covariate.get_occupation_code(),
-            "get_classification" => covariate.get_classification(),
-            "get_socio" => return covariate.get_socio().map(|v| v.to_string()),
-            "get_socio02" => return covariate.get_socio02().map(|v| v.to_string()),
-            "get_pre_socio" => return covariate.get_pre_socio().map(|v| v.to_string()),
+            "get_occupation_code" | "occupation_code" => covariate.occupation_code(),
+            "get_classification" | "classification" => covariate.classification(),
+            "get_socio" | "socio" => return covariate.socio().map(|v| v.to_string()),
+            "get_socio02" | "socio02" => return covariate.socio02().map(|v| v.to_string()),
+            "get_pre_socio" | "pre_socio" => return covariate.pre_socio().map(|v| v.to_string()),
 
             // Unknown accessor
             _ => {
@@ -481,9 +481,10 @@ mod tests {
         let factory = ProcessorFactory::new(config);
 
         // Create a processor for demographics
-        let processor = factory
-            .create_processor(CovariateType::Demographics)
-            .expect("Demographics processor should be available in default config");
+        let processor = match factory.create_processor(CovariateType::Demographics) {
+            Some(p) => p,
+            None => panic!("Demographics processor should be available in default config"),
+        };
 
         assert_eq!(processor.name(), "Demographics");
         assert_eq!(processor.covariate_type(), CovariateType::Demographics);
@@ -495,9 +496,10 @@ mod tests {
         let factory = ProcessorFactory::new(config);
 
         // Create a processor for a specific variable
-        let processor = factory
-            .create_variable_processor(CovariateType::Demographics, "Age")
-            .expect("Age variable processor should be available in default config");
+        let processor = match factory.create_variable_processor(CovariateType::Demographics, "Age") {
+            Some(p) => p,
+            None => panic!("Age variable processor should be available in default config"),
+        };
 
         assert_eq!(processor.name(), "Age");
         assert_eq!(processor.covariate_type(), CovariateType::Demographics);

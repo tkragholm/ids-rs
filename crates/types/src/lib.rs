@@ -1,31 +1,105 @@
-// Core modules
-pub mod arrow;
-pub mod config;
+//! # IDS Types
+//!
+//! Core type definitions and foundational abstractions for the IDS-RS workspace.
+//!
+//! This crate serves as the foundation for the entire IDS-RS system, providing:
+//!
+//! - Common data types and models for epidemiological research
+//! - Trait definitions used across the codebase
+//! - Error handling patterns and standardization
+//! - Storage abstractions for different data backends
+//! - Utilities for working with Arrow data
+//!
+//! ## Getting Started
+//!
+//! The easiest way to get started is to import the prelude module, which
+//! provides all commonly used types and traits:
+//!
+//! ```rust
+//! use types::prelude::*;
+//!
+//! // Create a data store
+//! let mut store = DataStore::new();
+//!
+//! // Work with covariates
+//! let education = EducationBuilder::new("higher")
+//!     .with_years(16.0)
+//!     .build();
+//!
+//! let demographics = DemographicsBuilder::new(2, 101, "nuclear")
+//!     .with_age(42)
+//!     .with_gender("M")
+//!     .build();
+//!
+//! // Combine them using the builder pattern
+//! let combined_covariate = CovariateBuilder::new()
+//!     .with_education(education)
+//!     .with_demographics(demographics)
+//!     .build();
+//! ```
+//!
+//! ## Core Components
+//!
+//! - **Models**: Data structures for demographic, health, and registry data
+//! - **Traits**: Interfaces for covariate processing, data access, and storage
+//! - **Error Handling**: Standardized error types and propagation patterns
+//! - **Storage**: Abstractions for data storage and retrieval
+//! - **Arrow Utilities**: Helpers for working with Apache Arrow data format
+//!
+//! ## Feature Flags
+//!
+//! The following feature flags will be available in future releases:
+//!
+//! - `arrow-integration` - Integration with Apache Arrow (enabled by default)
+//! - `serde-support` - Serialization/deserialization via serde (enabled by default)
+//! - `chrono-nightly` - Enables nightly chrono features for improved date handling
+//! - `polars-integration` - Integration with the polars DataFrame library
+//! - `logging` - Logging functionality (enabled by default)
+
+// Core public modules
 pub mod error;
-pub mod family;
 pub mod models;
 pub mod prelude;
-pub mod store;
+pub mod storage;
 pub mod traits;
+pub mod utils;
+
+// Internal modules - considered implementation details
+// Only public for backward compatibility
+#[doc(hidden)]
+pub mod arrow;
+#[doc(hidden)]
+pub mod config;
+#[doc(hidden)]
+pub mod family;
+#[doc(hidden)]
+pub mod store;
+#[doc(hidden)]
 pub mod translation;
 
-// New refactored modules
-pub mod storage;
-
-// Re-export commonly used types
-pub use self::storage::arrow::access::ArrowAccess;
-pub use self::error::IdsError;
-pub use self::family::FamilyRelations;
+// Re-export essential types at the crate root
+// These are the most commonly used types that users will need
+pub use self::error::{IdsError, Result};
 pub use self::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};
-pub use self::models::pnr::{PnrPool, PersonInfo, ParentPair, FamilyInfo};
-pub use self::traits::{Cacheable, Store};
+pub use self::models::{Pnr, PnrPool};
+pub use self::store::DataStore;
+#[cfg(feature = "arrow-integration")]
+pub use self::storage::arrow::ArrowBackend;
+pub use self::traits::{Store, DateHelpers};
 
 // Re-exports for backwards compatibility
+// These will be deprecated in a future release
+#[doc(hidden)]
 pub use self::arrow as arrow_utils;
+#[doc(hidden)]
 pub use self::error::prelude::ErrorContext as Context;
+#[doc(hidden)]
 pub use self::store as storage_old;
 
 // Type aliases for backward compatibility during transition
+#[doc(hidden)]
 pub type OldFamilyRelations = family::relations::FamilyRelations;
+#[doc(hidden)]
 pub type SamplingError = error::IdsError;
+#[doc(hidden)]
 pub type IdsResult<T> = error::Result<T>;

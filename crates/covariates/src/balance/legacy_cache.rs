@@ -207,8 +207,8 @@ impl CovariateCache {
         let cov_type = key.covariate_type;
         let date = key.date;
 
-        // Load from store
-        match store.get_covariate(pnr, cov_type, date) {
+        // Load from store using the new method name without the 'get_' prefix
+        match store.covariate(pnr, cov_type, date) {
             Ok(value) => {
                 // Cache the result in both caches
                 self.insert(key, value.clone());
@@ -271,7 +271,7 @@ impl CovariateCache {
                 let mut batch_results = Vec::with_capacity(chunk.len());
 
                 for (key, pnr, cov_type, date) in chunk {
-                    if let Ok(value) = store.get_covariate(pnr, *cov_type, *date) {
+                    if let Ok(value) = store.covariate(pnr, *cov_type, *date) {
                         batch_results.push((key.clone(), value.clone()));
                     }
                 }

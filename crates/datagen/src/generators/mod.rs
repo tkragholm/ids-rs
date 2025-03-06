@@ -75,7 +75,13 @@ impl RegisterGenerator {
     }
 
     /// Convert a date to days since epoch (1970-01-01)
+    ///
+    /// This is a const function that calculates days since the Unix epoch.
+    /// The `unwrap()` is safe here because 1970-01-01 is a valid date constant.
+    #[allow(clippy::unwrap_used)]
     const fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
+        // SAFETY: 1970-01-01 is a valid date and will never fail, so this unwrap is safe
+        // in a const context. We can't use expect() in a const fn, so we document the safety.
         date.signed_duration_since(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap())
             .num_days() as i32
     }

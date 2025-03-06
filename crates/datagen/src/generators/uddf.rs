@@ -37,7 +37,7 @@ impl super::RegisterGenerator {
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
                 .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-                .unwrap(),
+                .map_err(|e| DataGenError::Generation(format!("Failed to set progress bar template: {}", e)))?,
         );
         pb.set_message("Generating UDDF records...");
 

@@ -80,7 +80,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Family Size".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_family_size".to_string(),
+                accessor: "family_size".to_string(),
                 translation: None,
                 description: Some("Size of the family unit".to_string()),
                 default_value: None,
@@ -89,7 +89,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Municipality".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_municipality".to_string(),
+                accessor: "municipality".to_string(),
                 translation: None,
                 description: Some("Municipality code".to_string()),
                 default_value: None,
@@ -98,7 +98,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Family Type".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_family_type".to_string(),
+                accessor: "family_type".to_string(),
                 translation: Some("family_type".to_string()),
                 description: Some("Type of family structure".to_string()),
                 default_value: None,
@@ -107,7 +107,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Civil Status".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_civil_status".to_string(),
+                accessor: "civil_status".to_string(),
                 translation: Some("civst".to_string()),
                 description: Some("Civil status code".to_string()),
                 default_value: None,
@@ -116,7 +116,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Gender".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_gender".to_string(),
+                accessor: "gender".to_string(),
                 translation: None,
                 description: Some("Gender code".to_string()),
                 default_value: None,
@@ -125,7 +125,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Citizenship".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_citizenship".to_string(),
+                accessor: "citizenship".to_string(),
                 translation: Some("statsb".to_string()),
                 description: Some("Citizenship/country code".to_string()),
                 default_value: None,
@@ -134,7 +134,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Age".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_age".to_string(),
+                accessor: "age".to_string(),
                 translation: None,
                 description: Some("Age in years".to_string()),
                 default_value: None,
@@ -143,7 +143,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Children Count".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_children_count".to_string(),
+                accessor: "children_count".to_string(),
                 translation: None,
                 description: Some("Number of children".to_string()),
                 default_value: None,
@@ -156,7 +156,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Income Amount".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_income_amount".to_string(),
+                accessor: "income_amount".to_string(),
                 translation: None,
                 description: Some("Total income amount".to_string()),
                 default_value: Some("0".to_string()),
@@ -165,7 +165,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Wage Income".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_wage_income".to_string(),
+                accessor: "wage_income".to_string(),
                 translation: None,
                 description: Some("Income from wages (LOENMV_13)".to_string()),
                 default_value: Some("0".to_string()),
@@ -174,7 +174,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Employment Status".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_employment_status".to_string(),
+                accessor: "employment_status".to_string(),
                 translation: Some("beskst13".to_string()),
                 description: Some("Employment status code (BESKST13)".to_string()),
                 default_value: None,
@@ -187,7 +187,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Education Level".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_education_level".to_string(),
+                accessor: "education_level".to_string(),
                 translation: None,
                 description: Some("Highest education level attained".to_string()),
                 default_value: None,
@@ -196,7 +196,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "ISCED Code".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_isced_code".to_string(),
+                accessor: "isced_code".to_string(),
                 translation: None,
                 description: Some("International Standard Classification of Education code".to_string()),
                 default_value: None,
@@ -205,7 +205,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Education Years".to_string(),
                 variable_type: VariableType::Numeric,
-                accessor: "get_education_years".to_string(),
+                accessor: "education_years".to_string(),
                 translation: None,
                 description: Some("Years of education".to_string()),
                 default_value: None,
@@ -218,7 +218,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Occupation Code".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_occupation_code".to_string(),
+                accessor: "occupation_code".to_string(),
                 translation: None,
                 description: Some("Occupation classification code".to_string()),
                 default_value: None,
@@ -227,7 +227,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "Classification".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_classification".to_string(),
+                accessor: "classification".to_string(),
                 translation: None,
                 description: Some("Classification system used for the occupation code".to_string()),
                 default_value: None,
@@ -236,7 +236,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "SOCIO".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_socio".to_string(),
+                accessor: "socio".to_string(),
                 translation: Some("socio13".to_string()),
                 description: Some("Socioeconomic classification (SOCIO)".to_string()),
                 default_value: None,
@@ -245,7 +245,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "SOCIO02".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_socio02".to_string(),
+                accessor: "socio02".to_string(),
                 translation: None,
                 description: Some("Alternative socioeconomic classification (SOCIO02)".to_string()),
                 default_value: None,
@@ -254,7 +254,7 @@ impl CovariatesConfig {
             CovariateVariableConfig {
                 name: "PRE_SOCIO".to_string(),
                 variable_type: VariableType::Categorical,
-                accessor: "get_pre_socio".to_string(),
+                accessor: "pre_socio".to_string(),
                 translation: Some("pre_socio".to_string()),
                 description: Some("Previous socioeconomic classification (PRE_SOCIO)".to_string()),
                 default_value: None,

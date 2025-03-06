@@ -45,21 +45,21 @@ impl CovariateProcessor for OccupationProcessor {
     }
     
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
-        if covariate.get_type() != CovariateType::Occupation {
+        if covariate.type_() != CovariateType::Occupation {
             return None;
         }
 
         // Example: use socio as numeric value
-        covariate.get_socio().map(|socio| socio as f64)
+        covariate.socio().map(|socio| socio as f64)
     }
 
     fn process_categorical(&self, covariate: &Covariate) -> Option<String> {
-        if covariate.get_type() != CovariateType::Occupation {
+        if covariate.type_() != CovariateType::Occupation {
             return None;
         }
 
         // Example: use occupation code as categorical
-        covariate.get_occupation_code().clone()
+        covariate.occupation_code().clone()
     }
 }
 

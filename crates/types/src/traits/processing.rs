@@ -148,12 +148,12 @@ impl<T: CovariateProcessor> CovariateProcessorExt for T {
     }
     
     fn process_all_years(&self, store: &dyn Store) -> Result<Vec<Covariate>> {
-        let years = store.get_years();
+        let years = store.years();
         self.process_years(store, &years)
     }
     
     fn latest_processable_year(&self, store: &dyn Store) -> Option<i32> {
-        store.get_years().into_iter()
+        store.years().into_iter()
             .filter(|&year| self.can_process(store, year))
             .max()
     }

@@ -9,6 +9,10 @@ mod conversion;
 mod macros;
 #[cfg(doc)]
 pub mod example; // Only included for documentation, not part of public API
+#[cfg(test)]
+pub mod test_helpers; // Testing utilities
+#[cfg(test)]
+mod legacy_compat; // Tests for backward compatibility
 
 // Re-export from submodules
 pub use self::context::{ErrorContext, LegacyErrorContext, with_context, with_context_details};
@@ -103,6 +107,10 @@ pub enum IdsError {
     
     #[error("Plotting error: {0}")]
     Plotting(String),
+    
+    /// Schema-related errors (validation, mismatch, etc.)
+    #[error("Schema error: {0}")]
+    Schema(String),
     
     // Catch-all for other errors
     #[error("Other error: {0}")]
@@ -444,6 +452,96 @@ impl IdsError {
             source: Box::new(err),
             context: context.as_ref().to_string(),
         }
+    }
+    
+    /// Create an error for missing or invalid register data
+    /// 
+    /// # Arguments
+    /// * `register_type` - The type of register (e.g., "AKM", "BEF")
+    /// * `details` - Additional details about what's missing
+    /// 
+    /// # Returns
+    /// A new `IdsError::DataLoading` with a formatted message
+    #[must_use]
+    pub fn register_data(register_type: impl ToString, details: impl ToString) -> Self {
+        Self::DataLoading(format!(
+            "Invalid {} register data: {}", 
+            register_type.to_string(),
+            details.to_string()
+        ))
+    }
+    
+    /// Create an error for schema mismatches
+    /// 
+    /// # Arguments
+    /// * `expected` - The expected schema or field
+    /// * `actual` - The actual schema or field found (or "not found")
+    /// 
+    /// # Returns
+    /// A new `IdsError::Schema` with a formatted message
+    #[must_use]
+    pub fn schema_mismatch(expected: impl ToString, actual: impl ToString) -> Self {
+        Self::Schema(format!(
+            "Schema mismatch: expected {}, found {}", 
+            expected.to_string(),
+            actual.to_string()
+        ))
+    }
+    
+    /// Create an error for failed data lookup operations
+    /// 
+    /// # Arguments
+    /// * `entity_type` - The type of entity being looked up (PNR, column, etc.)
+    /// * `identifier` - The identifier that wasn't found
+    /// * `source` - The source being searched (register, dataset, etc.)
+    /// 
+    /// # Returns
+    /// A new `IdsError::MissingData` with a formatted message
+    #[must_use]
+    pub fn lookup_failed(
+        entity_type: impl ToString, 
+        identifier: impl ToString,
+        source: impl ToString
+    ) -> Self {
+        Self::MissingData(format!(
+            "Failed to find {} '{}' in {}", 
+            entity_type.to_string(),
+            identifier.to_string(),
+            source.to_string()
+        ))
+    }
+    
+    /// Create an error for invalid data types or conversions
+    /// 
+    /// # Arguments
+    /// * `source_type` - The source data type
+    /// * `target_type` - The target data type
+    /// * `details` - Optional additional details about the conversion failure
+    /// 
+    /// # Returns
+    /// A new `IdsError::TypeConversion` with a formatted message
+    #[must_use]
+    pub fn type_conversion_detailed(
+        source_type: impl ToString,
+        target_type: impl ToString,
+        details: Option<impl ToString>
+    ) -> Self {
+        let msg = if let Some(details) = details {
+            format!(
+                "Failed to convert {} to {}: {}", 
+                source_type.to_string(),
+                target_type.to_string(),
+                details.to_string()
+            )
+        } else {
+            format!(
+                "Failed to convert {} to {}", 
+                source_type.to_string(),
+                target_type.to_string()
+            )
+        };
+        
+        Self::type_conversion(msg)
     }
 }
 

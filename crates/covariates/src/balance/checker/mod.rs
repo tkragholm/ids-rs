@@ -47,7 +47,7 @@ impl BalanceChecker {
     }
 
     /// Get a covariate value for a specific PNR, type, and date
-    pub fn get_covariate(
+    pub fn covariate(
         &self,
         pnr: &str,
         covariate_type: CovariateType,
@@ -55,6 +55,17 @@ impl BalanceChecker {
     ) -> Result<Option<Covariate>, IdsError> {
         let key = CacheKey::new(pnr, covariate_type, date);
         self.cache.get_or_load(&*self.store, key)
+    }
+    
+    /// Backward compatibility method, deprecated
+    #[deprecated(note = "Use covariate method instead")]
+    pub fn get_covariate(
+        &self,
+        pnr: &str,
+        covariate_type: CovariateType,
+        date: NaiveDate,
+    ) -> Result<Option<Covariate>, IdsError> {
+        self.covariate(pnr, covariate_type, date)
     }
 
     /// Clears the covariate cache

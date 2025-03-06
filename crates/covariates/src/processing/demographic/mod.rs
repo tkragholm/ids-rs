@@ -48,21 +48,21 @@ impl CovariateProcessor for DemographicsProcessor {
     }
     
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
-        if covariate.get_type() != CovariateType::Demographics {
+        if covariate.type_() != CovariateType::Demographics {
             return None;
         }
 
         // Example implementation for age
-        covariate.get_age().map(|age| age as f64)
+        covariate.age().map(|age| age as f64)
     }
 
     fn process_categorical(&self, covariate: &Covariate) -> Option<String> {
-        if covariate.get_type() != CovariateType::Demographics {
+        if covariate.type_() != CovariateType::Demographics {
             return None;
         }
 
         // Example implementation for gender
-        covariate.get_gender().clone()
+        covariate.gender().clone()
     }
 }
 

@@ -81,7 +81,7 @@ impl TimeVaryingBackend {
 }
 
 impl Store for TimeVaryingBackend {
-    fn get_covariate(
+    fn covariate(
         &self,
         pnr: &str,
         covariate_type: CovariateType,
@@ -90,7 +90,7 @@ impl Store for TimeVaryingBackend {
         Ok(self.get_latest_value(pnr, covariate_type, date))
     }
 
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
         self.family_data.get(pnr)
     }
 

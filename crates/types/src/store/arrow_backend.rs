@@ -406,7 +406,11 @@ impl ArrowBackend {
                 };
                 
                 let month: u32 = if p.len() > 5 {
-                    p[4..6].parse().unwrap_or(12) // Default to December for invalid month
+                    // Parse month safely, defaulting to December (12) for invalid input
+                    match p[4..6].parse::<u32>() {
+                        Ok(m) if m >= 1 && m <= 12 => m, // Valid month range
+                        _ => 12, // Default to December for invalid month
+                    }
                 } else {
                     12 // Default to December when no month specified
                 };
@@ -509,7 +513,7 @@ impl ArrowBackend {
 }
 
 impl Store for ArrowBackend {
-    fn get_covariate(
+    fn covariate(
         &self,
         pnr: &str,
         covariate_type: CovariateType,
@@ -523,7 +527,7 @@ impl Store for ArrowBackend {
         }
     }
 
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
         self.family_data.get(pnr)
     }
 

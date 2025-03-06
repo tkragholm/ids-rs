@@ -3,6 +3,57 @@
 //! This file contains practical examples of using the error handling macros
 //! and utilities for the IDS codebase. It is not meant to be used directly,
 //! but rather as a reference and documentation for developers.
+//!
+//! # Domain-Specific Error Examples
+//!
+//! The error module provides specialized error factory methods for common
+//! error scenarios in the IDS codebase:
+//!
+//! ```rust
+//! use types::error::{IdsError, Result};
+//!
+//! // Example function using register-specific error methods
+//! fn load_register_data(register_type: &str, path: &str) -> Result<Vec<u8>> {
+//!     // Validate register type
+//!     match register_type {
+//!         "AKM" | "BEF" | "IND" | "UDDF" => {},
+//!         _ => return Err(IdsError::register_data(
+//!             register_type,
+//!             "unsupported register type"
+//!         )),
+//!     }
+//!
+//!     // Check if file exists
+//!     if !std::path::Path::new(path).exists() {
+//!         return Err(IdsError::lookup_failed(
+//!             "file", path, "filesystem"
+//!         ));
+//!     }
+//!
+//!     // Example schema validation
+//!     if register_type == "AKM" {
+//!         let expected_fields = vec!["PNR", "SOCIO13", "VERSION"];
+//!         let actual_fields = vec!["PNR", "SOCIO", "UNKNOWN"];
+//!         
+//!         if actual_fields != expected_fields {
+//!             return Err(IdsError::schema_mismatch(
+//!                 format!("{:?}", expected_fields),
+//!                 format!("{:?}", actual_fields)
+//!             ));
+//!         }
+//!     }
+//!
+//!     // Example type conversion with detailed context
+//!     let raw_value = "abc123";
+//!     let _numeric_value = raw_value.parse::<i32>()
+//!         .map_err(|_| IdsError::type_conversion_detailed(
+//!             "string", "i32", Some(format!("invalid format: '{}'", raw_value))
+//!         ))?;
+//!
+//!     // Success case
+//!     Ok(vec![1, 2, 3])
+//! }
+//! ```
 
 use std::path::Path;
 use std::fs::File;

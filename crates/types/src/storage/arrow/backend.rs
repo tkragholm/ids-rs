@@ -698,7 +698,7 @@ impl ArrowBackend {
 }
 
 impl Store for ArrowBackend {
-    fn get_covariate(
+    fn covariate(
         &self,
         pnr: &str,
         covariate_type: CovariateType,
@@ -712,7 +712,7 @@ impl Store for ArrowBackend {
         }
     }
 
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
         self.family_data.get(pnr)
     }
 
