@@ -1,25 +1,25 @@
 use crate::core::{IdsError, IdsResult};
+use core::sampler::IncidenceDensitySampler;
 use core::utils::console::{format_duration_short, ConsoleOutput};
 use core::utils::{load_records, validate_csv_format, MatchingCriteria};
-use core::sampler::IncidenceDensitySampler;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
 /// Handle the sampling command
-/// 
+///
 /// This function performs incidence density sampling to match controls to cases.
-/// 
+///
 /// # Arguments
 /// * `input` - Input CSV file containing case data
 /// * `controls` - Number of controls to match per case
 /// * `birth_window` - Birth date matching window in days
 /// * `parent_window` - Parent age matching window in days
 /// * `output_dir` - Directory where results will be saved
-/// 
+///
 /// # Returns
 /// * `IdsResult<()>` - Success or error
-/// 
+///
 /// # Errors
 /// Returns an error if sampling fails due to:
 /// - Invalid input CSV format (missing required columns)
@@ -36,7 +36,7 @@ pub fn handle_sampling(
     ConsoleOutput::section("Incidence Density Sampling");
 
     let start = Instant::now();
-    
+
     // Validate input data
     ConsoleOutput::subsection("Data Validation");
     validate_and_load_data(input)?;
@@ -52,7 +52,7 @@ pub fn handle_sampling(
 
     // Create and initialize sampler
     let sampler = create_sampler(input, criteria)?;
-    
+
     // Process sampling results
     process_sampling_results(&sampler, controls, output_dir)?;
 
@@ -68,10 +68,10 @@ pub fn handle_sampling(
 }
 
 /// Validate the CSV format and load data
-/// 
+///
 /// # Arguments
 /// * `input` - Path to the input CSV file
-/// 
+///
 /// # Returns
 /// * `IdsResult<()>` - Success or error
 fn validate_and_load_data(input: &str) -> IdsResult<()> {
@@ -94,24 +94,20 @@ fn validate_and_load_data(input: &str) -> IdsResult<()> {
 }
 
 /// Create and initialize the `IncidenceDensitySampler`
-/// 
+///
 /// # Arguments
 /// * `input` - Path to the input CSV file
 /// * `criteria` - Matching criteria for the sampler
-/// 
+///
 /// # Returns
 /// * `IdsResult<IncidenceDensitySampler>` - Initialized sampler or error
-fn create_sampler(
-    input: &str,
-    criteria: MatchingCriteria,
-) -> IdsResult<IncidenceDensitySampler> {
+fn create_sampler(input: &str, criteria: MatchingCriteria) -> IdsResult<IncidenceDensitySampler> {
     ConsoleOutput::subsection("Data Loading");
     ConsoleOutput::key_value("Input file", input);
 
     let start = Instant::now();
-    let records = load_records(input).map_err(|e| crate::core::IdsError::data_loading(format!(
-        "Failed to load records: {e}"
-    )))?;
+    let records = load_records(input)
+        .map_err(|e| crate::core::IdsError::data_loading(format!("Failed to load records: {e}")))?;
     let loading_time = start.elapsed();
 
     ConsoleOutput::key_value(
@@ -122,10 +118,9 @@ fn create_sampler(
 
     ConsoleOutput::subsection("Sampler Initialization");
     let sampler_start = Instant::now();
-    let sampler = IncidenceDensitySampler::new(records, criteria)
-        .map_err(|e| crate::core::IdsError::sampling(format!(
-            "Failed to initialize sampler: {e}"
-        )))?;
+    let sampler = IncidenceDensitySampler::new(records, criteria).map_err(|e| {
+        crate::core::IdsError::sampling(format!("Failed to initialize sampler: {e}"))
+    })?;
     let init_time = sampler_start.elapsed();
 
     // Get statistics and display in a more structured way
@@ -138,12 +133,12 @@ fn create_sampler(
 }
 
 /// Process sampling results and save outputs
-/// 
+///
 /// # Arguments
 /// * `sampler` - The initialized sampler
 /// * `controls` - Number of controls to sample per case
 /// * `output_dir` - Directory where results will be saved
-/// 
+///
 /// # Returns
 /// * `IdsResult<()>` - Success or error
 fn process_sampling_results(
@@ -155,10 +150,9 @@ fn process_sampling_results(
     ConsoleOutput::key_value("Requested controls per case", &controls.to_string());
 
     let sampling_start = Instant::now();
-    let case_control_pairs = sampler.sample_controls(controls)
-        .map_err(|e| crate::core::IdsError::sampling(format!(
-            "Failed to sample controls: {e}"
-        )))?;
+    let case_control_pairs = sampler
+        .sample_controls(controls)
+        .map_err(|e| crate::core::IdsError::sampling(format!("Failed to sample controls: {e}")))?;
     let sampling_time = sampling_start.elapsed();
 
     ConsoleOutput::key_value("Sampling time", &format_duration_short(sampling_time));

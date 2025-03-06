@@ -1,5 +1,7 @@
+mod base;
 mod parallel;
-mod parquet;
+mod sequential;
 
+pub use base::StoreLoader;
 pub use parallel::ParallelLoader;
-pub use parquet::ParquetLoader;
+pub use sequential::SequentialLoader;

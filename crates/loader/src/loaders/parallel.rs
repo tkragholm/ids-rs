@@ -1,24 +1,25 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::fs;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
-use arrow::array::{Array, StringArray};
-use arrow::record_batch::RecordBatch;
+use rayon::prelude::*;
+use crossbeam_channel::unbounded;
+use types::error::IdsError;
+use types::storage::ArrowBackend as ArrowStore;
 
-use crate::{
-    ArrowStore,
-    IdsError,
-    LoaderProgress,
-    utils::parquet::{read_parquet, load_parquet_files_parallel},
-};
+use crate::config::{RegisterPathConfig, env};
+use crate::registry;
+use crate::loaders::StoreLoader;
+use crate::ui::LoaderProgress;
 
 /// Parallel Register Loader implementation with optimization
 /// 
-/// This implements the Phase 1 optimization strategy:
+/// This implements advanced performance optimizations:
 /// 1. Uses all available CPU cores for loading
-/// 2. Uses larger batch sizes
-/// 3. Filters by PNR at load time
-/// 4. Loads files in parallel
+/// 2. Uses larger batch sizes for better throughput
+/// 3. Filters by PNR at load time to reduce memory usage
+/// 4. Loads multiple register files concurrently
 pub struct ParallelLoader;
 
 impl Default for ParallelLoader {
@@ -29,487 +30,430 @@ impl Default for ParallelLoader {
 
 impl ParallelLoader {
     /// Create a new ParallelLoader instance
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
-    
-    /// Load register parquet files in parallel with optional PNR filtering
-    /// 
-    /// This implements the Phase 1 optimization strategy:
-    /// 1. Uses all available CPU cores for loading (controlled by IDS_MAX_THREADS)
-    /// 2. Uses larger batch sizes (controlled by IDS_BATCH_SIZE)
-    /// 3. Filters by PNR at load time to reduce memory usage
-    /// 4. Loads all register files in parallel
-    pub fn load_registers_parallel(
-        base_path: &str,
-        pnr_filter: Option<&HashSet<String>>,
-    ) -> Result<ArrowStore, IdsError> {
-        log::info!("Starting parallel register loading with optimizations");
-        let base_dir = PathBuf::from(base_path);
-        
-        // Discover parquet files in base_path
-        let mut akm_files = Vec::new();
-        let mut bef_files = Vec::new();
-        let mut ind_files = Vec::new();
-        let mut uddf_files = Vec::new();
-        let mut family_file = None;
-        
-        // Scan for parquet files
-        if let Ok(entries) = fs::read_dir(&base_dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "parquet") {
-                    let filename = path.file_name().unwrap().to_string_lossy().to_string();
-                    
-                    if filename.starts_with("akm") {
-                        akm_files.push(path.clone());
-                    } else if filename.starts_with("bef") {
-                        bef_files.push(path.clone());
-                    } else if filename.starts_with("ind") {
-                        ind_files.push(path.clone());
-                    } else if filename.starts_with("uddf") {
-                        uddf_files.push(path.clone());
-                    } else if filename == "family.parquet" || filename == "families.parquet" {
-                        family_file = Some(path.clone());
-                    }
-                } else if path.is_dir() {
-                    // Check subdirectories by type
-                    let dir_name = path.file_name().map(|n| n.to_string_lossy().to_string());
-                    
-                    if let Some(dir) = dir_name {
-                        match dir.as_str() {
-                            "akm" => Self::collect_parquet_files(&path, &mut akm_files),
-                            "bef" => Self::collect_parquet_files(&path, &mut bef_files),
-                            "ind" => Self::collect_parquet_files(&path, &mut ind_files),
-                            "uddf" => Self::collect_parquet_files(&path, &mut uddf_files),
-                            "registers" => {
-                                // Check in registers subdirectory
-                                if let Ok(register_entries) = fs::read_dir(&path) {
-                                    for entry in register_entries.filter_map(Result::ok) {
-                                        let subpath = entry.path();
-                                        if subpath.is_dir() {
-                                            let subdir = subpath.file_name().map(|n| n.to_string_lossy().to_string());
-                                            if let Some(dir) = subdir {
-                                                match dir.as_str() {
-                                                    "akm" => Self::collect_parquet_files(&subpath, &mut akm_files),
-                                                    "bef" => Self::collect_parquet_files(&subpath, &mut bef_files),
-                                                    "ind" => Self::collect_parquet_files(&subpath, &mut ind_files),
-                                                    "uddf" => Self::collect_parquet_files(&subpath, &mut uddf_files),
-                                                    _ => {}
-                                                }
-                                            }
-                                        } else if subpath.extension().is_some_and(|ext| ext == "parquet") {
-                                            let filename = subpath.file_name().unwrap().to_string_lossy().to_string();
-                                            if filename == "family.parquet" {
-                                                family_file = Some(subpath);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-        
-        log::info!("Found {} AKM files, {} BEF files, {} IND files, {} UDDF files, family file: {}",
-                  akm_files.len(), bef_files.len(), ind_files.len(), uddf_files.len(),
-                  family_file.is_some());
+}
+
+impl StoreLoader for ParallelLoader {
+    fn load_from_path(base_path: String) -> Result<ArrowStore, IdsError> {
+        log::info!("Loading register data in parallel from {}", base_path);
         
         // Create a progress tracker
         let progress = LoaderProgress::new();
+        progress.set_main_message("Initializing parallel data loading");
         
-        // Create a new store
-        let mut store = ArrowStore::new()?;
+        // Create an empty store
+        let store = Arc::new(Mutex::new(ArrowStore::new()));
         
-        // Load family file if it exists
-        if let Some(family_path) = family_file {
-            log::info!("Loading family file...");
-            let family_batches = read_parquet(&family_path, None, Some(&progress), pnr_filter)?;
-            store.load_family_relations(family_batches)?;
+        // Create channels for communication between threads
+        let (sender, receiver) = unbounded();
+        
+        // Determine which registers to load in parallel vs sequentially
+        let load_family_parallel = false; // Family is always loaded first
+        let load_akm_parallel = env::use_parallel_loading("akm");
+        let load_bef_parallel = env::use_parallel_loading("bef");
+        let load_ind_parallel = env::use_parallel_loading("ind");
+        let load_uddf_parallel = env::use_parallel_loading("uddf");
+        
+        // First load family relations (always sequential)
+        progress.set_main_message("Loading family relations");
+        if let Ok(families) = registry::load_family(&base_path, None) {
+            let mut store_guard = store.lock().unwrap();
+            if let Err(e) = store_guard.add_family_data(families) {
+                log::error!("Failed to add family data: {}", e);
+            }
+            progress.inc_main();
+        }
+        
+        // Spawn worker threads for parallel loading
+        let mut handles = Vec::new();
+        
+        // AKM data
+        if load_akm_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_akm(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("akm", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("akm", Err(e)));
+                    }
+                }
+            }));
         } else {
-            return Err(IdsError::invalid_operation("Family relations file not found - required for loading"));
+            // Load sequentially
+            progress.set_main_message("Loading AKM data");
+            if let Ok(akm_data) = registry::load_akm(&base_path, None) {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_akm_data(akm_data) {
+                    log::error!("Failed to add AKM data: {}", e);
+                }
+                progress.inc_main();
+            }
         }
         
-        // Load all the register files in parallel by type
-        let process_register_files = |files: &[PathBuf], register_type: &str| -> Result<HashMap<String, Vec<RecordBatch>>, IdsError> {
-            if files.is_empty() {
-                return Ok(HashMap::new());
-            }
-            
-            log::info!("Loading {} {} register files in parallel", files.len(), register_type);
-            load_parquet_files_parallel(files, None, Some(&progress), pnr_filter)
-        };
-        
-        // Process each register type in sequence (but with internal parallelism)
-        if !akm_files.is_empty() {
-            let akm_batches = process_register_files(&akm_files, "AKM")?;
-            for (filename, batches) in akm_batches {
-                // Extract year from filename
-                if let Some(year_str) = self::extract_year_from_filename(&filename) {
-                    if let Ok(year) = year_str.parse::<i32>() {
-                        log::info!("Adding AKM data for year {}", year);
-                        store.add_akm_data(year, batches);
+        // BEF data
+        if load_bef_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_bef(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("bef", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("bef", Err(e)));
                     }
                 }
-            }
-        }
-        
-        if !bef_files.is_empty() {
-            let bef_batches = process_register_files(&bef_files, "BEF")?;
-            for (filename, batches) in bef_batches {
-                // Extract period from filename (YYYYq format)
-                if let Some(period) = self::extract_period_from_filename(&filename) {
-                    log::info!("Adding BEF data for period {}", period);
-                    store.add_bef_data(period, batches);
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading BEF data");
+            if let Ok(bef_data) = registry::load_bef(&base_path, None) {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_bef_data(bef_data) {
+                    log::error!("Failed to add BEF data: {}", e);
                 }
+                progress.inc_main();
             }
         }
         
-        if !ind_files.is_empty() {
-            let ind_batches = process_register_files(&ind_files, "IND")?;
-            for (filename, batches) in ind_batches {
-                // Extract year from filename
-                if let Some(year_str) = self::extract_year_from_filename(&filename) {
-                    if let Ok(year) = year_str.parse::<i32>() {
-                        log::info!("Adding IND data for year {}", year);
-                        store.add_ind_data(year, batches);
+        // IND data
+        if load_ind_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_ind(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("ind", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("ind", Err(e)));
                     }
                 }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading IND data");
+            if let Ok(ind_data) = registry::load_ind(&base_path, None) {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_ind_data(ind_data) {
+                    log::error!("Failed to add IND data: {}", e);
+                }
+                progress.inc_main();
             }
         }
         
-        if !uddf_files.is_empty() {
-            let uddf_batches = process_register_files(&uddf_files, "UDDF")?;
-            for (filename, batches) in uddf_batches {
-                // Extract period from filename
-                if let Some(period) = self::extract_period_from_filename(&filename) {
-                    log::info!("Adding UDDF data for period {}", period);
-                    store.add_uddf_data(period, batches);
+        // UDDF data
+        if load_uddf_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_uddf(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("uddf", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("uddf", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading UDDF data");
+            if let Ok(uddf_data) = registry::load_uddf(&base_path, None) {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_uddf_data(uddf_data) {
+                    log::error!("Failed to add UDDF data: {}", e);
+                }
+                progress.inc_main();
+            }
+        }
+        
+        // Close the sender to signal no more messages
+        drop(sender);
+        
+        // Process results from parallel loading
+        for (register_type, result) in receiver {
+            match (register_type, result) {
+                ("akm", Ok(data)) => {
+                    progress.set_main_message("Adding AKM data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_akm_data(data) {
+                        log::error!("Failed to add AKM data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                ("bef", Ok(data)) => {
+                    progress.set_main_message("Adding BEF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_bef_data(data) {
+                        log::error!("Failed to add BEF data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                ("ind", Ok(data)) => {
+                    progress.set_main_message("Adding IND data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_ind_data(data) {
+                        log::error!("Failed to add IND data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                ("uddf", Ok(data)) => {
+                    progress.set_main_message("Adding UDDF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_uddf_data(data) {
+                        log::error!("Failed to add UDDF data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                (register_type, Err(e)) => {
+                    log::error!("Error loading {} data: {}", register_type, e);
                 }
             }
         }
         
-        log::info!("Parallel register loading complete!");
-        Ok(store)
+        // Wait for all threads to finish
+        for handle in handles {
+            let _ = handle.join();
+        }
+        
+        progress.finish_main();
+        
+        // Return the store
+        match Arc::try_unwrap(store) {
+            Ok(mutex) => Ok(mutex.into_inner().unwrap()),
+            Err(_) => Err(IdsError::invalid_operation(
+                "Failed to unwrap store from Arc".to_string()
+            )),
+        }
     }
-    
-    /// Add parquet files from a directory to a collection
-    fn collect_parquet_files(dir: &Path, files: &mut Vec<PathBuf>) {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "parquet") {
-                    files.push(path);
-                }
-            }
-        }
-    }
-    
-    /// Load from a PNR list file
-    pub fn load_with_pnr_filter_file(
-        base_path: &str,
-        pnr_filter_file: &str
-    ) -> Result<ArrowStore, IdsError> {
-        // Read PNR filter file
-        log::info!("Reading PNR filter file: {}", pnr_filter_file);
-        let pnr_content = fs::read_to_string(pnr_filter_file)
-            .map_err(|e| IdsError::invalid_operation(format!("Failed to read PNR filter file: {}", e)))?;
+
+    fn load_with_custom_paths(config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
+        log::info!("Loading register data in parallel with custom paths");
         
-        // Parse PNR list (one per line)
-        let pnr_set: HashSet<String> = pnr_content
-            .lines()
-            .map(|line| line.trim().to_string())
-            .filter(|line| !line.is_empty())
-            .collect();
+        // Validate the config paths
+        config.validate()?;
         
-        log::info!("Loaded {} PNRs from filter file", pnr_set.len());
+        // Resolve the paths
+        let paths = config.resolve_paths()?;
         
-        // Load with the PNR filter
-        Self::load_registers_parallel(base_path, Some(&pnr_set))
-    }
-    
-    /// Extract PNRs from family data and create a filter set
-    pub fn extract_pnrs_from_family_batches(
-        family_batches: &[RecordBatch]
-    ) -> Result<HashSet<String>, IdsError> {
-        let mut pnr_set = HashSet::new();
-        
-        log::info!("Extracting PNRs from family data ({} batches)", family_batches.len());
-        
-        // Process each batch
-        for batch in family_batches {
-            // Try different field names for child PNR
-            let child_idx = batch.schema().index_of("PNR")
-                .or_else(|_| batch.schema().index_of("pnr"))
-                .or_else(|_| batch.schema().index_of("child_pnr"))
-                .or_else(|_| batch.schema().index_of("child_id"))
-                .map_err(|_| IdsError::invalid_operation("Could not find child PNR column in family data".to_string()))?;
-            
-            // Try to find parent columns
-            let mother_idx = batch.schema().index_of("mother_pnr")
-                .or_else(|_| batch.schema().index_of("mother_id"))
-                .or_else(|_| batch.schema().index_of("mor_pnr"))
-                .ok();
-                
-            let father_idx = batch.schema().index_of("father_pnr")
-                .or_else(|_| batch.schema().index_of("father_id"))
-                .or_else(|_| batch.schema().index_of("far_pnr"))
-                .ok();
-            
-            // Extract child PNRs
-            if let Some(child_array) = batch.column(child_idx).as_any().downcast_ref::<StringArray>() {
-                for i in 0..child_array.len() {
-                    if !child_array.is_null(i) {
-                        let pnr = child_array.value(i);
-                        if !pnr.is_empty() {
-                            pnr_set.insert(pnr.to_string());
-                        }
-                    }
-                }
-            }
-            
-            // Extract mother PNRs if available
-            if let Some(idx) = mother_idx {
-                if let Some(mother_array) = batch.column(idx).as_any().downcast_ref::<StringArray>() {
-                    for i in 0..mother_array.len() {
-                        if !mother_array.is_null(i) {
-                            let pnr = mother_array.value(i);
-                            if !pnr.is_empty() {
-                                pnr_set.insert(pnr.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Extract father PNRs if available
-            if let Some(idx) = father_idx {
-                if let Some(father_array) = batch.column(idx).as_any().downcast_ref::<StringArray>() {
-                    for i in 0..father_array.len() {
-                        if !father_array.is_null(i) {
-                            let pnr = father_array.value(i);
-                            if !pnr.is_empty() {
-                                pnr_set.insert(pnr.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        log::info!("Extracted {} unique PNRs from family data", pnr_set.len());
-        Ok(pnr_set)
-    }
-    
-    /// Load registers using family relations to filter data
-    /// This loads only the family data first, extracts all relevant PNRs,
-    /// and then loads other registers with PNR filtering
-    pub fn load_with_family_based_filtering(base_path: &str) -> Result<ArrowStore, IdsError> {
-        log::info!("Loading with family-based PNR filtering optimization");
-        
-        // First locate the family file
-        let base_dir = PathBuf::from(base_path);
-        let mut family_path = None;
-        
-        // Look for common family file names
-        for name in &["family.parquet", "families.parquet", "family_relations.parquet"] {
-            let test_path = base_dir.join(name);
-            if test_path.exists() && test_path.is_file() {
-                family_path = Some(test_path);
-                break;
-            }
-            
-            // Also check in registers subdirectory
-            let registers_path = base_dir.join("registers").join(name);
-            if registers_path.exists() && registers_path.is_file() {
-                family_path = Some(registers_path);
-                break;
-            }
-        }
-        
-        let family_path = family_path.ok_or_else(|| 
-            IdsError::invalid_operation(format!("Could not find family file in {}", base_path)))?;
-        
-        log::info!("Found family file at {}", family_path.display());
-        
-        // Load family file first
+        // Create a progress tracker
         let progress = LoaderProgress::new();
-        let family_batches = read_parquet(&family_path, None, Some(&progress), None)?;
+        progress.set_main_message("Initializing parallel data loading");
         
-        // Extract PNRs from family data
-        let pnr_set = Self::extract_pnrs_from_family_batches(&family_batches)?;
+        // Create an empty store
+        let store = Arc::new(Mutex::new(ArrowStore::new()));
         
-        // Create store and load family relations
-        let mut store = ArrowStore::new()?;
-        store.load_family_relations(family_batches)?;
+        // Create channels for communication between threads
+        let (sender, receiver) = unbounded();
         
-        // Load the rest of register files with PNR filtering
-        let base_dir = PathBuf::from(base_path);
-        let mut akm_files = Vec::new();
-        let mut bef_files = Vec::new();
-        let mut ind_files = Vec::new();
-        let mut uddf_files = Vec::new();
+        // Determine which registers to load in parallel vs sequentially
+        let load_family_parallel = false; // Family is always loaded first
+        let load_akm_parallel = env::use_parallel_loading("akm");
+        let load_bef_parallel = env::use_parallel_loading("bef");
+        let load_ind_parallel = env::use_parallel_loading("ind");
+        let load_uddf_parallel = env::use_parallel_loading("uddf");
         
-        // Use the same file collection logic as load_registers_parallel()
-        // but skip the family file since we already loaded it
-        if let Ok(entries) = fs::read_dir(&base_dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path == family_path {
-                    continue; // Skip the family file we already loaded
+        // First load family relations (always sequential)
+        if let Some(family_path) = paths.get("family") {
+            progress.set_main_message("Loading family relations");
+            if let Ok(families) = registry::load_family(
+                family_path.to_str().unwrap_or_default(), None
+            ) {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_family_data(families) {
+                    log::error!("Failed to add family data: {}", e);
                 }
-                
-                if path.extension().is_some_and(|ext| ext == "parquet") {
-                    let filename = path.file_name().unwrap().to_string_lossy().to_string();
-                    
-                    if filename.starts_with("akm") {
-                        akm_files.push(path.clone());
-                    } else if filename.starts_with("bef") {
-                        bef_files.push(path.clone());
-                    } else if filename.starts_with("ind") {
-                        ind_files.push(path.clone());
-                    } else if filename.starts_with("uddf") {
-                        uddf_files.push(path.clone());
-                    }
-                } else if path.is_dir() {
-                    // Check subdirectories by type
-                    let dir_name = path.file_name().map(|n| n.to_string_lossy().to_string());
-                    
-                    if let Some(dir) = dir_name {
-                        match dir.as_str() {
-                            "akm" => Self::collect_parquet_files(&path, &mut akm_files),
-                            "bef" => Self::collect_parquet_files(&path, &mut bef_files),
-                            "ind" => Self::collect_parquet_files(&path, &mut ind_files),
-                            "uddf" => Self::collect_parquet_files(&path, &mut uddf_files),
-                            "registers" => {
-                                // Check in registers subdirectory
-                                if let Ok(register_entries) = fs::read_dir(&path) {
-                                    for entry in register_entries.filter_map(Result::ok) {
-                                        let subpath = entry.path();
-                                        if subpath.is_dir() {
-                                            let subdir = subpath.file_name().map(|n| n.to_string_lossy().to_string());
-                                            if let Some(dir) = subdir {
-                                                match dir.as_str() {
-                                                    "akm" => Self::collect_parquet_files(&subpath, &mut akm_files),
-                                                    "bef" => Self::collect_parquet_files(&subpath, &mut bef_files),
-                                                    "ind" => Self::collect_parquet_files(&subpath, &mut ind_files),
-                                                    "uddf" => Self::collect_parquet_files(&subpath, &mut uddf_files),
-                                                    _ => {}
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {}
+                progress.inc_main();
+            }
+        }
+        
+        // Spawn worker threads for parallel loading
+        let mut handles = Vec::new();
+        
+        // AKM data
+        if let Some(akm_path) = paths.get("akm") {
+            if load_akm_parallel {
+                let akm_path_str = akm_path.to_str().unwrap_or_default().to_string();
+                let sender_clone = sender.clone();
+                handles.push(thread::spawn(move || {
+                    match registry::load_akm(&akm_path_str, None) {
+                        Ok(data) => {
+                            let _ = sender_clone.send(("akm", Ok(data)));
+                        }
+                        Err(e) => {
+                            let _ = sender_clone.send(("akm", Err(e)));
                         }
                     }
-                }
-            }
-        }
-        
-        log::info!("Using family-based filtering with {} PNRs for {} AKM files, {} BEF files, {} IND files, {} UDDF files",
-                  pnr_set.len(), akm_files.len(), bef_files.len(), ind_files.len(), uddf_files.len());
-        
-        // Process register files with PNR filtering
-        let process_register_files = |files: &[PathBuf], register_type: &str| -> Result<HashMap<String, Vec<RecordBatch>>, IdsError> {
-            if files.is_empty() {
-                return Ok(HashMap::new());
-            }
-            
-            log::info!("Loading {} {} register files with family-based PNR filtering", files.len(), register_type);
-            load_parquet_files_parallel(files, None, Some(&progress), Some(&pnr_set))
-        };
-        
-        // Process each register type with PNR filtering
-        if !akm_files.is_empty() {
-            let akm_batches = process_register_files(&akm_files, "AKM")?;
-            for (filename, batches) in akm_batches {
-                // Extract year from filename
-                if let Some(year_str) = self::extract_year_from_filename(&filename) {
-                    if let Ok(year) = year_str.parse::<i32>() {
-                        log::info!("Adding AKM data for year {}", year);
-                        store.add_akm_data(year, batches);
+                }));
+            } else {
+                // Load sequentially
+                progress.set_main_message("Loading AKM data");
+                if let Ok(akm_data) = registry::load_akm(
+                    akm_path.to_str().unwrap_or_default(), None
+                ) {
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_akm_data(akm_data) {
+                        log::error!("Failed to add AKM data: {}", e);
                     }
+                    progress.inc_main();
                 }
             }
         }
         
-        // Process BEF, IND, and UDDF files with the same pattern
-        if !bef_files.is_empty() {
-            let bef_batches = process_register_files(&bef_files, "BEF")?;
-            for (filename, batches) in bef_batches {
-                // Extract period from filename
-                if let Some(period) = self::extract_period_from_filename(&filename) {
-                    log::info!("Adding BEF data for period {}", period);
-                    store.add_bef_data(period, batches);
-                }
-            }
-        }
-        
-        if !ind_files.is_empty() {
-            let ind_batches = process_register_files(&ind_files, "IND")?;
-            for (filename, batches) in ind_batches {
-                // Extract year from filename
-                if let Some(year_str) = self::extract_year_from_filename(&filename) {
-                    if let Ok(year) = year_str.parse::<i32>() {
-                        log::info!("Adding IND data for year {}", year);
-                        store.add_ind_data(year, batches);
+        // BEF data
+        if let Some(bef_path) = paths.get("bef") {
+            if load_bef_parallel {
+                let bef_path_str = bef_path.to_str().unwrap_or_default().to_string();
+                let sender_clone = sender.clone();
+                handles.push(thread::spawn(move || {
+                    match registry::load_bef(&bef_path_str, None) {
+                        Ok(data) => {
+                            let _ = sender_clone.send(("bef", Ok(data)));
+                        }
+                        Err(e) => {
+                            let _ = sender_clone.send(("bef", Err(e)));
+                        }
                     }
+                }));
+            } else {
+                // Load sequentially
+                progress.set_main_message("Loading BEF data");
+                if let Ok(bef_data) = registry::load_bef(
+                    bef_path.to_str().unwrap_or_default(), None
+                ) {
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_bef_data(bef_data) {
+                        log::error!("Failed to add BEF data: {}", e);
+                    }
+                    progress.inc_main();
                 }
             }
         }
         
-        if !uddf_files.is_empty() {
-            let uddf_batches = process_register_files(&uddf_files, "UDDF")?;
-            for (filename, batches) in uddf_batches {
-                // Extract period from filename
-                if let Some(period) = self::extract_period_from_filename(&filename) {
-                    log::info!("Adding UDDF data for period {}", period);
-                    store.add_uddf_data(period, batches);
+        // IND data
+        if let Some(ind_path) = paths.get("ind") {
+            if load_ind_parallel {
+                let ind_path_str = ind_path.to_str().unwrap_or_default().to_string();
+                let sender_clone = sender.clone();
+                handles.push(thread::spawn(move || {
+                    match registry::load_ind(&ind_path_str, None) {
+                        Ok(data) => {
+                            let _ = sender_clone.send(("ind", Ok(data)));
+                        }
+                        Err(e) => {
+                            let _ = sender_clone.send(("ind", Err(e)));
+                        }
+                    }
+                }));
+            } else {
+                // Load sequentially
+                progress.set_main_message("Loading IND data");
+                if let Ok(ind_data) = registry::load_ind(
+                    ind_path.to_str().unwrap_or_default(), None
+                ) {
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_ind_data(ind_data) {
+                        log::error!("Failed to add IND data: {}", e);
+                    }
+                    progress.inc_main();
                 }
             }
         }
         
-        log::info!("Family-based PNR filtering loading complete!");
-        Ok(store)
-    }
-}
-
-/// Extract year from a filename
-fn extract_year_from_filename(filename: &str) -> Option<String> {
-    // Use a simpler approach that doesn't rely on regex
-    for i in 0..filename.len().saturating_sub(3) {
-        let slice = &filename[i..i+4];
-        if (slice.starts_with("19") || slice.starts_with("20")) && 
-           slice.chars().all(|c| c.is_ascii_digit()) {
-            return Some(slice.to_string());
-        }
-    }
-    None
-}
-
-/// Extract period (YYYYMM or YYYY format) from filename
-fn extract_period_from_filename(filename: &str) -> Option<String> {
-    // First try to find a YYYYMM format
-    for i in 0..filename.len().saturating_sub(5) {
-        let slice = &filename[i..i+6];
-        if (slice.starts_with("19") || slice.starts_with("20")) && 
-           slice.chars().all(|c| c.is_ascii_digit()) {
-            let _year = &slice[0..4];
-            let month = &slice[4..6];
-            // Validate month is between 01-12
-            if let Ok(m) = month.parse::<u8>() {
-                if (1..=12).contains(&m) {
-                    return Some(slice.to_string());
+        // UDDF data
+        if let Some(uddf_path) = paths.get("uddf") {
+            if load_uddf_parallel {
+                let uddf_path_str = uddf_path.to_str().unwrap_or_default().to_string();
+                let sender_clone = sender.clone();
+                handles.push(thread::spawn(move || {
+                    match registry::load_uddf(&uddf_path_str, None) {
+                        Ok(data) => {
+                            let _ = sender_clone.send(("uddf", Ok(data)));
+                        }
+                        Err(e) => {
+                            let _ = sender_clone.send(("uddf", Err(e)));
+                        }
+                    }
+                }));
+            } else {
+                // Load sequentially
+                progress.set_main_message("Loading UDDF data");
+                if let Ok(uddf_data) = registry::load_uddf(
+                    uddf_path.to_str().unwrap_or_default(), None
+                ) {
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_uddf_data(uddf_data) {
+                        log::error!("Failed to add UDDF data: {}", e);
+                    }
+                    progress.inc_main();
                 }
             }
         }
+        
+        // Close the sender to signal no more messages
+        drop(sender);
+        
+        // Process results from parallel loading
+        for (register_type, result) in receiver {
+            match (register_type, result) {
+                ("akm", Ok(data)) => {
+                    progress.set_main_message("Adding AKM data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_akm_data(data) {
+                        log::error!("Failed to add AKM data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                ("bef", Ok(data)) => {
+                    progress.set_main_message("Adding BEF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_bef_data(data) {
+                        log::error!("Failed to add BEF data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                ("ind", Ok(data)) => {
+                    progress.set_main_message("Adding IND data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_ind_data(data) {
+                        log::error!("Failed to add IND data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                ("uddf", Ok(data)) => {
+                    progress.set_main_message("Adding UDDF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_uddf_data(data) {
+                        log::error!("Failed to add UDDF data: {}", e);
+                    }
+                    progress.inc_main();
+                }
+                (register_type, Err(e)) => {
+                    log::error!("Error loading {} data: {}", register_type, e);
+                }
+            }
+        }
+        
+        // Wait for all threads to finish
+        for handle in handles {
+            let _ = handle.join();
+        }
+        
+        progress.finish_main();
+        
+        // Return the store
+        match Arc::try_unwrap(store) {
+            Ok(mutex) => Ok(mutex.into_inner().unwrap()),
+            Err(_) => Err(IdsError::invalid_operation(
+                "Failed to unwrap store from Arc".to_string()
+            )),
+        }
     }
-    
-    // If no YYYYMM found, fall back to just YYYY
-    extract_year_from_filename(filename)
 }

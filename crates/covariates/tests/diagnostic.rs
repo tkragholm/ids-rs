@@ -1,7 +1,7 @@
 use chrono::{Datelike, NaiveDate};
 use covariates::balance::BalanceChecker;
 use log::{debug, info};
-use rand::{Rng, thread_rng};
+use rand::Rng;
 use std::sync::Arc;
 use types::models::{Covariate, CovariateType};
 
@@ -18,13 +18,13 @@ pub struct CachePerformanceMetrics {
 pub trait BalanceCheckerDiagnostics {
     /// Create a new checker with an empty store (for diagnostic mode)
     fn new_diagnostic() -> BalanceChecker;
-    
+
     /// Create a new diagnostic checker using actual PNRs from matched pairs
     fn new_diagnostic_with_pnrs(pnrs: Vec<String>) -> BalanceChecker;
-    
+
     /// Analyze cache performance and provide detailed metrics
     fn analyze_cache_performance(&self) -> CachePerformanceMetrics;
-    
+
     /// Improved logging for balance analysis diagnostic information
     fn log_diagnostic_information(&self);
 }
@@ -35,12 +35,11 @@ impl BalanceCheckerDiagnostics for BalanceChecker {
         let empty_store = types::storage::ArrowBackend::new_empty();
 
         // Create a checker with an empty store but with a cache that simulates having some data
-        let checker = Self {
-            store: Arc::new(empty_store),
-            cache: covariates::balance::legacy_cache::CovariateCache::new(1000),
-            metrics: covariates::balance::metrics::BalanceMetrics::new(),
-            results: None,
-        };
+        // Create a checker builder
+        let checker = BalanceChecker::builder()
+            .with_store(empty_store)
+            .with_cache_size(1000)
+            .build();
 
         // Populate the cache with some placeholder data for diagnostic purposes
         populate_diagnostic_cache(&checker);
@@ -214,8 +213,8 @@ fn populate_diagnostic_cache(checker: &BalanceChecker) {
 
             // Occupation data
             let socio13_codes = [
-                "110", "111", "112", "113", "114", "120", "131", "132", "133", "134", "135",
-                "139", "210", "220", "310", "321", "322", "323", "330",
+                "110", "111", "112", "113", "114", "120", "131", "132", "133", "134", "135", "139",
+                "210", "220", "310", "321", "322", "323", "330",
             ];
             let socio13_code = socio13_codes[i % socio13_codes.len()];
             let socio = 100 + (i % 50) as i32; // SOCIO
@@ -305,7 +304,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
             .expect("Invalid date 2023-09-15 - this is a static date that should never fail"), // More recent
     ];
 
-    let mut rng = thread_rng();
+    let mut rng = rand::thread_rng();
 
     // Show the first few PNRs we're using
     if !pnrs.is_empty() {
@@ -381,7 +380,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
             let municipality = 100 + rng.gen_range(1..=100); // Municipality
             let family_type = format!("{}", 1 + rng.gen_range(1..=9)); // Family type
 
-            let income_amount = 200000.0 + rng.gen_range(0..800000) as f64;
+            let income_amount = 200000.0 + rng.gen_range(0.0..800000.0);
             let education_level = rng.gen_range(10..=30);
 
             // Generate ISCED level (1-8), with higher levels less common
@@ -398,7 +397,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
 
             // Weighted random selection for ISCED level
             let mut cdf = 0.0;
-            let roll: f64 = rng.gen();
+            let roll: f64 = rng.gen_range(0.0..1.0);
             let isced = {
                 let mut selected = 3; // Default to level 3 if selection fails
                 for (level, weight) in &isced_distribution {
@@ -412,7 +411,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
             };
 
             // Generate education years based on ISCED level
-            let education_years = 3.5 + (rng.gen_range(0..10) as f32 / 2.0);
+            let education_years = 3.5 + (rng.gen_range(0.0..5.0) as f32);
 
             // Create occupation covariates with SOCIO13 codes
             // Use values from the socio13.json mapping with weighted distribution
@@ -440,7 +439,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
 
             // Weighted random selection for SOCIO13 code
             let mut socio_cdf = 0.0;
-            let socio_roll: f64 = rng.gen();
+            let socio_roll: f64 = rng.gen_range(0.0..1.0);
             let socio13_code = {
                 let mut selected = "134"; // Default to employment at basic level
                 for (code, weight) in &socio13_codes {
@@ -498,7 +497,9 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
                                 );
                                 let key =
                                     CacheKey::new(id, CovariateType::Demographics, extra_date);
-                                checker.cache.insert(key, Some(quarterly_demographic.build()));
+                                checker
+                                    .cache
+                                    .insert(key, Some(quarterly_demographic.build()));
 
                                 let quarterly_income = Covariate::income(
                                     income_amount,
@@ -512,17 +513,17 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
                                     Covariate::education(format!("{}", education_level))
                                         .with_isced_code(format!("{}", isced))
                                         .with_years(education_years);
-                                let key =
-                                    CacheKey::new(id, CovariateType::Education, extra_date);
+                                let key = CacheKey::new(id, CovariateType::Education, extra_date);
                                 checker.cache.insert(key, Some(quarterly_education.build()));
 
                                 let quarterly_occupation = Covariate::occupation(
                                     socio13_code.to_string(),
                                     "SOCIO13".to_string(),
                                 );
-                                let key =
-                                    CacheKey::new(id, CovariateType::Occupation, extra_date);
-                                checker.cache.insert(key, Some(quarterly_occupation.build()));
+                                let key = CacheKey::new(id, CovariateType::Occupation, extra_date);
+                                checker
+                                    .cache
+                                    .insert(key, Some(quarterly_occupation.build()));
                             }
                         }
                     }
@@ -563,29 +564,38 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_create_diagnostic_checker() {
         let checker = BalanceChecker::new_diagnostic();
-        assert!(checker.cache.len() > 0, "Diagnostic cache should be populated");
+        assert!(
+            checker.cache.len() > 0,
+            "Diagnostic cache should be populated"
+        );
     }
-    
+
     #[test]
     fn test_create_diagnostic_with_pnrs() {
         let pnrs = vec![
             "010101-1234".to_string(),
             "020202-5678".to_string(),
-            "030303-9012".to_string()
+            "030303-9012".to_string(),
         ];
         let checker = BalanceChecker::new_diagnostic_with_pnrs(pnrs);
-        assert!(checker.cache.len() > 0, "Diagnostic cache should be populated with PNRs");
+        assert!(
+            checker.cache.len() > 0,
+            "Diagnostic cache should be populated with PNRs"
+        );
     }
-    
+
     #[test]
     fn test_analyze_performance() {
         let checker = BalanceChecker::new_diagnostic();
         let metrics = checker.analyze_cache_performance();
         assert!(metrics.total_entries > 0, "Should have cache entries");
-        assert!(metrics.memory_usage > 0, "Should have estimated memory usage");
+        assert!(
+            metrics.memory_usage > 0,
+            "Should have estimated memory usage"
+        );
     }
 }

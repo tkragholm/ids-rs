@@ -3,6 +3,13 @@ use thiserror::Error;
 pub use anyhow::{anyhow, Context, Result as AnyhowResultType};
 pub use color_eyre::{eyre::Report, Result as EyreResult};
 
+// New modules
+mod context;
+mod conversion;
+
+// Re-export from submodules
+pub use self::context::{ErrorContext, with_context, with_context_details};
+
 /// The main error type for the IDS project
 /// 
 /// This error type has been designed to handle all errors from all crates in the project,
@@ -25,8 +32,8 @@ pub enum IdsError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
     
-    #[error("Logger error: {0}")]
-    Logger(#[from] log::SetLoggerError),
+    #[error("Logger error: failed to set logger")]
+    Logger,
 
     // Domain-specific errors
     #[error("Configuration error: {0}")]
@@ -298,6 +305,15 @@ impl IdsError {
     pub fn other(msg: impl ToString) -> Self {
         Self::Other(msg.to_string())
     }
+    
+    /// Create a logger error
+    /// 
+    /// # Returns
+    /// A new `IdsError::Logger` error
+    #[must_use]
+    pub fn logger() -> Self {
+        Self::Logger
+    }
 }
 
 /// Type alias for Result with IdsError
@@ -344,127 +360,6 @@ pub type Result<T> = std::result::Result<T, IdsError>;
 ///         .map_err(IdsError::from)
 /// }
 /// ```
-/// Legacy Context trait for enhancing error handling with contextual information
-/// 
-/// This trait is kept for backward compatibility, but new code should use anyhow::Context instead.
-pub trait ErrorContext<T, E> {
-    /// Add context to an error, explaining what was happening when the error occurred
-    /// 
-    /// # Example
-    /// ```
-    /// use types::error::ErrorContext;
-    /// 
-    /// let result = std::fs::read_to_string("missing_file.txt")
-    ///     .with_context(|| "Failed to read configuration file");
-    /// ```
-    ///
-    /// # Errors
-    /// Returns the original error wrapped with the provided context
-    fn with_context<C, F>(self, context: F) -> std::result::Result<T, IdsError>
-    where
-        F: FnOnce() -> C,
-        C: std::fmt::Display;
-
-    /// Add context with details to an error, allowing for formatted messages
-    ///
-    /// # Example
-    /// ```
-    /// use types::error::ErrorContext;
-    /// 
-    /// let file_path = "data/config.json";
-    /// let result = std::fs::read_to_string(file_path)
-    ///     .with_context_details(|| format!("Failed to read file at {file_path}"));
-    /// ```
-    ///
-    /// # Errors
-    /// Returns the original error replaced with the provided context
-    fn with_context_details<C, F>(self, context: F) -> std::result::Result<T, IdsError>
-    where
-        F: FnOnce() -> C,
-        C: std::fmt::Display;
-}
-
-/// Helper function to add context to Result types
-/// 
-/// This is a simple workaround for the trait conflict issue. Instead of
-/// implementing the trait multiple times, we provide a direct function.
-#[inline]
-pub fn with_context<T, E, C, F>(
-    result: std::result::Result<T, E>,
-    context_fn: F,
-) -> std::result::Result<T, IdsError>
-where
-    E: std::fmt::Display + 'static,
-    F: FnOnce() -> C,
-    C: std::fmt::Display,
-{
-    match result {
-        Ok(value) => Ok(value),
-        Err(e) => {
-            // Special case for io::Error to preserve its type information
-            if let Some(io_err) = (&e as &dyn std::any::Any).downcast_ref::<std::io::Error>() {
-                let ctx = context_fn();
-                Err(IdsError::Io(std::io::Error::new(
-                    io_err.kind(),
-                    format!("{}: {}", ctx, e),
-                )))
-            } else {
-                // General case for other errors
-                let ctx = context_fn();
-                Err(IdsError::Validation(format!("{}: {}", ctx, e)))
-            }
-        }
-    }
-}
-
-/// Helper function to replace error with context for Result types
-#[inline]
-pub fn with_context_details<T, E, C, F>(
-    result: std::result::Result<T, E>,
-    context_fn: F,
-) -> std::result::Result<T, IdsError>
-where
-    E: std::fmt::Display + 'static,
-    F: FnOnce() -> C,
-    C: std::fmt::Display,
-{
-    match result {
-        Ok(value) => Ok(value),
-        Err(e) => {
-            // Special case for io::Error to preserve its type information
-            if let Some(io_err) = (&e as &dyn std::any::Any).downcast_ref::<std::io::Error>() {
-                let ctx = context_fn();
-                Err(IdsError::Io(std::io::Error::new(
-                    io_err.kind(),
-                    format!("{}", ctx),
-                )))
-            } else {
-                // For other errors, just use the context message
-                let ctx = context_fn();
-                Err(IdsError::Validation(ctx.to_string()))
-            }
-        }
-    }
-}
-
-// Implement ErrorContext for all Result types using the helper functions
-impl<T, E: std::fmt::Display + 'static> ErrorContext<T, E> for std::result::Result<T, E> {
-    fn with_context<C, F>(self, context: F) -> std::result::Result<T, IdsError>
-    where
-        F: FnOnce() -> C,
-        C: std::fmt::Display,
-    {
-        with_context(self, context)
-    }
-
-    fn with_context_details<C, F>(self, context: F) -> std::result::Result<T, IdsError>
-    where
-        F: FnOnce() -> C,
-        C: std::fmt::Display,
-    {
-        with_context_details(self, context)
-    }
-}
 
 // Type aliases for backwards compatibility
 pub type SamplingError = IdsError;

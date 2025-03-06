@@ -3,17 +3,25 @@
 //! This module contains trait definitions that provide
 //! standardized interfaces for various components of the system.
 
+// Submodules
 mod cacheable;
+pub mod access;
+pub mod processing;
+mod utils;
 
+// Imports
 use crate::{
-    error::IdsError,
-    family::relations::FamilyRelations,
+    error::Result,
     models::{Covariate, CovariateType, TimeVaryingValue},
+    OldFamilyRelations,
 };
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 
-// Re-export all traits
-pub use cacheable::Cacheable;
+// Re-exports
+pub use self::access::ArrowAccess;
+pub use self::cacheable::Cacheable;
+pub use self::processing::{CovariateProcessor, VariableType};
+pub use self::utils::DateHelpers;
 
 // Store trait definition here directly
 /// Combined Store trait - both data and family access
@@ -24,20 +32,20 @@ pub trait Store: Send + Sync {
         pnr: &str, 
         covariate_type: CovariateType, 
         date: NaiveDate
-    ) -> Result<Option<Covariate>, IdsError>;
+    ) -> Result<Option<Covariate>>;
 
     /// Get family relations for a person
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
+    fn get_family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations>;
 
     /// Load data into the store
-    fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError>;
+    fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<()>;
 
     /// Get all covariates for a person at a specific date
     fn get_covariates(
         &self, 
         pnr: &str, 
         date: NaiveDate
-    ) -> Result<hashbrown::HashMap<CovariateType, Covariate>, IdsError> {
+    ) -> Result<hashbrown::HashMap<CovariateType, Covariate>> {
         let mut covariates = hashbrown::HashMap::new();
         
         for covariate_type in &[
@@ -59,7 +67,7 @@ pub trait Store: Send + Sync {
         &self, 
         pnr: &str, 
         date: NaiveDate
-    ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>, IdsError> {
+    ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>> {
         let family = self.get_family_relations(pnr);
         
         if let Some(_family) = family {
@@ -81,7 +89,7 @@ pub trait Store: Send + Sync {
 
 /// Trait for accessing family relations
 pub trait FamilyAccess {
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
+    fn get_family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations>;
     fn get_parents(&self, pnr: &str) -> Option<(Option<String>, Option<String>)>;
     fn get_birth_date(&self, pnr: &str) -> Option<NaiveDate>;
 }
@@ -89,21 +97,12 @@ pub trait FamilyAccess {
 /// Trait for accessing time-varying data
 pub trait TimeVaryingAccess<T> {
     fn get_at_date(&self, pnr: &str, date: NaiveDate) -> Option<Vec<T>>;
-    fn load_data(&self, data: Vec<TimeVaryingValue<T>>) -> Result<(), IdsError>;
+    fn load_data(&self, data: Vec<TimeVaryingValue<T>>) -> Result<()>;
 }
-
-/// Helper for date operations
-pub trait DateHelpers: Datelike {
-    fn get_quarter(&self) -> u32 {
-        ((self.month() - 1) / 3) + 1
-    }
-}
-
-impl DateHelpers for NaiveDate {}
 
 // Implement FamilyAccess for any type that implements Store
 impl<T: Store> FamilyAccess for T {
-    fn get_family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
+    fn get_family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations> {
         Store::get_family_relations(self, pnr)
     }
 
@@ -115,57 +114,5 @@ impl<T: Store> FamilyAccess for T {
     fn get_birth_date(&self, pnr: &str) -> Option<NaiveDate> {
         self.get_family_relations(pnr)
             .map(|rel| rel.birth_date)
-    }
-}
-
-/// Variable type for covariate processing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum VariableType {
-    /// Numeric variable (f64)
-    Numeric,
-    /// Categorical variable (String)
-    Categorical,
-    /// Binary variable (0 or 1)
-    Binary,
-}
-
-/// Trait that standardizes the processing of different covariate types
-pub trait CovariateProcessor: Send + Sync {
-    /// Get the name of this processor
-    fn get_name(&self) -> &str;
-    
-    /// Get the covariate type this processor handles
-    fn get_covariate_type(&self) -> CovariateType;
-    
-    /// Extract a numeric value from a covariate, returning None if not applicable
-    fn process_numeric(&self, covariate: &Covariate) -> Option<f64>;
-    
-    /// Extract a categorical value from a covariate, returning None if not applicable
-    fn process_categorical(&self, covariate: &Covariate) -> Option<String>;
-    
-    /// Determine if this variable should be treated as categorical
-    fn is_categorical(&self) -> bool;
-    
-    /// Get the variable type for this processor
-    fn get_variable_type(&self) -> VariableType {
-        if self.is_categorical() {
-            VariableType::Categorical
-        } else {
-            VariableType::Numeric
-        }
-    }
-    
-    /// Convert a categorical value to a numeric representation if needed for calculations
-    fn categorical_to_numeric(&self, value: &str) -> f64 {
-        if let Ok(num) = value.parse::<f64>() { 
-            num 
-        } else {
-            // Hash the string to create a stable numeric value
-            let mut hash = 0.0;
-            for (i, b) in value.bytes().enumerate() {
-                hash += f64::from(b) * (i + 1) as f64;
-            }
-            hash
-        }
     }
 }

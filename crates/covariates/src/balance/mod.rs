@@ -8,7 +8,7 @@
 mod checker;    // Main balance checker implementation
 pub mod legacy_cache;  // Cache for covariate values
 mod memory;     // Memory management for large datasets
-mod metrics;    // Balance metrics calculations
+pub mod metrics;    // Balance metrics calculations
 mod optimization; // Optimization strategies for processing
 mod processor;  // Main value processor
 mod proc_impl;  // Implementation details for processor

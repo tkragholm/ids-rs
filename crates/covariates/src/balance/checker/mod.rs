@@ -23,10 +23,10 @@ pub use self::builder::BalanceCheckerBuilder;
 
 /// Main balance checker for analyzing covariate balance between case and control groups
 pub struct BalanceChecker {
-    store: Arc<ArrowStore>,
-    cache: CovariateCache,
-    metrics: BalanceMetrics,
-    results: Option<BalanceResults>,
+    pub(crate) store: Arc<ArrowStore>,
+    pub(crate) cache: CovariateCache,
+    pub(crate) metrics: BalanceMetrics,
+    pub(crate) results: Option<BalanceResults>,
 }
 
 impl BalanceChecker {
