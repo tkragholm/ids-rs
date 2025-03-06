@@ -1,4 +1,4 @@
-use crate::error::IdsResult;
+use crate::core::IdsResult;
 use core::utils::console::{format_duration_short, ConsoleOutput};
 use datagen::{GeneratorConfig, RegisterGenerator};
 use std::path::Path;
@@ -72,7 +72,7 @@ pub fn handle_generate_registers(
     let pediatric_path = Path::new(output_dir).join("pediatric.csv");
     let pediatric_path_str = pediatric_path
         .to_str()
-        .ok_or_else(|| crate::error::IdsError::path_resolution(format!(
+        .ok_or_else(|| crate::core::IdsError::path_resolution(format!(
             "Invalid path: {}", pediatric_path.display()
         )))?;
     generator.generate_pediatric(pediatric_path_str)?;

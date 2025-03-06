@@ -1,5 +1,5 @@
 use crate::balance::results::BalanceResults;
-use crate::matched_pairs::record::{CaseWithControls, MatchedPairRecord};
+use crate::data::matched_pairs::record::{CaseWithControls, MatchedPairRecord};
 use chrono::Local;
 use hashbrown::HashMap;
 use std::fs;

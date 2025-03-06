@@ -1,7 +1,7 @@
-use crate::cli::ConfigCommands;
-use crate::error::IdsResult;
+use crate::cli::types::ConfigCommands;
+use crate::core::IdsResult;
 use core::utils::console::ConsoleOutput;
-use covariates::config::CovariatesConfig;
+use covariates::core::config::CovariatesConfig;
 use std::fs;
 use std::path::Path;
 
@@ -43,7 +43,7 @@ fn generate_covariates_config(output_path: &str, force: bool) -> IdsResult<()> {
         ConsoleOutput::error(&format!(
             "Output file {output_path} already exists. Use --force to overwrite."
         ));
-        return Err(crate::error::IdsError::config(format!(
+        return Err(crate::core::IdsError::config(format!(
             "Output file {output_path} already exists. Use --force to overwrite."
         )));
     }

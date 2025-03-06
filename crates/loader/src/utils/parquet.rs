@@ -113,7 +113,7 @@ pub fn read_parquet(
             file_size,
             path.file_name()
                 .and_then(|n| n.to_str())
-                .unwrap_or("unknown"),
+                .unwrap_or("unknown"), // Safe fallback with unwrap_or
         )
     });
 
@@ -138,7 +138,7 @@ pub fn read_parquet(
     let batch_size = std::env::var("IDS_BATCH_SIZE")
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(65536); // 4x larger than previous default
+        .unwrap_or(65536); // 4x larger than previous default, safe fallback
     
     log::debug!("Using batch size of {} rows for Parquet loading", batch_size);
 
@@ -210,7 +210,7 @@ pub fn read_parquet(
     let num_workers = std::env::var("IDS_MAX_THREADS")
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or_else(num_cpus::get)
+        .unwrap_or_else(num_cpus::get) // Safe fallback to available CPUs
         .max(2); // At least 2 workers for parallelism
     
     log::debug!("Using {} worker threads for Parquet batch processing", num_workers);
@@ -346,7 +346,10 @@ pub fn read_parquet(
     });
 
     // Wait for feeder to finish
-    feeder.join().expect("Feeder thread panicked");
+    if let Err(e) = feeder.join() {
+        log::error!("Feeder thread panicked: {:?}", e);
+        return Err(IdsError::invalid_operation("Feeder thread panicked during parquet reading"));
+    }
     
     // Wait for all workers to finish
     for (i, handle) in worker_handles.into_iter().enumerate() {
@@ -407,7 +410,11 @@ fn process_batch(
 
     // Optimize memory layout
     #[allow(clippy::unnecessary_mut_passed)]
-    let aligned_batch = ArrowUtils::align_batch_buffers(&batch)?;
+    let aligned_batch = ArrowUtils::align_batch_buffers(&batch)
+        .map_err(|e| {
+            // Add more context to the error
+            IdsError::invalid_operation(format!("Failed to align batch buffers: {}", e))
+        })?;
 
     if let Some(pb) = pb {
         pb.inc(aligned_batch.get_array_memory_size() as u64);
@@ -510,7 +517,7 @@ pub fn load_parquet_files_parallel(
         .map(|path| {
             let filename = path.file_name()
                 .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
+                .unwrap_or("unknown") // Safe fallback with unwrap_or
                 .to_string();
                 
             match read_parquet(path, schema, progress, pnr_filter) {
@@ -581,7 +588,11 @@ pub fn filter_batches_by_date_range(
                 Ok(Some(filtered)) => {
                     // Optimize memory layout
                     #[allow(clippy::unnecessary_mut_passed)]
-                    let optimized = ArrowUtils::align_batch_buffers(&filtered);
+                    let optimized = ArrowUtils::align_batch_buffers(&filtered)
+                        .map_err(|e| {
+                            // Add more context to the error
+                            IdsError::invalid_operation(format!("Failed to align filtered batch buffers: {}", e))
+                        })?;
                     Ok(Some(optimized))
                 }
                 Ok(None) => Ok(None), // No rows matched the filter
@@ -609,13 +620,9 @@ pub fn filter_batches_by_date_range(
             },
         );
     
-    // Flatten the result to handle the nested Results
-    filtered_batches.map(|batches_with_results| {
-        // Collect and propagate any errors
-        let mut flattened = Vec::with_capacity(batches_with_results.len());
-        for batch_result in batches_with_results {
-            flattened.push(batch_result?);
-        }
-        Ok(flattened)
+    // Flatten the result to get the final batches
+    filtered_batches.map(|batches| {
+        // The batches are already validated, so just flatten 
+        Ok(batches)
     })?
 }

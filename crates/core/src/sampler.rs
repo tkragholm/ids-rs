@@ -74,70 +74,65 @@ impl IncidenceDensitySampler {
                 )
             })
             .collect();
-        
+
         // Allocate all data structures with appropriate capacity
         let mut dates = Vec::with_capacity(n_records);
         let mut cases = Vec::with_capacity(50_000);
         let mut controls = Vec::with_capacity(n_records - 50_000);
-        
+
         // Process birth date index more efficiently using parallel aggregation
         // First collect all birth dates with their indices
         let birth_date_entries: Vec<_> = processed_data
             .par_iter()
             .map(|(idx, date_data, _)| (date_data.birth, *idx))
             .collect();
-        
+
         // Then build the birth date index using a thread-safe approach
         use std::sync::Mutex;
         let birth_date_index = {
             let index = Mutex::new(FxHashMap::with_capacity_and_hasher(
-                n_records / 365, 
-                FxBuildHasher
+                n_records / 365,
+                FxBuildHasher,
             ));
-            
+
             // Process in chunks to reduce lock contention
-            birth_date_entries
-                .par_chunks(1024)
-                .for_each(|chunk| {
-                    // Build a local map for this chunk
-                    let mut local_map = FxHashMap::with_capacity_and_hasher(
-                        chunk.len(),
-                        FxBuildHasher
-                    );
-                    
-                    // Add entries to the local map
-                    for &(birth_date, idx) in chunk {
-                        local_map
-                            .entry(birth_date)
-                            .or_insert_with(SmallVec::<[usize; 16]>::new)
-                            .push(idx);
-                    }
-                    
-                    // Merge the local map into the global map with a single lock
-                    let mut global_map = index.lock().unwrap();
-                    for (birth_date, indices) in local_map {
-                        global_map
-                            .entry(birth_date)
-                            .or_insert_with(SmallVec::<[usize; 16]>::new)
-                            .extend_from_slice(&indices);
-                    }
-                });
-            
+            birth_date_entries.par_chunks(1024).for_each(|chunk| {
+                // Build a local map for this chunk
+                let mut local_map = FxHashMap::with_capacity_and_hasher(chunk.len(), FxBuildHasher);
+
+                // Add entries to the local map
+                for &(birth_date, idx) in chunk {
+                    local_map
+                        .entry(birth_date)
+                        .or_insert_with(SmallVec::<[usize; 16]>::new)
+                        .push(idx);
+                }
+
+                // Merge the local map into the global map with a single lock
+                let mut global_map = index.lock().unwrap();
+                for (birth_date, indices) in local_map {
+                    global_map
+                        .entry(birth_date)
+                        .or_insert_with(SmallVec::<[usize; 16]>::new)
+                        .extend_from_slice(&indices);
+                }
+            });
+
             // Unwrap the mutex to get the final map
             index.into_inner().unwrap()
         };
-        
+
         // Process the remainder of the data
         for (idx, date_data, treatment) in processed_data {
             dates.push(date_data);
-            
+
             if treatment.is_some() {
                 cases.push(idx);
             } else {
                 controls.push(idx);
             }
         }
-        
+
         // Sort controls for efficient binary search later
         controls.par_sort_unstable();
 
@@ -189,7 +184,7 @@ impl IncidenceDensitySampler {
         println!("{}", "=".repeat(text.len()).blue());
     }
 
-    #[allow(dead_code, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn format_percentage(value: f64, total: f64) -> String {
         format!(
             "{:.1}% ({}/{})",
@@ -202,7 +197,7 @@ impl IncidenceDensitySampler {
     #[must_use]
     pub fn get_statistics(&self) -> String {
         use crate::utils::console::ConsoleOutput;
-        
+
         let total_records = self.records.len();
         let total_cases = self.cases.len();
         let total_controls = self.sorted_controls.len();
@@ -210,30 +205,30 @@ impl IncidenceDensitySampler {
         let control_pct = total_controls as f64 / total_records as f64 * 100.0;
 
         let mut stats = String::new();
-        
+
         stats.push_str(&format!("\n{}\n", "Dataset Statistics".green().bold()));
         stats.push_str(&format!("{}\n", "═".repeat(18).green()));
-        
+
         stats.push_str(&format!(
             "│ {} {}\n",
             "Total Records:".bold(),
             ConsoleOutput::format_number(total_records).yellow()
         ));
-        
+
         stats.push_str(&format!(
             "│ {} {} ({:.1}%)\n",
             "Cases:".bold(),
             ConsoleOutput::format_number(total_cases).yellow(),
             case_pct
         ));
-        
+
         stats.push_str(&format!(
             "│ {} {} ({:.1}%)\n",
             "Controls:".bold(),
             ConsoleOutput::format_number(total_controls).yellow(),
             control_pct
         ));
-        
+
         let ratio = total_controls as f64 / total_cases as f64;
         let ratio_str = format!("{ratio:.2}");
         let ratio_colored = if ratio >= 3.0 {
@@ -243,15 +238,15 @@ impl IncidenceDensitySampler {
         } else {
             ratio_str.red()
         };
-        
+
         stats.push_str(&format!(
             "│ {} {}\n",
             "Case/Control Ratio:".bold(),
             ratio_colored
         ));
-        
+
         stats.push_str(&format!("└{}\n", "─".repeat(30)));
-        
+
         stats
     }
 
@@ -308,7 +303,7 @@ impl IncidenceDensitySampler {
                         .filter_map(|birth_date| self.birth_date_index.get(&birth_date))
                         .flat_map(|controls| controls.iter().copied())
                         .collect();
-                    
+
                     // Filter candidates using binary search optimization
                     // and check the parent matches for each candidate
                     for control_idx in candidate_controls {
@@ -451,14 +446,14 @@ impl IncidenceDensitySampler {
 
     fn calculate_balance_metric(diffs: &[i64]) -> f64 {
         use rayon::prelude::*;
-        
+
         // Only use parallelism for large datasets where the overhead is worth it
         if diffs.len() > 10_000 {
             #[allow(clippy::cast_precision_loss)]
             let sum: i64 = diffs.par_iter().sum();
             #[allow(clippy::cast_precision_loss)]
             let mean = sum as f64 / diffs.len() as f64;
-            
+
             let variance_sum: f64 = diffs
                 .par_iter()
                 .map(|&x| {
@@ -467,7 +462,7 @@ impl IncidenceDensitySampler {
                     diff * diff
                 })
                 .sum();
-            
+
             #[allow(clippy::cast_precision_loss)]
             let variance = variance_sum / (diffs.len() - 1) as f64;
             mean / variance.sqrt()
@@ -500,9 +495,9 @@ impl IncidenceDensitySampler {
     ) -> Result<(), Box<dyn std::error::Error>> {
         use rayon::prelude::*;
         use std::sync::Mutex;
-        
+
         log::info!("Saving matches to {}", filename);
-        
+
         // Prepare all records in parallel before writing to file
         // This is faster than doing file I/O inside the parallel loop
         struct CsvRecord {
@@ -517,61 +512,64 @@ impl IncidenceDensitySampler {
             mother_diff: String,
             father_diff: String,
         }
-        
+
         // Count total number of records to pre-allocate
         let total_pairs: usize = case_control_pairs
             .iter()
             .map(|(_, controls)| controls.len())
             .sum();
-            
+
         // Process data in parallel and collect all records
         let all_records = Mutex::new(Vec::with_capacity(total_pairs));
-        
+
         // Use parallel processing to prepare records
-        case_control_pairs.par_iter().for_each(|(case_idx, controls)| {
-            let case = &self.records[*case_idx];
-            let case_dates = self.dates[*case_idx];
-            
-            // Process each control for this case
-            let mut batch_records = Vec::with_capacity(controls.len());
-            
-            for &control_idx in controls {
-                let control = &self.records[control_idx];
-                let control_dates = self.dates[control_idx];
+        case_control_pairs
+            .par_iter()
+            .for_each(|(case_idx, controls)| {
+                let case = &self.records[*case_idx];
+                let case_dates = self.dates[*case_idx];
 
-                let mother_diff = match (case_dates.mother, control_dates.mother) {
-                    (Some(m1), Some(m2)) => (m1 - m2).abs().to_string(),
-                    _ => "NA".to_string(),
-                };
+                // Process each control for this case
+                let mut batch_records = Vec::with_capacity(controls.len());
 
-                let father_diff = match (case_dates.father, control_dates.father) {
-                    (Some(f1), Some(f2)) => (f1 - f2).abs().to_string(),
-                    _ => "NA".to_string(),
-                };
-                
-                batch_records.push(CsvRecord {
-                    case_id: case_idx.to_string(),
-                    case_pnr: case.pnr.clone(),
-                    case_birth_date: case.bday.to_string(),
-                    case_treatment_date: case.treatment_date
-                        .map_or("NA".to_string(), |d| d.to_string()),
-                    control_id: control_idx.to_string(),
-                    control_pnr: control.pnr.clone(),
-                    control_birth_date: control.bday.to_string(),
-                    birth_date_diff: (case_dates.birth - control_dates.birth).abs().to_string(),
-                    mother_diff,
-                    father_diff,
-                });
-            }
-            
-            // Add this batch to the main collection with a single lock
-            let mut all_records = all_records.lock().unwrap();
-            all_records.extend(batch_records);
-        });
-        
+                for &control_idx in controls {
+                    let control = &self.records[control_idx];
+                    let control_dates = self.dates[control_idx];
+
+                    let mother_diff = match (case_dates.mother, control_dates.mother) {
+                        (Some(m1), Some(m2)) => (m1 - m2).abs().to_string(),
+                        _ => "NA".to_string(),
+                    };
+
+                    let father_diff = match (case_dates.father, control_dates.father) {
+                        (Some(f1), Some(f2)) => (f1 - f2).abs().to_string(),
+                        _ => "NA".to_string(),
+                    };
+
+                    batch_records.push(CsvRecord {
+                        case_id: case_idx.to_string(),
+                        case_pnr: case.pnr.clone(),
+                        case_birth_date: case.bday.to_string(),
+                        case_treatment_date: case
+                            .treatment_date
+                            .map_or("NA".to_string(), |d| d.to_string()),
+                        control_id: control_idx.to_string(),
+                        control_pnr: control.pnr.clone(),
+                        control_birth_date: control.bday.to_string(),
+                        birth_date_diff: (case_dates.birth - control_dates.birth).abs().to_string(),
+                        mother_diff,
+                        father_diff,
+                    });
+                }
+
+                // Add this batch to the main collection with a single lock
+                let mut all_records = all_records.lock().unwrap();
+                all_records.extend(batch_records);
+            });
+
         // Write the CSV file in a single thread (disk I/O is not parallelized)
         let mut wtr = csv::Writer::from_path(filename)?;
-        
+
         // Write header
         wtr.write_record([
             "case_id",
@@ -585,7 +583,7 @@ impl IncidenceDensitySampler {
             "mother_age_diff_days",
             "father_age_diff_days",
         ])?;
-        
+
         // Write all records
         let records = all_records.into_inner().unwrap();
         for record in records {

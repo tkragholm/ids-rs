@@ -1,17 +1,12 @@
 pub mod cli;
 pub mod commands;
-pub mod config;
-pub mod error;
+pub mod core;
+pub mod diagnostic;
+pub mod prelude;
 pub mod utils;
 
-// Re-export key types for convenient access
-pub use cli::{Cli, Commands, ConfigCommands};
-pub use error::{IdsError, IdsResult};
-
-use clap::Parser;
-use indicatif::MultiProgress;
-use indicatif_log_bridge::LogWrapper;
-use std::process;
+// Re-export from prelude for convenience
+pub use prelude::*;
 
 /// Main entry function for the library
 /// 
@@ -31,23 +26,37 @@ use std::process;
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Install color-eyre for better error reporting
     color_eyre::install()?;
-    // Check for the most common command line mistake - missing space after --family-file
-    for arg in std::env::args() {
-        if arg.starts_with("--family-file") && arg != "--family-file" {
-            eprintln!(
-                "ERROR: Detected possible command line issue. You provided '{arg}' without a space."
-            );
-            eprintln!("       Did you mean to write: --family-file {}", &arg[13..]);
-            eprintln!(
-                "       Check other parameters too. Put a space between each flag and its value."
-            );
-            process::exit(1);
-        }
-    }
+    
+    // Parse command line arguments with extended error handling
+    let cli = cli::parser::parse_cli_args();
 
-    // Initialize logging system with progress bars
+    // Initialize logging with progress bars
+    initialize_logging()?;
+    
+    // Create output directories and configure file logging
+    utils::setup_directories(&cli.output_dir)?;
+    utils::configure_logging_with_dir(&cli.output_dir)?;
+
+    // Execute the requested command
+    let result = dispatch_command(&cli)?;
+    
+    Ok(result)
+}
+
+/// Initialize logging with progress bars
+/// 
+/// Sets up console logging with progress bar integration.
+/// 
+/// # Returns
+/// * `Result<(), Box<dyn std::error::Error>>` - Success or error
+/// 
+/// # Errors
+/// * Returns an error if logging initialization fails
+fn initialize_logging() -> Result<(), Box<dyn std::error::Error>> {
+    use indicatif::MultiProgress;
+    use indicatif_log_bridge::LogWrapper;
+    
     // Create a custom environment with a modified default filter
-    // This allows us to control the logger behavior more precisely
     let env = env_logger::Env::default().filter_or("RUST_LOG", "warn");
 
     // Build the logger with our custom env settings
@@ -69,25 +78,31 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set the global max log level
     log::set_max_level(level);
+    
+    Ok(())
+}
 
-    // Parse command line arguments
-    let cli = match Cli::try_parse() {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("{e}");
-            eprintln!("\nNOTE: Make sure there is a space between each flag and its value!");
-            eprintln!("Example: --family-file data/registers/family.parquet");
-            process::exit(1);
-        }
-    };
-
-    // Create output directories and configure logging
-    utils::setup_directories(&cli.output_dir)?;
-    utils::configure_logging_with_dir(&cli.output_dir)?;
-
-    // Execute the requested command
-    let result = match &cli.command {
-        Commands::Config { command } => commands::handle_config_command(command),
+/// Dispatch the command to the appropriate handler
+/// 
+/// Based on the command specified in the CLI arguments, this function
+/// calls the appropriate command handler.
+/// 
+/// # Arguments
+/// * `cli` - The parsed CLI arguments
+/// 
+/// # Returns
+/// * `IdsResult<()>` - Success or error
+/// 
+/// # Errors
+/// * Returns an error if command execution fails
+fn dispatch_command(cli: &cli::types::Cli) -> IdsResult<()> {
+    use cli::types::Commands;
+    
+    match &cli.command {
+        Commands::Config { command } => {
+            commands::config::handle_config_command(command)
+        },
+        
         Commands::GenerateRegisters {
             output_dir,
             num_records,
@@ -95,26 +110,32 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             start_year,
             end_year,
             seed,
-        } => commands::handle_generate_registers(
-            output_dir,
-            *num_records,
-            *num_cases,
-            *start_year,
-            *end_year,
-            *seed,
-        ),
+        } => {
+            commands::generate::handle_generate_registers(
+                output_dir,
+                *num_records,
+                *num_cases,
+                *start_year,
+                *end_year,
+                *seed,
+            )
+        },
+        
         Commands::Sample {
             input,
             controls,
             birth_window,
             parent_window,
-        } => commands::handle_sampling(
-            input,
-            *controls,
-            *birth_window,
-            *parent_window,
-            &cli.output_dir,
-        ),
+        } => {
+            commands::sample::handle_sampling(
+                input,
+                *controls,
+                *birth_window,
+                *parent_window,
+                &cli.output_dir,
+            )
+        },
+        
         Commands::CheckBalance {
             matches_file,
             covariate_dir,
@@ -125,7 +146,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             uddf_dir,
             structured,
         } => {
-            let config = commands::balance::BalanceCheckConfig {
+            let config = commands::balance::config::BalanceCheckConfig {
                 matches_file,
                 covariate_dir: covariate_dir.as_deref(),
                 output_dir: &cli.output_dir,
@@ -136,13 +157,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 uddf_dir: uddf_dir.as_deref(),
                 generate_structured_output: *structured,
             };
-            commands::handle_balance_check(&config)
+            commands::balance::handler::handle_balance_check(&config)
         }
-    };
-    
-    // Convert custom error to standard Box<dyn std::error::Error>
-    match result {
-        Ok(()) => Ok(()),
-        Err(e) => Err(Box::new(e))
     }
 }

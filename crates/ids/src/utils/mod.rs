@@ -1,7 +1,9 @@
-mod paths;
-mod setup;
-mod reports;
+pub mod paths;
+pub mod reports;
+pub mod setup;
 
-pub use paths::{resolve_path, check_path_exists, normalize_path};
-pub use setup::{setup_directories, configure_logging_with_dir};
+// Re-export the most commonly used functionality
+pub use paths::normalize_path;
 pub use reports::generate_structured_reports;
+pub use setup::logging::configure_logging_with_dir;
+pub use setup::directories::setup_directories;

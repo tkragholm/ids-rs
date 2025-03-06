@@ -1188,6 +1188,7 @@ dependencies = [
  "loader",
  "log",
  "log4rs",
+ "num_cpus",
  "serde_json",
  "smallvec",
  "thiserror 2.0.12",

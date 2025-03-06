@@ -1,4 +1,4 @@
-use super::checker::BalanceChecker;
+use super::BalanceChecker;
 use super::processor::ValueProcessor;
 use super::stats::StatisticalCalculations;
 use crate::models::CovariateSummary;

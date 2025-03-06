@@ -1,4 +1,4 @@
-use super::checker::BalanceChecker;
+use super::BalanceChecker;
 use chrono::NaiveDate;
 use indicatif::{ParallelProgressIterator, ProgressStyle};
 use rayon::prelude::*;
@@ -39,6 +39,18 @@ pub(crate) struct ValueProcessor {
     thread_count: usize,
     chunk_size_multiplier: usize,
     optimization_strategy: OptimizationStrategy,
+}
+
+/// Parameters for processing a chunk of data with date grouping
+struct DateGroupingParams<'a, F, V> {
+    chunk: &'a [(String, NaiveDate)],
+    covariate_type: CovariateType,
+    checker: &'a BalanceChecker,
+    extractor: &'a F,
+    values: &'a mut Vec<V>,
+    missing: &'a mut usize,
+    cache_hits: &'a mut usize,
+    cache_misses: &'a mut usize,
 }
 
 impl ValueProcessor {
@@ -262,14 +274,16 @@ impl ValueProcessor {
                 if chunk.len() < 500 {
                     // For small chunks, try the date grouping optimization
                     self.process_with_date_grouping_numeric(
-                        chunk,
-                        covariate_type,
-                        checker,
-                        extractor,
-                        &mut values,
-                        &mut missing,
-                        &mut cache_hits,
-                        &mut cache_misses,
+                        DateGroupingParams {
+                            chunk,
+                            covariate_type,
+                            checker,
+                            extractor,
+                            values: &mut values,
+                            missing: &mut missing,
+                            cache_hits: &mut cache_hits,
+                            cache_misses: &mut cache_misses,
+                        }
                     );
                 } else {
                     // For larger chunks, process linearly to avoid memory issues
@@ -293,14 +307,16 @@ impl ValueProcessor {
             OptimizationStrategy::Performance => {
                 // Performance mode: use date grouping optimization for all chunk sizes
                 self.process_with_date_grouping_numeric(
-                    chunk,
-                    covariate_type,
-                    checker,
-                    extractor,
-                    &mut values,
-                    &mut missing,
-                    &mut cache_hits,
-                    &mut cache_misses,
+                    DateGroupingParams {
+                        chunk,
+                        covariate_type,
+                        checker,
+                        extractor,
+                        values: &mut values,
+                        missing: &mut missing,
+                        cache_hits: &mut cache_hits,
+                        cache_misses: &mut cache_misses,
+                    }
                 );
             }
         }
@@ -498,14 +514,16 @@ impl ValueProcessor {
                 if chunk.len() < 500 {
                     // For small chunks, try the date grouping optimization
                     self.process_with_date_grouping_categorical(
-                        chunk,
-                        covariate_type,
-                        checker,
-                        extractor,
-                        &mut values,
-                        &mut missing,
-                        &mut cache_hits,
-                        &mut cache_misses,
+                        DateGroupingParams {
+                            chunk,
+                            covariate_type, 
+                            checker,
+                            extractor,
+                            values: &mut values,
+                            missing: &mut missing,
+                            cache_hits: &mut cache_hits,
+                            cache_misses: &mut cache_misses,
+                        }
                     );
                 } else {
                     // For larger chunks, process linearly to avoid memory issues
@@ -529,14 +547,16 @@ impl ValueProcessor {
             OptimizationStrategy::Performance => {
                 // Performance mode: use date grouping optimization for all chunk sizes
                 self.process_with_date_grouping_categorical(
-                    chunk,
-                    covariate_type,
-                    checker,
-                    extractor,
-                    &mut values,
-                    &mut missing,
-                    &mut cache_hits,
-                    &mut cache_misses,
+                    DateGroupingParams {
+                        chunk,
+                        covariate_type,
+                        checker,
+                        extractor,
+                        values: &mut values,
+                        missing: &mut missing,
+                        cache_hits: &mut cache_hits,
+                        cache_misses: &mut cache_misses,
+                    }
                 );
             }
         }
@@ -592,36 +612,30 @@ impl ValueProcessor {
         }
     }
 
+
     /// Process a chunk of subjects with date grouping optimization for numeric values
     #[inline]
     fn process_with_date_grouping_numeric<F>(
         &self,
-        chunk: &[(String, NaiveDate)],
-        covariate_type: CovariateType,
-        checker: &BalanceChecker,
-        extractor: &F,
-        values: &mut Vec<f64>,
-        missing: &mut usize,
-        cache_hits: &mut usize,
-        cache_misses: &mut usize,
+        params: DateGroupingParams<'_, F, f64>,
     ) where
         F: Fn(&Covariate) -> Option<f64> + Send + Sync,
     {
         // Create a memory reservation for the temporary date grouping
         let guard_id = format!(
             "date_group_numeric_{}_{}",
-            covariate_type as u8,
-            chunk.len()
+            params.covariate_type as u8,
+            params.chunk.len()
         );
         let estimated_size =
-            chunk.len() * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
+            params.chunk.len() * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
         let _memory_guard = MemoryGuard::new(&guard_id, estimated_size);
 
         // Use date grouping for better cache locality
-        let mut date_groups = hashbrown::HashMap::with_capacity(chunk.len() / 10);
+        let mut date_groups = hashbrown::HashMap::with_capacity(params.chunk.len() / 10);
 
         // Group by date first
-        for (pnr, date) in chunk {
+        for (pnr, date) in params.chunk {
             date_groups
                 .entry(*date)
                 .or_insert_with(Vec::new)
@@ -635,13 +649,13 @@ impl ValueProcessor {
                 self.process_single_numeric_item(
                     pnr,
                     date,
-                    covariate_type,
-                    checker,
-                    extractor,
-                    values,
-                    missing,
-                    cache_hits,
-                    cache_misses,
+                    params.covariate_type,
+                    params.checker,
+                    params.extractor,
+                    params.values,
+                    params.missing,
+                    params.cache_hits,
+                    params.cache_misses,
                     start,
                 );
             }
@@ -652,32 +666,25 @@ impl ValueProcessor {
     #[inline]
     fn process_with_date_grouping_categorical<F>(
         &self,
-        chunk: &[(String, NaiveDate)],
-        covariate_type: CovariateType,
-        checker: &BalanceChecker,
-        extractor: &F,
-        values: &mut Vec<String>,
-        missing: &mut usize,
-        cache_hits: &mut usize,
-        cache_misses: &mut usize,
+        params: DateGroupingParams<'_, F, String>,
     ) where
         F: Fn(&Covariate) -> Option<String> + Send + Sync,
     {
         // Create a memory reservation for the temporary date grouping
         let guard_id = format!(
             "date_group_categorical_{}_{}",
-            covariate_type as u8,
-            chunk.len()
+            params.covariate_type as u8,
+            params.chunk.len()
         );
         let estimated_size =
-            chunk.len() * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
+            params.chunk.len() * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
         let _memory_guard = MemoryGuard::new(&guard_id, estimated_size);
 
         // Use date grouping for better cache locality
-        let mut date_groups = hashbrown::HashMap::with_capacity(chunk.len() / 10);
+        let mut date_groups = hashbrown::HashMap::with_capacity(params.chunk.len() / 10);
 
         // Group by date first
-        for (pnr, date) in chunk {
+        for (pnr, date) in params.chunk {
             date_groups
                 .entry(*date)
                 .or_insert_with(Vec::new)
@@ -691,13 +698,13 @@ impl ValueProcessor {
                 self.process_single_categorical_item(
                     pnr,
                     date,
-                    covariate_type,
-                    checker,
-                    extractor,
-                    values,
-                    missing,
-                    cache_hits,
-                    cache_misses,
+                    params.covariate_type,
+                    params.checker,
+                    params.extractor,
+                    params.values,
+                    params.missing,
+                    params.cache_hits,
+                    params.cache_misses,
                     start,
                 );
             }

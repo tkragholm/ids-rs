@@ -19,7 +19,7 @@ impl LoaderProgress {
         let multi_progress = MultiProgress::new();
         let main_style = ProgressStyle::default_bar()
             .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-            .unwrap();
+            .expect("Failed to create progress bar template - this is a static template that should never fail");
 
         let main_pb = multi_progress.add(ProgressBar::new(5));
         main_pb.set_style(main_style);
@@ -36,7 +36,7 @@ impl LoaderProgress {
     pub fn create_file_progress(&self, size: u64, filename: &str) -> ProgressBar {
         let style = ProgressStyle::default_bar()
                 .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.yellow/red} {bytes}/{total_bytes} ({percent}%) {msg}")
-                .unwrap()
+                .expect("Failed to create progress bar template - this is a static template that should never fail")
                 .progress_chars("█▇▆▅▄▃▂▁  ");
 
         let pb = self.multi_progress.add(ProgressBar::new(size));
@@ -49,7 +49,7 @@ impl LoaderProgress {
     pub fn start_sub_progress(&mut self, total: u64, prefix: String) {
         let style = ProgressStyle::default_bar()
                 .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.yellow/red} {pos}/{len} ({percent}%) {msg}")
-                .unwrap();
+                .expect("Failed to create progress bar template - this is a static template that should never fail");
 
         let pb = self.multi_progress.add(ProgressBar::new(total));
         pb.set_style(style);
@@ -88,7 +88,7 @@ impl LoaderProgress {
     pub fn create_main_progress(&self, total: u64, operation_name: String) -> ProgressBar {
         let style = ProgressStyle::default_bar()
             .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.green/blue} {pos}/{len} ({percent}%) {msg}")
-            .unwrap();
+            .expect("Failed to create progress bar template - this is a static template that should never fail");
 
         let pb = self.multi_progress.add(ProgressBar::new(total));
         pb.set_style(style);
@@ -100,7 +100,7 @@ impl LoaderProgress {
     pub fn start_with_spinner(&self, message: String) -> ProgressBar {
         let spinner_style = ProgressStyle::default_spinner()
             .template("{spinner:.green} {prefix:.bold.dim} [{elapsed_precise}] {msg}")
-            .unwrap();
+            .expect("Failed to create spinner template - this is a static template that should never fail");
             
         let spinner = self.multi_progress.add(ProgressBar::new_spinner());
         spinner.set_style(spinner_style);

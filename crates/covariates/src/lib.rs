@@ -1,30 +1,45 @@
+// Core modules
+pub mod core;
+pub mod data;
+pub mod processing;
 pub mod balance;
-pub mod config;
-pub mod matched_pairs;
-pub mod models;
-pub mod processors;
 pub mod reporting;
-pub mod storage;
+pub mod models;
+pub mod prelude;
 
-pub use balance::BalanceChecker;
-pub use config::{CovariatesConfig, CovariateTypeConfig, CovariateVariableConfig, generate_default_config};
-pub use matched_pairs::loader::load_matched_pairs;
+// Re-exports for backward compatibility
+pub use core::config::{CovariatesConfig, CovariateTypeConfig, CovariateVariableConfig, generate_default_config};
+pub use core::Error as CovariateError;
+
+// Balance checking functionality
+pub use balance::{
+    BalanceChecker, 
+    BalanceCheckerBuilder,
+    BalanceResults, 
+    OptimizationStrategy,
+    memory_manager, 
+    MemoryGuard, 
+    MemoryTier,
+};
+
+// Data access
+pub use data::matched_pairs::loader::load_matched_pairs;
 pub use models::CovariateSummary;
-pub use processors::{
-    ConfigurableProcessor,
-    ConfigurableVariableProcessor,
-    CovariateProcessorRegistry,
+
+// Processors
+pub use processing::{
+    ConfigurableProcessor, 
+    ProcessorFactory,
     DemographicsProcessor,
     EducationProcessor,
     IncomeProcessor,
     OccupationProcessor,
-    ProcessorFactory,
 };
+pub use core::registry::CovariateProcessorRegistry;
+
+// Reporting
 pub use reporting::{BalanceReport, ComprehensiveReport, CsvReport};
 
-// Re-export types that we want to expose
-pub use types::{
-    error::IdsError as CovariateError,
-    models::{Covariate, CovariateType, CovariateValue},
-    traits::{CovariateProcessor, Store, VariableType},
-};
+// Re-export types we depend on for convenience
+pub use types::models::{Covariate, CovariateType, CovariateValue};
+pub use types::traits::{CovariateProcessor, Store, VariableType};

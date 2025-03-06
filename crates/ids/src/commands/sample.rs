@@ -1,4 +1,4 @@
-use crate::error::IdsResult;
+use crate::core::{IdsError, IdsResult};
 use core::utils::console::{format_duration_short, ConsoleOutput};
 use core::utils::{load_records, validate_csv_format, MatchingCriteria};
 use core::sampler::IncidenceDensitySampler;
@@ -86,7 +86,7 @@ fn validate_and_load_data(input: &str) -> IdsResult<()> {
         }
         Err(e) => {
             ConsoleOutput::error(&format!("CSV validation failed: {e}"));
-            Err(crate::error::IdsError::validation(format!(
+            Err(crate::core::IdsError::validation(format!(
                 "CSV validation failed: {e}"
             )))
         }
@@ -109,7 +109,7 @@ fn create_sampler(
     ConsoleOutput::key_value("Input file", input);
 
     let start = Instant::now();
-    let records = load_records(input).map_err(|e| crate::error::IdsError::data_loading(format!(
+    let records = load_records(input).map_err(|e| crate::core::IdsError::data_loading(format!(
         "Failed to load records: {e}"
     )))?;
     let loading_time = start.elapsed();
@@ -123,7 +123,7 @@ fn create_sampler(
     ConsoleOutput::subsection("Sampler Initialization");
     let sampler_start = Instant::now();
     let sampler = IncidenceDensitySampler::new(records, criteria)
-        .map_err(|e| crate::error::IdsError::sampling(format!(
+        .map_err(|e| crate::core::IdsError::sampling(format!(
             "Failed to initialize sampler: {e}"
         )))?;
     let init_time = sampler_start.elapsed();
@@ -156,7 +156,7 @@ fn process_sampling_results(
 
     let sampling_start = Instant::now();
     let case_control_pairs = sampler.sample_controls(controls)
-        .map_err(|e| crate::error::IdsError::sampling(format!(
+        .map_err(|e| crate::core::IdsError::sampling(format!(
             "Failed to sample controls: {e}"
         )))?;
     let sampling_time = sampling_start.elapsed();
@@ -181,7 +181,7 @@ fn process_sampling_results(
         }
         Err(e) => {
             ConsoleOutput::error(&format!("Error saving matches to CSV: {e}"));
-            return Err(crate::error::IdsError::sampling(format!(
+            return Err(crate::core::IdsError::sampling(format!(
                 "Error saving matches to CSV: {e}"
             )));
         }
@@ -195,7 +195,7 @@ fn process_sampling_results(
         }
         Err(e) => {
             ConsoleOutput::error(&format!("Error saving statistics: {e}"));
-            return Err(crate::error::IdsError::sampling(format!(
+            return Err(crate::core::IdsError::sampling(format!(
                 "Error saving matching statistics: {e}"
             )));
         }
@@ -219,7 +219,7 @@ fn process_sampling_results(
         }
         Err(e) => {
             ConsoleOutput::error(&format!("Error generating plots: {e}"));
-            return Err(crate::error::IdsError::sampling(format!(
+            return Err(crate::core::IdsError::sampling(format!(
                 "Error generating plots: {e}"
             )));
         }

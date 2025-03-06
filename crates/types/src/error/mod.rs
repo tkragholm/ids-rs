@@ -344,7 +344,6 @@ pub type Result<T> = std::result::Result<T, IdsError>;
 ///         .map_err(IdsError::from)
 /// }
 /// ```
-
 /// Legacy Context trait for enhancing error handling with contextual information
 /// 
 /// This trait is kept for backward compatibility, but new code should use anyhow::Context instead.
