@@ -4,13 +4,14 @@ use chrono::NaiveDate;
 use hashbrown::HashMap;
 use log;
 
-// Note: For initial phase, we'll keep original imports, to be updated in next phase
+// Updated imports for new module structure
 use crate::{
-    arrow::access::ArrowAccess,
-    arrow::utils::ArrowUtils,
     error::IdsError,
     family::{FamilyRelations, FamilyStore},
     models::{Covariate, CovariateType, TimeVaryingValue},
+    storage::arrow::access::ArrowAccess,
+    storage::arrow::convert::ArrowType, 
+    storage::arrow::utils::ArrowUtils,
     traits::Store,
     translation::TranslationMaps,
 };
@@ -27,7 +28,7 @@ pub struct ArrowBackend {
 }
 
 impl ArrowBackend {
-    pub fn new() -> Result<Self, IdsError> {
+    pub fn new() -> std::result::Result<Self, IdsError> {
         let translations =
             TranslationMaps::new().map_err(|e| IdsError::invalid_format(format!("{e}")))?;
 
@@ -118,7 +119,7 @@ impl ArrowBackend {
         }
     }
 
-    pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
+    pub fn add_akm_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -135,7 +136,7 @@ impl ArrowBackend {
         Ok(())
     }
 
-    pub fn add_bef_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
+    pub fn add_bef_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -152,7 +153,7 @@ impl ArrowBackend {
         Ok(())
     }
 
-    pub fn add_ind_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
+    pub fn add_ind_data(&mut self, year: i32, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -169,7 +170,7 @@ impl ArrowBackend {
         Ok(())
     }
 
-    pub fn add_uddf_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> Result<(), IdsError> {
+    pub fn add_uddf_data(&mut self, period: String, mut batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
@@ -187,12 +188,12 @@ impl ArrowBackend {
     }
     
     /// Add family data to the backend
-    pub fn add_family_data(&mut self, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
+    pub fn add_family_data(&mut self, batches: Vec<RecordBatch>) -> std::result::Result<(), IdsError> {
         // Load family relations using existing implementation
         self.load_family_relations(batches)
     }
 
-    fn get_education(&self, pnr: &str, date: NaiveDate) -> Result<Option<Covariate>, IdsError> {
+    fn get_education(&self, pnr: &str, date: NaiveDate) -> std::result::Result<Option<Covariate>, IdsError> {
         // Find the closest UDDF data period before the given date
         let period = self.find_closest_period(date, &self.uddf_data)?;
 
@@ -212,14 +213,18 @@ impl ArrowBackend {
         Ok(None)
     }
 
-    fn get_income(&self, pnr: &str, date: NaiveDate) -> Result<Option<Covariate>, IdsError> {
+    fn get_income(&self, pnr: &str, date: NaiveDate) -> std::result::Result<Option<Covariate>, IdsError> {
         use chrono::Datelike;
         let year = date.year();
         if let Some(batches) = self.ind_data.get(&year) {
             for batch in batches {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
                     // Get value directly using optimized method
-                    let amount: Option<f64> = self.get_value(batch, "PERINDKIALT_13", idx)?;
+                    // Use batch directly to get the value
+                    let column = batch.column(batch.schema().index_of("PERINDKIALT_13")?);
+                    let array = column.as_any().downcast_ref::<arrow::array::Float64Array>()
+                        .ok_or_else(|| IdsError::data_loading("Income column not a float array".to_string()))?;
+                    let amount = if array.is_null(idx) { None } else { Some(array.value(idx)) };
                     if let Some(amount) = amount {
                         return Ok(Some(Covariate::income(
                             amount,
@@ -233,18 +238,49 @@ impl ArrowBackend {
         Ok(None)
     }
 
-    fn get_demographics(&self, pnr: &str, date: NaiveDate) -> Result<Option<Covariate>, IdsError> {
+    fn get_demographics(&self, pnr: &str, date: NaiveDate) -> std::result::Result<Option<Covariate>, IdsError> {
         let period = self.find_closest_period(date, &self.bef_data)?;
 
         if let Some(batches) = period.and_then(|p| self.bef_data.get(p)) {
             for batch in batches {
                 if let Some(idx) = self.find_pnr_index(batch, pnr)? {
                     // Use direct access for better performance - get all values at once
-                    let family_size: Option<i32> = self.get_value(batch, "ANTPERSF", idx)?;
-                    let municipality: Option<i32> = self.get_value(batch, "KOM", idx)?;
-                    let family_type: Option<i32> = self.get_value(batch, "FAMILIE_TYPE", idx)?;
-                    // Fix: Get STATSB as a string value, not an integer
-                    let statsb: Option<String> = self.get_value(batch, "STATSB", idx)?;
+                    // Get values directly from the batch
+                    let family_size_col = batch.column(batch.schema().index_of("ANTPERSF")?);
+                    let family_size: Option<i32> = if family_size_col.is_null(idx) { 
+                        None 
+                    } else {
+                        let array = family_size_col.as_any().downcast_ref::<arrow::array::Int32Array>()
+                            .ok_or_else(|| IdsError::data_loading("ANTPERSF not an int32 array".to_string()))?;
+                        Some(array.value(idx))
+                    };
+                    
+                    let kom_col = batch.column(batch.schema().index_of("KOM")?);
+                    let municipality: Option<i32> = if kom_col.is_null(idx) { 
+                        None 
+                    } else {
+                        let array = kom_col.as_any().downcast_ref::<arrow::array::Int32Array>()
+                            .ok_or_else(|| IdsError::data_loading("KOM not an int32 array".to_string()))?;
+                        Some(array.value(idx))
+                    };
+                    
+                    let family_col = batch.column(batch.schema().index_of("FAMILIE_TYPE")?);
+                    let family_type: Option<i32> = if family_col.is_null(idx) {
+                        None
+                    } else {
+                        let array = family_col.as_any().downcast_ref::<arrow::array::Int32Array>()
+                            .ok_or_else(|| IdsError::data_loading("FAMILIE_TYPE not an int32 array".to_string()))?;
+                        Some(array.value(idx))
+                    };
+
+                    let statsb_col = batch.column(batch.schema().index_of("STATSB")?);
+                    let statsb: Option<String> = if statsb_col.is_null(idx) {
+                        None
+                    } else {
+                        let array = statsb_col.as_any().downcast_ref::<arrow::array::StringArray>()
+                            .ok_or_else(|| IdsError::data_loading("STATSB not a string array".to_string()))?;
+                        Some(array.value(idx).to_string())
+                    };
 
                     if let (Some(family_size), Some(municipality), Some(family_type)) =
                         (family_size, municipality, family_type)
@@ -280,7 +316,7 @@ impl ArrowBackend {
     }
 
     /// Optimize batch operations by slicing when needed
-    pub fn optimize_batch(&mut self, batch: &mut RecordBatch) -> Result<(), IdsError> {
+    pub fn optimize_batch(&mut self, batch: &mut RecordBatch) -> std::result::Result<(), IdsError> {
         // Align buffers for better memory performance
         let _ = ArrowUtils::align_batch_buffers(batch);
         Ok(())
@@ -292,7 +328,7 @@ impl ArrowBackend {
         batch: &RecordBatch,
         offset: usize,
         length: usize,
-    ) -> Result<RecordBatch, IdsError> {
+    ) -> std::result::Result<RecordBatch, IdsError> {
         let mut columns = Vec::with_capacity(batch.num_columns());
 
         for i in 0..batch.num_columns() {
@@ -312,7 +348,7 @@ impl ArrowBackend {
     pub fn create_optimized_string_array(
         &self,
         strings: &[String],
-    ) -> Result<StringArray, IdsError> {
+    ) -> std::result::Result<StringArray, IdsError> {
         ArrowUtils::create_optimized_string_array(strings, strings.len())
     }
 
@@ -320,7 +356,7 @@ impl ArrowBackend {
         &self,
         date: NaiveDate,
         data: &'a HashMap<String, Vec<RecordBatch>>,
-    ) -> Result<Option<&'a String>, IdsError> {
+    ) -> std::result::Result<Option<&'a String>, IdsError> {
         Ok(data
             .keys()
             .filter(|p| {
@@ -350,7 +386,7 @@ impl ArrowBackend {
     pub fn load_family_relations(
         &mut self,
         mut family_batches: Vec<RecordBatch>,
-    ) -> Result<(), IdsError> {
+    ) -> std::result::Result<(), IdsError> {
         // Optimize batches before loading
         for batch in &mut family_batches {
             // Validate batch
@@ -375,7 +411,7 @@ impl Store for ArrowBackend {
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,
-    ) -> Result<Option<Covariate>, IdsError> {
+    ) -> std::result::Result<Option<Covariate>, IdsError> {
         match covariate_type {
             CovariateType::Education => self.get_education(pnr, date),
             CovariateType::Income => self.get_income(pnr, date),
@@ -388,7 +424,7 @@ impl Store for ArrowBackend {
         self.family_data.get(pnr)
     }
 
-    fn load_data(&mut self, _data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError> {
+    fn load_data(&mut self, _data: Vec<TimeVaryingValue<Covariate>>) -> std::result::Result<(), IdsError> {
         Err(IdsError::invalid_operation(
             "Cannot load time-varying data into Arrow store",
         ))
@@ -400,5 +436,88 @@ impl Store for ArrowBackend {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+}
+
+// Helper method to find the index of a PNR in a batch
+impl ArrowBackend {
+    fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> std::result::Result<Option<usize>, IdsError> {
+        if !batch.schema().fields().iter().any(|f| f.name() == "PNR") {
+            return Ok(None);
+        }
+        
+        let pnr_idx = batch.schema().index_of("PNR")?;
+        let pnr_array = batch.column(pnr_idx);
+        
+        if let Some(string_array) = pnr_array.as_any().downcast_ref::<StringArray>() {
+            for i in 0..string_array.len() {
+                if !string_array.is_null(i) && string_array.value(i) == pnr {
+                    return Ok(Some(i));
+                }
+            }
+        }
+        
+        Ok(None)
+    }
+    
+    // Helper method to get a string array from a column
+    fn get_string_array<'a>(&self, batch: &'a RecordBatch, column_name: &str) -> std::result::Result<&'a StringArray, IdsError> {
+        let col_idx = batch.schema().index_of(column_name)?;
+        let array = batch.column(col_idx);
+        
+        array.as_any().downcast_ref::<StringArray>()
+            .ok_or_else(move || IdsError::data_loading(format!("Column {} is not a string array", column_name)))
+    }
+    
+    fn validate_batch(&self, batch: &RecordBatch) -> std::result::Result<(), IdsError> {
+        // Implementation to validate batch structure
+        if batch.num_rows() == 0 {
+            return Err(IdsError::data_loading("Empty batch".to_string()));
+        }
+        
+        Ok(())
+    }
+}
+
+// Implement ArrowAccess for ArrowBackend
+impl ArrowAccess for ArrowBackend {
+    fn get_value<T: ArrowType>(&self, _column: &str, _row: usize) -> std::result::Result<T, IdsError> {
+        Err(IdsError::invalid_operation(
+            format!("ArrowBackend does not implement direct get_value. Use get_covariate instead.")
+        ))
+    }
+    
+    fn get_optional_value<T: ArrowType>(&self, _column: &str, _row: usize) -> std::result::Result<Option<T>, IdsError> {
+        Err(IdsError::invalid_operation(
+            format!("ArrowBackend does not implement direct get_optional_value. Use get_covariate instead.")
+        ))
+    }
+    
+    fn has_column(&self, _column: &str) -> bool {
+        false // This implementation doesn't provide direct column access
+    }
+    
+    fn row_count(&self) -> usize {
+        0 // This implementation doesn't provide direct row access
+    }
+    
+    fn column_names(&self) -> Vec<String> {
+        Vec::new() // This implementation doesn't provide direct column access
+    }
+    
+    fn schema(&self) -> arrow::datatypes::SchemaRef {
+        // Create an empty schema for compatibility
+        use std::sync::Arc;
+        use arrow::datatypes::{Schema, Field};
+        
+        // Create an empty schema with explicitly typed empty vector
+        let empty_fields: Vec<Field> = vec![];
+        Arc::new(Schema::new(empty_fields))
+    }
+    
+    fn get_column(&self, _column: &str) -> std::result::Result<arrow::array::ArrayRef, IdsError> {
+        Err(IdsError::invalid_operation(
+            format!("ArrowBackend does not implement direct get_column. Use get_covariate instead.")
+        ))
     }
 }

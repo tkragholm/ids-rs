@@ -18,7 +18,8 @@ use crate::{
 use chrono::NaiveDate;
 
 // Re-exports
-pub use self::access::ArrowAccess;
+// ArrowAccess is now in storage::arrow
+pub use crate::storage::arrow::access::ArrowAccess;
 pub use self::cacheable::Cacheable;
 pub use self::processing::{CovariateProcessor, VariableType};
 pub use self::utils::DateHelpers;

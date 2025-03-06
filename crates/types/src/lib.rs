@@ -13,7 +13,7 @@ pub mod translation;
 pub mod storage;
 
 // Re-export commonly used types
-pub use self::traits::access::ArrowAccess;
+pub use self::storage::arrow::access::ArrowAccess;
 pub use self::error::IdsError;
 pub use self::family::FamilyRelations;
 pub use self::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};

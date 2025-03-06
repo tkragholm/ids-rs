@@ -1,5 +1,5 @@
 // Re-export commonly used types and traits
-pub use crate::traits::access::ArrowAccess;
+pub use crate::storage::arrow::access::ArrowAccess;
 pub use crate::error::{ErrorContext, IdsError, Result};
 pub use crate::models::family::FamilyRelations;
 pub use crate::models::{

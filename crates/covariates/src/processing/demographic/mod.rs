@@ -1,5 +1,7 @@
+use types::error::{IdsError, Result};
 use types::models::{Covariate, CovariateType};
 use types::traits::CovariateProcessor;
+use types::traits::processing::LegacyCovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;
@@ -19,14 +21,33 @@ impl DemographicsProcessor {
 }
 
 impl CovariateProcessor for DemographicsProcessor {
-    fn get_name(&self) -> &str {
-        &self.name
+    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> Result<Covariate> {
+        // Default implementation - would be overridden by concrete implementation
+        Err(IdsError::invalid_operation("Not implemented".to_string()))
     }
-
-    fn get_covariate_type(&self) -> CovariateType {
+    
+    fn covariate_type(&self) -> CovariateType {
         CovariateType::Demographics
     }
-
+    
+    fn required_fields(&self) -> Vec<String> {
+        vec![
+            "KOM".to_string(),
+            "FAMILIE_TYPE".to_string(),
+            "STATSB".to_string(),
+            "ANTPERSF".to_string(),
+        ]
+    }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
+    
+    fn is_categorical(&self) -> bool {
+        // Demographics can be both, default to false
+        false
+    }
+    
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
         if covariate.get_type() != CovariateType::Demographics {
             return None;
@@ -44,15 +65,10 @@ impl CovariateProcessor for DemographicsProcessor {
         // Example implementation for gender
         covariate.get_gender().clone()
     }
-
-    fn is_categorical(&self) -> bool {
-        // Demographics can be both, default to false
-        false
-    }
 }
 
 impl ConfigurableProcessor for DemographicsProcessor {
-    fn from_config(config: &CovariateTypeConfig) -> Result<Self, Error> {
+    fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error> {
         if config.covariate_type != CovariateType::Demographics {
             return Err(Error::config(
                 format!("Invalid covariate type: expected Demographics, got {:?}", 

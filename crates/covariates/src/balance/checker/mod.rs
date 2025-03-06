@@ -54,8 +54,7 @@ impl BalanceChecker {
         date: NaiveDate,
     ) -> Result<Option<Covariate>, IdsError> {
         let key = CacheKey::new(pnr, covariate_type, date);
-        self.cache.get_or_load(&*self.store, key)?
-            .map_err(|e| IdsError::invalid_operation(format!("Failed to get covariate for PNR {}: {}", pnr, e)))
+        self.cache.get_or_load(&*self.store, key)
     }
 
     /// Clears the covariate cache

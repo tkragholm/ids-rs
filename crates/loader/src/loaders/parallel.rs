@@ -7,18 +7,43 @@ use types::error::IdsError;
 use types::storage::arrow::backend::ArrowBackend as ArrowStore;
 
 use crate::config::RegisterPathConfig;
+use crate::loaders::StoreLoader;
 use crate::registry;
 use crate::ui::LoaderProgress;
 
-pub trait ParallelLoader {
-    fn load_from_path(base_path: &str, parallel: bool) -> Result<ArrowStore, IdsError>;
-    fn load_with_custom_paths(config: RegisterPathConfig) -> Result<ArrowStore, IdsError>;
+/// Parallel Register Loader implementation
+///
+/// This loader loads registers in parallel, which is useful for:
+/// 1. Performance - faster loading on multi-core systems
+/// 2. Efficiency - takes advantage of multiple CPU cores
+/// 3. Systems with adequate memory resources
+pub struct ParallelLoader {
+    /// Whether to load data in parallel
+    parallel: bool,
 }
 
-pub struct ParallelLoaderImpl;
+impl Default for ParallelLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-impl ParallelLoader for ParallelLoaderImpl {
-    fn load_from_path(base_path: &str, parallel: bool) -> Result<ArrowStore, IdsError> {
+impl ParallelLoader {
+    /// Create a new ParallelLoader instance with parallel loading enabled
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { parallel: true }
+    }
+    
+    /// Create a new ParallelLoader with specified parallel setting
+    #[must_use]
+    pub const fn with_parallel(parallel: bool) -> Self {
+        Self { parallel }
+    }
+}
+
+impl StoreLoader for ParallelLoader {
+    fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError> {
         log::info!("Loading register data from path: {}", base_path);
 
         // Create a progress tracker
@@ -26,10 +51,10 @@ impl ParallelLoader for ParallelLoaderImpl {
         progress.set_main_message("Initializing data loading");
 
         // Determine which loaders to run in parallel
-        let load_akm_parallel = parallel;
-        let load_bef_parallel = parallel;
-        let load_ind_parallel = parallel;
-        let load_uddf_parallel = parallel;
+        let load_akm_parallel = self.parallel;
+        let load_bef_parallel = self.parallel;
+        let load_ind_parallel = self.parallel;
+        let load_uddf_parallel = self.parallel;
 
         // Create a shared store to collect all data
         let store_result = ArrowStore::new();
@@ -49,7 +74,7 @@ impl ParallelLoader for ParallelLoaderImpl {
 
         // AKM data
         if load_akm_parallel {
-            let base_path_clone = base_path.to_string();
+            let base_path_clone = base_path.clone();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
                 match registry::load_akm(&base_path_clone, None) {
@@ -64,7 +89,7 @@ impl ParallelLoader for ParallelLoaderImpl {
         } else {
             // Load sequentially
             progress.set_main_message("Loading AKM data");
-            if let Ok(akm_data) = registry::load_akm(base_path, None) {
+            if let Ok(akm_data) = registry::load_akm(&base_path, None) {
                 let mut store_guard = store.lock().unwrap();
                 let current_year = chrono::Local::now().year();
                 if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
@@ -76,7 +101,7 @@ impl ParallelLoader for ParallelLoaderImpl {
 
         // BEF data
         if load_bef_parallel {
-            let base_path_clone = base_path.to_string();
+            let base_path_clone = base_path.clone();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
                 match registry::load_bef(&base_path_clone, None) {
@@ -91,7 +116,7 @@ impl ParallelLoader for ParallelLoaderImpl {
         } else {
             // Load sequentially
             progress.set_main_message("Loading BEF data");
-            if let Ok(bef_data) = registry::load_bef(base_path, None) {
+            if let Ok(bef_data) = registry::load_bef(&base_path, None) {
                 let mut store_guard = store.lock().unwrap();
                 if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
                     log::error!("Failed to add BEF data: {}", e);
@@ -102,7 +127,7 @@ impl ParallelLoader for ParallelLoaderImpl {
 
         // IND data
         if load_ind_parallel {
-            let base_path_clone = base_path.to_string();
+            let base_path_clone = base_path.clone();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
                 match registry::load_ind(&base_path_clone, None) {
@@ -117,7 +142,7 @@ impl ParallelLoader for ParallelLoaderImpl {
         } else {
             // Load sequentially
             progress.set_main_message("Loading IND data");
-            if let Ok(ind_data) = registry::load_ind(base_path, None) {
+            if let Ok(ind_data) = registry::load_ind(&base_path, None) {
                 let mut store_guard = store.lock().unwrap();
                 let current_year = chrono::Local::now().year();
                 if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
@@ -129,7 +154,7 @@ impl ParallelLoader for ParallelLoaderImpl {
 
         // UDDF data
         if load_uddf_parallel {
-            let base_path_clone = base_path.to_string();
+            let base_path_clone = base_path.clone();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
                 match registry::load_uddf(&base_path_clone, None) {
@@ -144,7 +169,7 @@ impl ParallelLoader for ParallelLoaderImpl {
         } else {
             // Load sequentially
             progress.set_main_message("Loading UDDF data");
-            if let Ok(uddf_data) = registry::load_uddf(base_path, None) {
+            if let Ok(uddf_data) = registry::load_uddf(&base_path, None) {
                 let mut store_guard = store.lock().unwrap();
                 if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data) {
                     log::error!("Failed to add UDDF data: {}", e);
@@ -218,7 +243,7 @@ impl ParallelLoader for ParallelLoaderImpl {
         }
     }
 
-    fn load_with_custom_paths(config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
+    fn load_with_custom_paths(&self, config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
         log::info!("Loading register data in parallel with custom paths");
 
         // Validate the config paths
@@ -227,17 +252,15 @@ impl ParallelLoader for ParallelLoaderImpl {
         // Resolve the paths
         let paths = config.resolve_paths()?;
 
-        // We'll add the catch-all pattern for both match statements to fix the non-exhaustive pattern error
-
         // Create a progress tracker
         let progress = LoaderProgress::new();
         progress.set_main_message("Initializing parallel data loading");
 
         // Determine which loaders to run in parallel
-        let load_akm_parallel = true; // Use hardcoded values or derive from custom_paths
-        let load_bef_parallel = true;
-        let load_ind_parallel = true;
-        let load_uddf_parallel = true;
+        let load_akm_parallel = self.parallel;
+        let load_bef_parallel = self.parallel;
+        let load_ind_parallel = self.parallel;
+        let load_uddf_parallel = self.parallel;
 
         // Get the paths
         let akm_path = paths
@@ -429,10 +452,6 @@ impl ParallelLoader for ParallelLoaderImpl {
                 }
                 (unknown_type, Ok(_)) => {
                     log::warn!("Received data for unknown register type: {}", unknown_type);
-                }
-                (_, _) => {
-                    // This should never happen but is needed for exhaustive pattern matching
-                    log::warn!("Unexpected result combination from register loading");
                 }
             }
         }

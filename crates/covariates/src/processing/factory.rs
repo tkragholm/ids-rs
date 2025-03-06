@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use types::models::{Covariate, CovariateType};
 use types::traits::{CovariateProcessor, VariableType};
+use types::traits::processing::LegacyCovariateProcessor;
 use types::translation::{TranslationMaps, TranslationType};
 
 use crate::core::config::{CovariateTypeConfig, CovariateVariableConfig, CovariatesConfig};
@@ -34,14 +35,29 @@ impl ConfigurableProcessorImpl {
 }
 
 impl CovariateProcessor for ConfigurableProcessorImpl {
-    fn get_name(&self) -> &str {
-        &self.name
+    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> types::error::Result<Covariate> {
+        // Default implementation, will be overridden by concrete processors
+        Err(types::error::IdsError::invalid_operation("Not implemented".to_string()))
     }
-
-    fn get_covariate_type(&self) -> CovariateType {
+    
+    fn covariate_type(&self) -> CovariateType {
         self.covariate_type
     }
-
+    
+    fn required_fields(&self) -> Vec<String> {
+        // Default to empty list - concrete implementations will provide actual fields
+        Vec::new()
+    }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
+    
+    fn is_categorical(&self) -> bool {
+        // Default to false - specialized implementations will determine this
+        false
+    }
+    
     fn process_numeric(&self, _covariate: &Covariate) -> Option<f64> {
         // Default to None - specialized implementations will be needed
         None
@@ -50,11 +66,6 @@ impl CovariateProcessor for ConfigurableProcessorImpl {
     fn process_categorical(&self, _covariate: &Covariate) -> Option<String> {
         // Default to None - specialized implementations will be needed
         None
-    }
-
-    fn is_categorical(&self) -> bool {
-        // Default to false - specialized implementations will determine this
-        false
     }
 }
 
@@ -249,14 +260,24 @@ impl ConfigurableVariableProcessorImpl {
 }
 
 impl CovariateProcessor for ConfigurableVariableProcessorImpl {
-    fn get_name(&self) -> &str {
-        &self.name
+    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> types::error::Result<Covariate> {
+        // Default implementation, will be overridden by concrete processors
+        Err(types::error::IdsError::invalid_operation("Not implemented".to_string()))
     }
-
-    fn get_covariate_type(&self) -> CovariateType {
+    
+    fn covariate_type(&self) -> CovariateType {
         self.covariate_type
     }
-
+    
+    fn required_fields(&self) -> Vec<String> {
+        // Default to empty list - concrete implementations will provide actual fields
+        Vec::new()
+    }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
+    
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
         self.process_value(covariate)
     }
@@ -268,8 +289,8 @@ impl CovariateProcessor for ConfigurableVariableProcessorImpl {
     fn is_categorical(&self) -> bool {
         matches!(self.variable_type, VariableType::Categorical)
     }
-
-    fn get_variable_type(&self) -> VariableType {
+    
+    fn variable_type(&self) -> VariableType {
         self.variable_type
     }
 }
@@ -465,8 +486,8 @@ mod tests {
             .create_processor(CovariateType::Demographics)
             .expect("Demographics processor should be available in default config");
 
-        assert_eq!(processor.get_name(), "Demographics");
-        assert_eq!(processor.get_covariate_type(), CovariateType::Demographics);
+        assert_eq!(processor.name(), "Demographics");
+        assert_eq!(processor.covariate_type(), CovariateType::Demographics);
     }
 
     #[test]
@@ -479,9 +500,9 @@ mod tests {
             .create_variable_processor(CovariateType::Demographics, "Age")
             .expect("Age variable processor should be available in default config");
 
-        assert_eq!(processor.get_name(), "Age");
-        assert_eq!(processor.get_covariate_type(), CovariateType::Demographics);
-        assert_eq!(processor.get_variable_type(), VariableType::Numeric);
+        assert_eq!(processor.name(), "Age");
+        assert_eq!(processor.covariate_type(), CovariateType::Demographics);
+        assert_eq!(processor.variable_type(), VariableType::Numeric);
 
         // Create a test covariate
 
@@ -514,7 +535,7 @@ mod tests {
         assert_eq!(processors.len(), 4);
 
         // Verify that we have a processor for each type
-        let types: Vec<CovariateType> = processors.iter().map(|p| p.get_covariate_type()).collect();
+        let types: Vec<CovariateType> = processors.iter().map(|p| p.covariate_type()).collect();
 
         assert!(types.contains(&CovariateType::Demographics));
         assert!(types.contains(&CovariateType::Income));
@@ -557,7 +578,7 @@ mod tests {
         assert_eq!(processors.len(), 8); // 8 demographic variables
 
         // Check that we have processor for specific variables
-        let variable_names: Vec<&str> = processors.iter().map(|p| p.get_name()).collect();
+        let variable_names: Vec<&str> = processors.iter().map(|p| p.name()).collect();
 
         assert!(variable_names.contains(&"Age"));
         assert!(variable_names.contains(&"Family Size"));

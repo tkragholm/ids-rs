@@ -30,7 +30,7 @@ impl SequentialLoader {
 }
 
 impl StoreLoader for SequentialLoader {
-    fn load_from_path(base_path: String) -> Result<ArrowStore, IdsError> {
+    fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError> {
         log::info!("Loading register data sequentially from {}", base_path);
 
         // Create a progress tracker
@@ -95,7 +95,7 @@ impl StoreLoader for SequentialLoader {
         Ok(store)
     }
 
-    fn load_with_custom_paths(config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
+    fn load_with_custom_paths(&self, config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
         log::info!("Loading register data sequentially with custom paths");
 
         // Validate the config paths

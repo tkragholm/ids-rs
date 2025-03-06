@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use core::utils::console::{format_duration_short, ConsoleOutput};
 use covariates::data::matched_pairs::load_matched_pairs;
 use hashbrown::HashMap;
-use loader::ParquetLoader;
+use loader::{ParallelLoader, StoreLoader, RegisterPathConfig};
 use log::{error, info};
 use std::collections::HashSet;
 use std::path::Path;
@@ -139,7 +139,7 @@ pub fn setup_data_paths(config: &BalanceCheckConfig) -> IdsResult<(String, HashM
 pub fn load_register_data(base_path: &str, custom_paths: &HashMap<String, String>) -> IdsResult<types::storage::ArrowBackend> {
     ConsoleOutput::subsection("Loading Register Data");
     
-    let loader = ParquetLoader::new();
+    let loader = ParallelLoader::new();
     let load_start = Instant::now();
     let has_custom_paths = !custom_paths.is_empty();
 
@@ -149,9 +149,14 @@ pub fn load_register_data(base_path: &str, custom_paths: &HashMap<String, String
         ConsoleOutput::info(&format!("Using custom {register} path: {path}"));
     }
 
-    // Load data with the ParquetLoader
+    // Load data with the ParallelLoader
     let result = if has_custom_paths {
-        loader.load_with_custom_paths_map(base_path.to_string(), custom_paths.clone())
+        let mut config = RegisterPathConfig::new(base_path.to_string());
+        // Use builder pattern with the with_custom_path method
+        for (register_type, path) in custom_paths {
+            config = config.with_custom_path(register_type, path);
+        }
+        loader.load_with_custom_paths(config)
     } else {
         loader.load_from_path(base_path.to_string())
     };

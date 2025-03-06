@@ -1,5 +1,7 @@
+use types::error::{IdsError, Result};
 use types::models::{Covariate, CovariateType};
 use types::traits::CovariateProcessor;
+use types::traits::processing::LegacyCovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;
@@ -19,12 +21,28 @@ impl EducationProcessor {
 }
 
 impl CovariateProcessor for EducationProcessor {
-    fn get_name(&self) -> &str {
+    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> Result<Covariate> {
+        // Default implementation - would be overridden by concrete implementation
+        Err(IdsError::invalid_operation("Not implemented".to_string()))
+    }
+    
+    fn covariate_type(&self) -> CovariateType {
+        CovariateType::Education
+    }
+    
+    fn required_fields(&self) -> Vec<String> {
+        vec![
+            "HFAUDD".to_string(),
+        ]
+    }
+    
+    fn name(&self) -> &str {
         &self.name
     }
-
-    fn get_covariate_type(&self) -> CovariateType {
-        CovariateType::Education
+    
+    fn is_categorical(&self) -> bool {
+        // Default to false
+        false
     }
 
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
@@ -44,15 +62,10 @@ impl CovariateProcessor for EducationProcessor {
         // Example implementation for education level
         covariate.get_education_level().clone()
     }
-
-    fn is_categorical(&self) -> bool {
-        // Default to false
-        false
-    }
 }
 
 impl ConfigurableProcessor for EducationProcessor {
-    fn from_config(config: &CovariateTypeConfig) -> Result<Self, Error> {
+    fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error> {
         if config.covariate_type != CovariateType::Education {
             return Err(Error::config(
                 format!("Invalid covariate type: expected Education, got {:?}", 

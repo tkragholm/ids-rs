@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use types::models::CovariateType;
-use types::traits::CovariateProcessor;
+use types::traits::{CovariateProcessor};
+use types::traits::processing::LegacyCovariateProcessor;
 use types::translation::TranslationMaps;
 
 use crate::core::config::CovariatesConfig;
@@ -68,7 +69,7 @@ impl CovariateProcessorRegistry {
     
     /// Register a new processor
     pub fn register(&mut self, processor: Box<dyn CovariateProcessor>) {
-        self.processors.insert(processor.get_covariate_type(), processor);
+        self.processors.insert(processor.covariate_type(), processor);
     }
     
     /// Get a processor by covariate type

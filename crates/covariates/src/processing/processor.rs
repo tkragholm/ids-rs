@@ -6,7 +6,7 @@ use types::traits::{CovariateProcessor, VariableType};
 /// A processor that can be configured from configuration
 pub trait ConfigurableProcessor: CovariateProcessor {
     /// Create a new processor from configuration
-    fn from_config(config: &CovariateTypeConfig) -> Result<Self, Error>
+    fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error>
     where
         Self: Sized;
 }
@@ -17,7 +17,7 @@ pub trait ConfigurableVariableProcessor {
     fn variable_type() -> VariableType;
     
     /// Create a new processor from configuration
-    fn from_config(config: &CovariateVariableConfig) -> Result<Self, Error>
+    fn from_config(config: &CovariateVariableConfig) -> std::result::Result<Self, Error>
     where
         Self: Sized;
     

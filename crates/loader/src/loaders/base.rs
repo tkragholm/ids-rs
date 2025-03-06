@@ -17,7 +17,7 @@ pub trait StoreLoader {
     ///
     /// # Errors
     /// Returns an error if loading fails
-    fn load_from_path(base_path: String) -> Result<ArrowStore, IdsError>;
+    fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError>;
 
     /// Load data with custom paths for different register types
     ///
@@ -29,5 +29,5 @@ pub trait StoreLoader {
     ///
     /// # Errors
     /// Returns an error if loading fails
-    fn load_with_custom_paths(config: RegisterPathConfig) -> Result<ArrowStore, IdsError>;
+    fn load_with_custom_paths(&self, config: RegisterPathConfig) -> Result<ArrowStore, IdsError>;
 }

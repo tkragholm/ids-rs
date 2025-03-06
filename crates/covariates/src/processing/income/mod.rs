@@ -1,5 +1,7 @@
+use types::error::{IdsError, Result};
 use types::models::{Covariate, CovariateType};
 use types::traits::CovariateProcessor;
+use types::traits::processing::LegacyCovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;
@@ -19,14 +21,29 @@ impl IncomeProcessor {
 }
 
 impl CovariateProcessor for IncomeProcessor {
-    fn get_name(&self) -> &str {
-        &self.name
+    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> Result<Covariate> {
+        // Default implementation - would be overridden by concrete implementation
+        Err(IdsError::invalid_operation("Not implemented".to_string()))
     }
-
-    fn get_covariate_type(&self) -> CovariateType {
+    
+    fn covariate_type(&self) -> CovariateType {
         CovariateType::Income
     }
-
+    
+    fn required_fields(&self) -> Vec<String> {
+        vec![
+            "PERINDKIALT_13".to_string(),
+        ]
+    }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
+    
+    fn is_categorical(&self) -> bool {
+        false
+    }
+    
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
         if covariate.get_type() != CovariateType::Income {
             return None;
@@ -43,14 +60,10 @@ impl CovariateProcessor for IncomeProcessor {
         // Example: convert employment status to string
         covariate.get_employment_status().map(|status| status.to_string())
     }
-
-    fn is_categorical(&self) -> bool {
-        false
-    }
 }
 
 impl ConfigurableProcessor for IncomeProcessor {
-    fn from_config(config: &CovariateTypeConfig) -> Result<Self, Error> {
+    fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error> {
         if config.covariate_type != CovariateType::Income {
             return Err(Error::config(
                 format!("Invalid covariate type: expected Income, got {:?}", 

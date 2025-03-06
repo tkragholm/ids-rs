@@ -1,12 +1,12 @@
 use crate::{
-    arrow::access::ArrowAccess,
     error::IdsError,
     family::FamilyRelations,
 };
 use arrow::{
-    array::Array, 
+    array::{Array, StringArray, Date32Array},
     record_batch::RecordBatch,
 };
+use chrono::NaiveDate;
 use hashbrown::HashMap;
 
 /// A store for family relationships
@@ -56,22 +56,47 @@ impl FamilyStore {
     }
 
     fn process_batch(&mut self, batch: &RecordBatch) -> Result<(), IdsError> {
-        // Use a simple struct type that will get the generic impl of ArrowAccess
-        struct TempAccess;
-        
-        let accessor = TempAccess;
-        
-        let pnr_array = accessor.get_string_array(batch, "PNR")?;
-        let birth_date_array = accessor.get_date_array(batch, "BIRTH_DATE")?;
-        let father_id_array = accessor.get_string_array(batch, "FATHER_ID")?;
-        let father_birth_date_array = accessor.get_date_array(batch, "FATHER_BIRTH_DATE")?;
-        let mother_id_array = accessor.get_string_array(batch, "MOTHER_ID")?;
-        let mother_birth_date_array = accessor.get_date_array(batch, "MOTHER_BIRTH_DATE")?;
-        let family_id_array = accessor.get_string_array(batch, "FAMILY_ID")?;
+        // Get the string arrays from the batch
+        let pnr_column = batch.column(batch.schema().index_of("PNR")?);
+        let pnr_array = pnr_column.as_any().downcast_ref::<StringArray>()
+            .ok_or_else(|| IdsError::data_loading("PNR column is not a string array".to_string()))?;
+            
+        let birth_date_column = batch.column(batch.schema().index_of("BIRTH_DATE")?);
+        let birth_date_array = birth_date_column.as_any().downcast_ref::<Date32Array>()
+            .ok_or_else(|| IdsError::data_loading("BIRTH_DATE column is not a date array".to_string()))?;
+            
+        let father_id_column = batch.column(batch.schema().index_of("FATHER_ID")?);
+        let father_id_array = father_id_column.as_any().downcast_ref::<StringArray>()
+            .ok_or_else(|| IdsError::data_loading("FATHER_ID column is not a string array".to_string()))?;
+            
+        let father_birth_date_column = batch.column(batch.schema().index_of("FATHER_BIRTH_DATE")?);
+        let father_birth_date_array = father_birth_date_column.as_any().downcast_ref::<Date32Array>()
+            .ok_or_else(|| IdsError::data_loading("FATHER_BIRTH_DATE column is not a date array".to_string()))?;
+            
+        let mother_id_column = batch.column(batch.schema().index_of("MOTHER_ID")?);
+        let mother_id_array = mother_id_column.as_any().downcast_ref::<StringArray>()
+            .ok_or_else(|| IdsError::data_loading("MOTHER_ID column is not a string array".to_string()))?;
+            
+        let mother_birth_date_column = batch.column(batch.schema().index_of("MOTHER_BIRTH_DATE")?);
+        let mother_birth_date_array = mother_birth_date_column.as_any().downcast_ref::<Date32Array>()
+            .ok_or_else(|| IdsError::data_loading("MOTHER_BIRTH_DATE column is not a date array".to_string()))?;
+            
+        let family_id_column = batch.column(batch.schema().index_of("FAMILY_ID")?);
+        let family_id_array = family_id_column.as_any().downcast_ref::<StringArray>()
+            .ok_or_else(|| IdsError::data_loading("FAMILY_ID column is not a string array".to_string()))?;
 
+        // Helper function to convert date32 to NaiveDate
+        fn convert_date32_to_naive_date(days_since_epoch: i32) -> Result<NaiveDate, IdsError> {
+            // Use the new safe method
+            NaiveDate::from_num_days_from_ce_opt(days_since_epoch)
+                .ok_or_else(|| IdsError::data_loading(format!(
+                    "Could not convert {} days since epoch to date", days_since_epoch
+                )))
+        }
+        
         for i in 0..batch.num_rows() {
             let pnr = pnr_array.value(i).to_string();
-            let birth_date = accessor.convert_date32_to_naive_date(birth_date_array.value(i))?;
+            let birth_date = convert_date32_to_naive_date(birth_date_array.value(i))?;
 
             let relation = FamilyRelations {
                 pnr: pnr.clone(),
@@ -84,7 +109,7 @@ impl FamilyStore {
                 father_birth_date: if father_birth_date_array.is_null(i) {
                     None
                 } else {
-                    Some(accessor.convert_date32_to_naive_date(father_birth_date_array.value(i))?)
+                    Some(convert_date32_to_naive_date(father_birth_date_array.value(i))?)
                 },
                 mother_id: if mother_id_array.is_null(i) {
                     None
@@ -94,7 +119,7 @@ impl FamilyStore {
                 mother_birth_date: if mother_birth_date_array.is_null(i) {
                     None
                 } else {
-                    Some(accessor.convert_date32_to_naive_date(mother_birth_date_array.value(i))?)
+                    Some(convert_date32_to_naive_date(mother_birth_date_array.value(i))?)
                 },
                 family_id: if family_id_array.is_null(i) {
                     None

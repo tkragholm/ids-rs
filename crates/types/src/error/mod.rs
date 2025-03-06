@@ -282,6 +282,18 @@ impl IdsError {
         Self::InvalidCriteria(msg.to_string())
     }
     
+    /// Create an invalid value error
+    /// 
+    /// # Arguments
+    /// * `msg` - The error message
+    /// 
+    /// # Returns
+    /// A new `IdsError::InvalidFormat` with the provided message about invalid values
+    #[must_use]
+    pub fn invalid_value(msg: impl ToString) -> Self {
+        Self::InvalidFormat(format!("Invalid value: {}", msg.to_string()))
+    }
+    
     /// Create an IO error with a message
     /// 
     /// # Arguments
@@ -313,6 +325,66 @@ impl IdsError {
     #[must_use]
     pub fn logger() -> Self {
         Self::Logger
+    }
+    
+    /// Create a new type conversion error
+    /// 
+    /// # Arguments
+    /// * `msg` - The error message
+    /// 
+    /// # Returns
+    /// A new error with type conversion context
+    #[must_use]
+    pub fn type_conversion(msg: impl ToString) -> Self {
+        Self::DataLoading(format!("Type conversion: {}", msg.to_string()))
+    }
+    
+    /// Create a new column not found error
+    /// 
+    /// # Arguments
+    /// * `msg` - The error message
+    /// 
+    /// # Returns
+    /// A new error with column not found context
+    #[must_use]
+    pub fn column_not_found(msg: impl ToString) -> Self {
+        Self::DataLoading(format!("Column not found: {}", msg.to_string()))
+    }
+    
+    /// Create a new index out of bounds error
+    /// 
+    /// # Arguments
+    /// * `msg` - The error message
+    /// 
+    /// # Returns
+    /// A new error with index out of bounds context
+    #[must_use]
+    pub fn index_out_of_bounds(msg: impl ToString) -> Self {
+        Self::DataLoading(format!("Index out of bounds: {}", msg.to_string()))
+    }
+    
+    /// Create a new date conversion error
+    /// 
+    /// # Arguments
+    /// * `msg` - The error message
+    /// 
+    /// # Returns
+    /// A new error with date conversion context
+    #[must_use]
+    pub fn date_conversion(msg: impl ToString) -> Self {
+        Self::DataLoading(format!("Date conversion: {}", msg.to_string()))
+    }
+    
+    /// Create a new missing value error
+    /// 
+    /// # Arguments
+    /// * `msg` - The error message
+    /// 
+    /// # Returns
+    /// A new error for missing values
+    #[must_use]
+    pub fn missing_value(msg: impl ToString) -> Self {
+        Self::MissingData(format!("Missing value: {}", msg.to_string()))
     }
 }
 
