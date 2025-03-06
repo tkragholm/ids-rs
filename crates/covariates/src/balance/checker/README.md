@@ -1,93 +1,98 @@
 # Balance Checker Module
 
-This directory contains the implementation of the `BalanceChecker` which is responsible for analyzing covariate balance between case and control groups in matched studies.
+This module implements the core functionality for analyzing covariate balance between case and control groups in matched studies. It provides tools to evaluate whether the matching process has resulted in comparable groups.
 
 ## Module Structure
 
-The balance checker functionality has been split into several focused modules:
+The balance checker implementation is organized into these components:
 
-- **mod.rs**: Core `BalanceChecker` struct definition and public API
-- **builder.rs**: Builder pattern implementation for flexible checker construction
-- **diagnostic.rs**: Diagnostic and performance analysis capabilities
-- **balance_calculation.rs**: Core balance calculation logic for different covariate types
-- **paired_analysis.rs**: Matched pair analysis functionality
-- **performance.rs**: Performance optimization utilities
-
-## Flow of Functionality
-
-1. **Initialization**: The checker is created either directly or using the builder pattern
-2. **Data Loading**: Covariates are loaded and cached from the underlying data store
-3. **Balance Calculation**: Domain-specific calculations for demographics, income, education, and occupation
-4. **Paired Analysis**: Detailed analysis of individual matched pairs
-5. **Result Generation**: Creation of comprehensive balance results
+- **mod.rs**: Exports the `BalanceChecker` struct and related types
+- **builder.rs**: Implements the builder pattern for creating and configuring balance checkers
+- **balance_calculation.rs**: Core logic for calculating balance metrics
+- **paired_analysis.rs**: Functions for analyzing matched pairs
+- **performance.rs**: Performance measurement and optimization utilities
 
 ## Key Components
 
 ### BalanceChecker
 
-The main entry point for balance checking functionality. It orchestrates the overall process and delegates to specialized components.
+The main public interface for balance checking operations. It provides methods to:
+
+- Check covariate balance between case and control groups
+- Calculate standardized differences for numeric and categorical variables
+- Generate detailed reports on balance metrics
+- Fetch and cache covariates efficiently
+
+### BalanceCheckerBuilder
+
+A builder for creating and configuring `BalanceChecker` instances with specific settings:
 
 ```rust
-// Creating a balance checker
-let checker = BalanceChecker::new(data_store);
-
-// Or using the builder pattern
-let checker = BalanceChecker::builder()
+let checker = BalanceCheckerBuilder::new()
     .with_store(data_store)
     .with_cache_capacity(200_000)
+    .with_debug_mode(true)
     .build()?;
-
-// Running a balance check
-let results = checker.calculate_balance(cases, controls)?;
 ```
 
 ### Balance Calculation
 
-The balance calculation process:
+The core logic for calculating balance metrics across different covariate types:
 
-1. Calculates standardized mean differences for numeric variables
-2. Calculates proportional differences for categorical variables
-3. Handles missing data appropriately
-4. Provides detailed metrics for each variable
+- **Demographics**: Age, gender, family size, geographic location
+- **Income**: Earnings, employment status
+- **Education**: Education level, years of education
+- **Occupation**: Job type, industry sector
 
-### Optimization Features
+### Paired Analysis
 
-- **Memory Management**: Efficient handling of large datasets
-- **Caching**: Sophisticated caching system to avoid redundant data loading
-- **Parallel Processing**: Utilizes parallel computation for performance
-- **Prefetching**: Proactively loads data to improve performance
+Specialized analysis for matched pairs that calculates:
 
-## Usage Examples
+- Balance metrics for each case-control pair
+- Standardized differences at the individual level
+- Detailed statistics for matched pair quality
 
-Basic usage:
+### Performance Optimization
+
+The module uses several approaches to optimize performance:
+
+- **Caching**: Cache frequently accessed covariates
+- **Parallel Processing**: Process data in parallel using rayon
+- **Batch Processing**: Group similar operations to improve throughput
+- **Memory Management**: Adaptive memory usage based on system capabilities
+
+## Usage Example
 
 ```rust
-use covariates::prelude::*;
-
 // Create a balance checker
-let checker = BalanceChecker::new(data_store);
+let checker = BalanceCheckerBuilder::new()
+    .with_store(data_store)
+    .build()?;
 
-// Calculate balance
-let results = checker.calculate_balance(&cases, &controls)?;
+// Run balance analysis
+let results = checker.check_balance(&matched_pairs)?;
 
-// Generate reports
-let report = BalanceReport::new(&results);
+// View results
+println!("Overall balance quality: {}", results.get_balance_quality());
+println!("Imbalanced variables: {}", results.get_imbalanced_variables().len());
+
+// Generate detailed report
+let report = results.generate_report();
 report.save_to_file("balance_report.html")?;
 ```
 
-With prefetching for better performance:
+## Integration with Other Modules
 
-```rust
-// Prefetch data for better performance
-let covariate_types = [
-    CovariateType::Demographics,
-    CovariateType::Income,
-    CovariateType::Education,
-    CovariateType::Occupation,
-];
+The balance checker integrates with:
 
-checker.prefetch_data(&all_pnrs, &covariate_types, &unique_dates);
+- **Processor**: For efficient data processing
+- **Metrics**: For statistical calculations
+- **Legacy Cache**: For optimized data access
+- **Results**: For structured output generation
 
-// Then calculate balance
-let results = checker.calculate_balance(&cases, &controls)?;
-```
+## Design Considerations
+
+1. **Memory Efficiency**: The module is designed to handle large datasets efficiently
+2. **Extensibility**: New covariate types and processors can be easily added
+3. **Configurability**: Many aspects of the balance checking can be customized
+4. **Reliability**: Comprehensive error handling and diagnostics

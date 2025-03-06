@@ -1,217 +1,254 @@
 use super::BalanceChecker;
-use super::processor::ValueProcessor;
 use super::stats::StatisticalCalculations;
 use crate::models::CovariateSummary;
 use chrono::NaiveDate;
-use hashbrown::HashMap;
-use types::{
-    error::IdsError,
-    models::{Covariate, CovariateType},
-};
+use log::{debug, info, warn};
+use types::error::Result as IdsResult;
+use types::models::{Covariate, CovariateType};
 
-pub(crate) struct BalanceMetrics {
-    processor: ValueProcessor,
+/// Main balance metrics calculator
+pub struct BalanceMetrics {
+    processor: super::processor::ValueProcessor,
 }
 
 impl BalanceMetrics {
+    /// Create a new balance metrics calculator
     pub fn new() -> Self {
         Self {
-            processor: ValueProcessor::new(),
+            processor: super::processor::ValueProcessor::new(),
         }
     }
-
-    pub fn calculate_numeric_balance<F>(
+    
+    /// Calculate balance metrics for a numeric variable
+    pub fn calculate_numeric_balance(
         &self,
         checker: &BalanceChecker,
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
         covariate_type: CovariateType,
-        name: &str,
-        extractor: F,
-    ) -> Result<(CovariateSummary, (f64, f64)), IdsError>
-    where
-        F: Fn(&Covariate) -> Option<f64> + Send + Sync,
-    {
-        // Print some diagnostic info about the input
-        if !cases.is_empty() {
-            log::debug!(
-                "Sample cases: {} pairs, first case PNR: {}, date: {}", 
-                cases.len(),
-                cases[0].0,
-                cases[0].1
-            );
+        variable_name: &str,
+        extractor: impl Fn(&Covariate) -> Option<f64> + Send + Sync,
+    ) -> IdsResult<(CovariateSummary, (f64, f64))> {
+        // Log diagnostics for first call
+        if variable_name == "Family Size" {
+            self.log_diagnostics(cases, controls, checker, true);
         }
         
-        // Add debug log for cache size in the balance checker
-        log::debug!("Balance checker cache size: {}", checker.cache_size());
-        
-        // Sample the first few cases to diagnose PNR format and matching issues
-        for (i, (case_pnr, case_date)) in cases.iter().enumerate().take(5) {
-            log::debug!("Checking case entry {}: PNR {} at date {}", i, case_pnr, case_date);
-            
-            // Try both original PNR and the C/K format just to be extra sure
-            match checker.get_covariate(case_pnr, covariate_type, *case_date) {
-                Ok(Some(_)) => {
-                    // Found a value - this is good
-                    log::debug!("✓ Successfully found covariate for case PNR: {}", case_pnr);
-                }
-                Ok(None) => {
-                    // No value found - log with PNR format info for diagnosis
-                    if case_pnr.starts_with('C') {
-                        log::debug!("✗ No covariate found for C-format case PNR: {}", case_pnr);
-                    } else {
-                        log::debug!("✗ No covariate found for regular case PNR: {}", case_pnr);
-                    }
-                    
-                    // If this is the first few, dump out diagnostic info about exactly what we're looking for
-                    if i < 2 {
-                        log::debug!("Dumping cache key details for debugging:");
-                        log::debug!("PNR: '{}', Type: {:?}, Date: {}", case_pnr, covariate_type, case_date);
-                        
-                        // Also try searching for it in a different format to diagnose case sensitivity issues
-                        let alternate_pnr = if case_pnr.contains('-') {
-                            case_pnr.replace('-', "")
-                        } else if case_pnr.len() > 6 {
-                            format!("{}-{}", &case_pnr[0..6], &case_pnr[6..])
-                        } else {
-                            case_pnr.clone()
-                        };
-                        
-                        if alternate_pnr != *case_pnr {
-                            log::debug!("Also trying alternate PNR format: '{}'", alternate_pnr);
-                            match checker.get_covariate(&alternate_pnr, covariate_type, *case_date) {
-                                Ok(Some(_)) => log::debug!("✓ Found with alternate format!"),
-                                _ => log::debug!("✗ Still not found with alternate format"),
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Error accessing covariate - this is unexpected
-                    log::warn!("✗ Error accessing covariate for PNR {}: {}", case_pnr, e);
-                }
-            }
-        }
-        
-        let (case_values, case_missing) =
-            self.processor
-                .collect_numeric_values(cases, covariate_type, checker, &extractor);
-        let (control_values, control_missing) =
-            self.processor
-                .collect_numeric_values(controls, covariate_type, checker, &extractor);
-
-        // Log the actual values found for debugging
-        log::debug!(
-            "Found {} numeric values for cases and {} for controls, missing {} and {} respectively", 
-            case_values.len(), control_values.len(), case_missing, control_missing
+        debug!(
+            "Calculating balance for numeric variable {} (type: {:?})",
+            variable_name, covariate_type
         );
         
-        let missing_rates = (
-            case_missing as f64 / cases.len() as f64,
-            control_missing as f64 / controls.len() as f64,
+        // Extract values
+        let (case_values, case_missing) = self.processor.collect_numeric_values(
+            cases,
+            covariate_type,
+            checker,
+            &extractor,
         );
-
-        if case_values.is_empty() || control_values.is_empty() {
-            return Ok((
-                CovariateSummary {
-                    variable: name.to_string(),
-                    mean_cases: 0.0,
-                    mean_controls: 0.0,
-                    std_diff: 0.0,
-                    variance_ratio: 1.0,
-                },
-                missing_rates,
-            ));
-        }
-
-        // Calculate all statistics in one pass for each group
-        let case_summary = StatisticalCalculations::calculate_summary(&case_values);
-        let control_summary = StatisticalCalculations::calculate_summary(&control_values);
-
-        // Use the pre-calculated statistics
-        Ok((
-            CovariateSummary {
-                variable: name.to_string(),
-                mean_cases: case_summary.mean,
-                mean_controls: control_summary.mean,
-                std_diff: StatisticalCalculations::calculate_standardized_difference_from_summaries(
-                    &case_summary,
-                    &control_summary,
-                ),
-                variance_ratio: StatisticalCalculations::calculate_variance_ratio_from_summaries(
-                    &case_summary,
-                    &control_summary,
-                ),
-            },
-            missing_rates,
-        ))
+        
+        let (control_values, control_missing) = self.processor.collect_numeric_values(
+            controls,
+            covariate_type,
+            checker,
+            &extractor,
+        );
+        
+        // Calculate missing rates
+        let case_missing_rate = self.calculate_missing_rate(case_missing, cases.len());
+        let control_missing_rate = self.calculate_missing_rate(control_missing, controls.len());
+        
+        // Calculate statistics
+        let case_stats = StatisticalCalculations::calculate_summary(&case_values);
+        let control_stats = StatisticalCalculations::calculate_summary(&control_values);
+        
+        // Calculate standardized mean difference
+        let std_diff = StatisticalCalculations::calculate_standardized_difference_from_summaries(
+            &case_stats, 
+            &control_stats
+        );
+        
+        // Calculate variance ratio
+        let variance_ratio = StatisticalCalculations::calculate_variance_ratio_from_summaries(
+            &case_stats, 
+            &control_stats
+        );
+        
+        // Create summary
+        let summary = CovariateSummary::new(
+            variable_name.to_string(),
+            case_stats.mean,
+            control_stats.mean,
+            std_diff,
+            variance_ratio,
+        );
+        
+        Ok((summary, (case_missing_rate, control_missing_rate)))
     }
-
-    pub fn calculate_categorical_balance<F>(
+    
+    /// Calculate balance metrics for a categorical variable
+    pub fn calculate_categorical_balance(
         &self,
         checker: &BalanceChecker,
         cases: &[(String, NaiveDate)],
         controls: &[(String, NaiveDate)],
         covariate_type: CovariateType,
-        name: &str,
-        extractor: F,
-    ) -> Result<(Vec<CovariateSummary>, (f64, f64)), IdsError>
-    where
-        F: Fn(&Covariate) -> Option<String> + Send + Sync,
-    {
-        let (case_values, case_missing) =
-            self.processor
-                .collect_categorical_values(cases, covariate_type, checker, &extractor);
+        variable_name: &str,
+        extractor: impl Fn(&Covariate) -> Option<String> + Send + Sync,
+    ) -> IdsResult<(Vec<CovariateSummary>, (f64, f64))> {
+        debug!(
+            "Calculating balance for categorical variable {} (type: {:?})",
+            variable_name, covariate_type
+        );
+        
+        // Extract values
+        let (case_values, case_missing) = self.processor.collect_categorical_values(
+            cases,
+            covariate_type,
+            checker,
+            &extractor,
+        );
+        
         let (control_values, control_missing) = self.processor.collect_categorical_values(
             controls,
             covariate_type,
             checker,
             &extractor,
         );
-
-        let missing_rates = (
-            case_missing as f64 / cases.len() as f64,
-            control_missing as f64 / controls.len() as f64,
-        );
-
-        let mut summaries = Vec::new();
-
-        // Calculate frequencies for each category
-        let mut case_freqs = HashMap::new();
-        let mut control_freqs = HashMap::new();
-
-        for value in case_values {
-            *case_freqs.entry(value).or_insert(0) += 1;
-        }
-        for value in control_values {
-            *control_freqs.entry(value).or_insert(0) += 1;
-        }
-
-        // Calculate summary statistics for each category
-        for (category, count) in &case_freqs {
-            let case_prop = *count as f64 / cases.len() as f64;
-            let control_prop = control_freqs
-                .get(category)
-                .map_or(0.0, |&count| count as f64 / controls.len() as f64);
-
-            let std_diff = if case_prop == 0.0 && control_prop == 0.0 {
+        
+        // Calculate missing rates
+        let case_missing_rate = self.calculate_missing_rate(case_missing, cases.len());
+        let control_missing_rate = self.calculate_missing_rate(control_missing, controls.len());
+        
+        // Calculate category counts and proportions
+        let case_counts = self.count_categories(&case_values);
+        let control_counts = self.count_categories(&control_values);
+        
+        // Combine categories from both groups
+        let all_categories: Vec<_> = case_counts
+            .keys()
+            .chain(control_counts.keys())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .cloned()
+            .collect();
+        
+        // Calculate proportions and standardized differences for each category
+        let mut results = Vec::new();
+        for category in all_categories {
+            let case_count = case_counts.get(&category).cloned().unwrap_or(0);
+            let case_prop = if case_values.is_empty() {
                 0.0
             } else {
-                (case_prop - control_prop)
-                    / (case_prop.mul_add(1.0 - case_prop, control_prop * (1.0 - control_prop))
-                        / 2.0)
-                        .sqrt()
+                case_count as f64 / case_values.len() as f64
             };
-
-            summaries.push(CovariateSummary {
-                variable: format!("{name} - {category}"),
-                mean_cases: case_prop,
-                mean_controls: control_prop,
+            
+            let control_count = control_counts.get(&category).cloned().unwrap_or(0);
+            let control_prop = if control_values.is_empty() {
+                0.0
+            } else {
+                control_count as f64 / control_values.len() as f64
+            };
+            
+            // Calculate standardized difference for categorical variables
+            let pooled_var = (case_prop * (1.0 - case_prop) + control_prop * (1.0 - control_prop)) / 2.0;
+            let pooled_sd = pooled_var.sqrt();
+            
+            let std_diff = if pooled_sd == 0.0 {
+                0.0
+            } else {
+                (case_prop - control_prop) / pooled_sd
+            };
+            
+            // For categorical variables, variance ratio is set to 1.0
+            let variance_ratio = 1.0;
+            
+            // Create summary for this category
+            let category_name = if variable_name.is_empty() {
+                category.clone()
+            } else {
+                format!("{}: {}", variable_name, category)
+            };
+            
+            let summary = CovariateSummary::new(
+                category_name,
+                case_prop,
+                control_prop,
                 std_diff,
-                variance_ratio: 1.0, // Not applicable for categorical variables
-            });
+                variance_ratio,
+            );
+            
+            results.push(summary);
         }
+        
+        Ok((results, (case_missing_rate, control_missing_rate)))
+    }
+    
+    // Helper methods
+    
+    /// Log diagnostic information about the data
+    fn log_diagnostics(
+        &self,
+        cases: &[(String, NaiveDate)],
+        controls: &[(String, NaiveDate)],
+        _checker: &BalanceChecker,
+        verbose: bool,
+    ) {
+        // Count unique cases and controls for logging
+        let unique_cases: std::collections::HashSet<&str> = cases.iter()
+            .map(|(s, _)| s.as_str())
+            .collect();
+        let unique_controls: std::collections::HashSet<&str> = controls.iter()
+            .map(|(s, _)| s.as_str())
+            .collect();
+        
+        // Log case & control counts
+        info!(
+            "Case-control balance: {} cases, {} controls ({:.1}x), {} unique cases, {} unique controls",
+            cases.len(),
+            controls.len(),
+            controls.len() as f64 / cases.len() as f64,
+            unique_cases.len(),
+            unique_controls.len(),
+        );
+        
+        if verbose {
+            // Diagnostics for PNR formats
+            let dash_count = cases.iter()
+                .map(|(pnr, _)| pnr)
+                .filter(|pnr| pnr.contains('-'))
+                .count();
+                
+            if dash_count > 0 {
+                warn!(
+                    "{} PNRs contain dashes, which might affect matching", 
+                    dash_count
+                );
+            }
+        }
+    }
+    
+    /// Calculate missing data rate
+    fn calculate_missing_rate(&self, missing: usize, total: usize) -> f64 {
+        if total == 0 {
+            0.0 
+        } else {
+            missing as f64 / total as f64
+        }
+    }
+    
+    /// Count occurrences of each category
+    fn count_categories(&self, values: &[String]) -> std::collections::HashMap<String, usize> {
+        let mut counts = std::collections::HashMap::new();
+        for value in values {
+            *counts.entry(value.clone()).or_insert(0) += 1;
+        }
+        counts
+    }
+}
 
-        Ok((summaries, missing_rates))
+impl Default for BalanceMetrics {
+    fn default() -> Self {
+        Self::new()
     }
 }

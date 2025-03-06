@@ -9,12 +9,15 @@ mod checker;    // Main balance checker implementation
 pub mod legacy_cache;  // Cache for covariate values
 mod memory;     // Memory management for large datasets
 mod metrics;    // Balance metrics calculations
-mod processor;  // Processing engine for covariates
+mod optimization; // Optimization strategies for processing
+mod processor;  // Main value processor
+mod proc_impl;  // Implementation details for processor
 pub mod results;  // Results data structures
 mod stats;      // Statistical calculations
 
 // Public exports
 pub use checker::{BalanceChecker, BalanceCheckerBuilder};
 pub use memory::{memory_manager, MemoryGuard, MemoryTier};
-pub use processor::OptimizationStrategy;
+pub use optimization::OptimizationStrategy;
+pub use processor::ValueProcessor;
 pub use results::{BalanceResults, MatchedPairSummary};
