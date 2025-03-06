@@ -7,7 +7,7 @@
 
 #![cfg(test)]
 
-use super::{IdsError, Result, ErrorContext, LegacyErrorContext};
+use super::{IdsError, Result, ErrorContext};
 // No macros needed for this test file
 
 /// Tests that legacy code patterns involving unwrapping errors still work

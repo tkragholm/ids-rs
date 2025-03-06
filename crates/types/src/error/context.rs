@@ -130,8 +130,36 @@ where
             // Get context value
             let ctx = context_fn().to_string();
             
-            // Map the error to the appropriate IdsError variant
-            Err(map_error_type(e, &ctx))
+            // Create a descriptive error message that combines all previous context
+            let error_description = format!("{}", e);
+            
+            // Create an appropriate IdsError that preserves context
+            // Check if we're already dealing with an IdsError
+            let new_error = if let Some(ids_err) = (&e as &dyn StdError).downcast_ref::<super::IdsError>() {
+                match ids_err {
+                    // For Validation errors, preserve the error type with chained context
+                    super::IdsError::Validation(_) => {
+                        super::IdsError::Validation(format!("{}: {}", ctx, error_description))
+                    },
+                    // For DataAccess errors, preserve their structure and source
+                    super::IdsError::DataAccess { source: _, context: _ } => {
+                        // Create a new DataAccess error with updated context
+                        let new_context = format!("{}: {}", ctx, error_description);
+                        let boxed_error = Box::new(std::io::Error::new(std::io::ErrorKind::Other, error_description));
+                        super::IdsError::DataAccess {
+                            source: boxed_error,
+                            context: new_context,
+                        }
+                    },
+                    // Use standard mapping for other IdsError types
+                    _ => map_error_type(e, &ctx)
+                }
+            } else {
+                // For non-IdsError types, use the standard mapping
+                map_error_type(e, &ctx)
+            };
+            
+            Err(new_error)
         }
     }
 }

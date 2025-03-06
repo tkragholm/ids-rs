@@ -248,6 +248,7 @@ impl IdsError {
     pub fn missing_data(msg: impl ToString) -> Self {
         Self::MissingData(msg.to_string())
     }
+    
 
     /// Create an invalid format error
     /// 

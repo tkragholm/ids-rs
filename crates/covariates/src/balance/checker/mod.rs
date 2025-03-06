@@ -77,12 +77,27 @@ impl BalanceChecker {
     pub fn cache_size(&self) -> usize {
         self.cache.len()
     }
+    
+    /// Alias for cache_size for backward compatibility
+    pub fn cache_len(&self) -> usize {
+        self.cache.len()
+    }
+    
+    /// Add a value to the cache (used for testing)
+    pub fn add_to_cache(&self, key: crate::balance::legacy_cache::CacheKey, value: Option<types::models::Covariate>) {
+        self.cache.insert(key, value);
+    }
 
     /// Get the summary for a specific variable from the results
     pub fn get_variable_summary(&self, variable: &str) -> Option<&CovariateSummary> {
         self.results
             .as_ref()
             .and_then(|r| r.summaries.iter().find(|s| s.variable == variable))
+    }
+    
+    /// Get a reference to the results (mainly for testing)
+    pub fn results(&self) -> Option<&BalanceResults> {
+        self.results.as_ref()
     }
 
     /// Get matched pair details for a specific case PNR

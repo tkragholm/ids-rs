@@ -38,8 +38,9 @@ impl BalanceCheckerDiagnostics for BalanceChecker {
         // Create a checker builder
         let checker = BalanceChecker::builder()
             .with_store(empty_store)
-            .with_cache_size(1000)
-            .build();
+            .with_cache_capacity(1000)
+            .build()
+            .expect("Failed to build BalanceChecker for diagnostic mode");
 
         // Populate the cache with some placeholder data for diagnostic purposes
         populate_diagnostic_cache(&checker);
@@ -52,12 +53,12 @@ impl BalanceCheckerDiagnostics for BalanceChecker {
         let empty_store = types::storage::arrow::backend::ArrowBackend::new_empty();
 
         // Create a checker with an empty store but with a cache that simulates having some data
-        let checker = Self {
-            store: Arc::new(empty_store),
-            cache: covariates::balance::legacy_cache::CovariateCache::new(100_000), // Larger cache for real PNRs
-            metrics: covariates::balance::metrics::BalanceMetrics::new(),
-            results: None,
-        };
+        // Use the builder pattern instead of direct struct initialization
+        let checker = BalanceChecker::builder()
+            .with_store(empty_store)
+            .with_cache_capacity(100_000) // Larger cache for real PNRs
+            .build()
+            .expect("Failed to build BalanceChecker for diagnostic mode with PNRs");
 
         // Populate the cache with data using the actual PNRs from matched pairs
         populate_diagnostic_cache_with_pnrs(&checker, pnrs);
@@ -68,7 +69,7 @@ impl BalanceCheckerDiagnostics for BalanceChecker {
     /// Analyze cache performance and provide detailed metrics
     fn analyze_cache_performance(&self) -> CachePerformanceMetrics {
         CachePerformanceMetrics {
-            total_entries: self.cache.len(),
+            total_entries: self.cache_len(),
             hit_ratio: 0.0, // Would need to track hits/misses for this
             memory_usage: estimate_memory_usage(self),
             access_pattern: "Unknown".to_string(),
@@ -78,13 +79,13 @@ impl BalanceCheckerDiagnostics for BalanceChecker {
     /// Improved logging for balance analysis diagnostic information
     fn log_diagnostic_information(&self) {
         debug!("Balance checker diagnostic information:");
-        debug!("Cache size: {} entries", self.cache.len());
+        debug!("Cache size: {} entries", self.cache_len());
         debug!(
             "Estimated memory usage: {} bytes",
             estimate_memory_usage(self)
         );
 
-        if let Some(results) = &self.results {
+        if let Some(results) = self.results() {
             debug!(
                 "Results summary: {} variables analyzed",
                 results.summaries.len()
@@ -123,7 +124,7 @@ fn estimate_memory_usage(checker: &BalanceChecker) -> usize {
     const AVG_COVARIATE_SIZE: usize = 256; // bytes
     const CACHE_OVERHEAD: usize = 50; // bytes per entry
 
-    checker.cache.len() * (AVG_COVARIATE_SIZE + CACHE_OVERHEAD)
+    checker.cache_len() * (AVG_COVARIATE_SIZE + CACHE_OVERHEAD)
 }
 
 /// Populate the cache with some placeholder data for diagnostic purposes using standard test data
@@ -234,7 +235,7 @@ fn populate_diagnostic_cache(checker: &BalanceChecker) {
                         .with_age(age)
                         .with_children_count(children_count);
                 let key = CacheKey::new(id, CovariateType::Demographics, *date);
-                checker.cache.insert(key, Some(demographic.build()));
+                checker.add_to_cache(key, Some(demographic.build()));
 
                 // Income
                 let income = Covariate::income(
@@ -245,14 +246,14 @@ fn populate_diagnostic_cache(checker: &BalanceChecker) {
                 .with_wage_income(wage_income)
                 .with_employment_status(employment_status);
                 let key = CacheKey::new(id, CovariateType::Income, *date);
-                checker.cache.insert(key, Some(income.build()));
+                checker.add_to_cache(key, Some(income.build()));
 
                 // Education
                 let education = Covariate::education(format!("{}", edu_level))
                     .with_isced_code(format!("{}", isced_level))
                     .with_years(edu_years);
                 let key = CacheKey::new(id, CovariateType::Education, *date);
-                checker.cache.insert(key, Some(education.build()));
+                checker.add_to_cache(key, Some(education.build()));
 
                 // Occupation
                 let occupation =
@@ -261,7 +262,7 @@ fn populate_diagnostic_cache(checker: &BalanceChecker) {
                         .with_socio02(socio02)
                         .with_pre_socio(pre_socio);
                 let key = CacheKey::new(id, CovariateType::Occupation, *date);
-                checker.cache.insert(key, Some(occupation.build()));
+                checker.add_to_cache(key, Some(occupation.build()));
             }
         }
     }
@@ -270,12 +271,12 @@ fn populate_diagnostic_cache(checker: &BalanceChecker) {
     for i in 0..100 {
         let case_id = format!("C{:06}", i);
         let key = CacheKey::new(&case_id, CovariateType::Education, treatment_dates[0]);
-        checker.cache.insert(key, None);
+        checker.add_to_cache(key, None);
     }
 
     debug!(
         "Diagnostic cache populated with {} entries",
-        checker.cache.len()
+        checker.cache_len()
     );
 }
 
@@ -459,7 +460,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
                 let demographic =
                     Covariate::demographics(family_size, municipality, family_type.clone());
                 let key = CacheKey::new(id, CovariateType::Demographics, *date);
-                checker.cache.insert(key, Some(demographic.build()));
+                checker.add_to_cache(key, Some(demographic.build()));
 
                 // Income
                 let income = Covariate::income(
@@ -468,20 +469,20 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
                     "PERINDKIALT_13".to_string(),
                 );
                 let key = CacheKey::new(id, CovariateType::Income, *date);
-                checker.cache.insert(key, Some(income.build()));
+                checker.add_to_cache(key, Some(income.build()));
 
                 // Education
                 let education = Covariate::education(format!("{}", education_level))
                     .with_isced_code(format!("{}", isced))
                     .with_years(education_years);
                 let key = CacheKey::new(id, CovariateType::Education, *date);
-                checker.cache.insert(key, Some(education.build()));
+                checker.add_to_cache(key, Some(education.build()));
 
                 // Occupation (SOCIO13)
                 let occupation =
                     Covariate::occupation(socio13_code.to_string(), "SOCIO13".to_string());
                 let key = CacheKey::new(id, CovariateType::Occupation, *date);
-                checker.cache.insert(key, Some(occupation.build()));
+                checker.add_to_cache(key, Some(occupation.build()));
 
                 // Add more date coverage to increase chance of hits
                 // Generate data for each quarter of each year from 2008 to 2023
@@ -497,9 +498,7 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
                                 );
                                 let key =
                                     CacheKey::new(id, CovariateType::Demographics, extra_date);
-                                checker
-                                    .cache
-                                    .insert(key, Some(quarterly_demographic.build()));
+                                checker.add_to_cache(key, Some(quarterly_demographic.build()));
 
                                 let quarterly_income = Covariate::income(
                                     income_amount,
@@ -507,23 +506,21 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
                                     "PERINDKIALT_13".to_string(),
                                 );
                                 let key = CacheKey::new(id, CovariateType::Income, extra_date);
-                                checker.cache.insert(key, Some(quarterly_income.build()));
+                                checker.add_to_cache(key, Some(quarterly_income.build()));
 
                                 let quarterly_education =
                                     Covariate::education(format!("{}", education_level))
                                         .with_isced_code(format!("{}", isced))
                                         .with_years(education_years);
                                 let key = CacheKey::new(id, CovariateType::Education, extra_date);
-                                checker.cache.insert(key, Some(quarterly_education.build()));
+                                checker.add_to_cache(key, Some(quarterly_education.build()));
 
                                 let quarterly_occupation = Covariate::occupation(
                                     socio13_code.to_string(),
                                     "SOCIO13".to_string(),
                                 );
                                 let key = CacheKey::new(id, CovariateType::Occupation, extra_date);
-                                checker
-                                    .cache
-                                    .insert(key, Some(quarterly_occupation.build()));
+                                checker.add_to_cache(key, Some(quarterly_occupation.build()));
                             }
                         }
                     }
@@ -542,19 +539,19 @@ fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<Strin
     for i in 0..missing_count {
         if i < pnrs.len() {
             let key = CacheKey::new(&pnrs[i], CovariateType::Education, treatment_dates[0]);
-            checker.cache.insert(key, None);
+            checker.add_to_cache(key, None);
         }
     }
 
     info!(
         "Diagnostic cache populated with {} entries for {} real PNRs",
-        checker.cache.len(),
+        checker.cache_len(),
         pnrs.len()
     );
     info!(
         "Average entries per PNR: {:.1}",
         if !pnrs.is_empty() {
-            checker.cache.len() as f64 / pnrs.len() as f64
+            checker.cache_len() as f64 / pnrs.len() as f64
         } else {
             0.0
         }
@@ -569,7 +566,7 @@ mod tests {
     fn test_create_diagnostic_checker() {
         let checker = BalanceChecker::new_diagnostic();
         assert!(
-            checker.cache.len() > 0,
+            checker.cache_len() > 0,
             "Diagnostic cache should be populated"
         );
     }
@@ -583,7 +580,7 @@ mod tests {
         ];
         let checker = BalanceChecker::new_diagnostic_with_pnrs(pnrs);
         assert!(
-            checker.cache.len() > 0,
+            checker.cache_len() > 0,
             "Diagnostic cache should be populated with PNRs"
         );
     }

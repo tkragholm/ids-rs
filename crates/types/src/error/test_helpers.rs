@@ -193,7 +193,7 @@ mod tests {
     use super::*;
     use std::path::Path;
     use std::error::Error;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     // Test helper function to simulate an operation that might fail
     fn divide(a: i32, b: i32) -> Result<i32> {
