@@ -9,6 +9,7 @@ covariates = { path = "../covariates" }
 loader = { path = "../loader" }
 types = { path = "../types" }
 datagen = { path = "../datagen" }
+utils = { path = "../utils" }
 clap.workspace = true
 log.workspace = true
 env_logger.workspace = true

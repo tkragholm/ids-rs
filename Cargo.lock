@@ -1581,6 +1581,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.12",
  "types",
+ "utils",
 ]
 
 [[package]]
@@ -3513,6 +3514,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "colored",
+ "console",
  "csv",
  "log",
  "serde",
