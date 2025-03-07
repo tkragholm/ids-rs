@@ -23,6 +23,9 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Science/Research",
 ]
+dependencies = [
+    "pyarrow>=12.0.1",
+]
 
 [tool.maturin]
 # Configure maturin to build and package the binary
