@@ -47,7 +47,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// Sets up a combined logging system with:
 /// 1. Console output with progress bar integration via indicatif_log_bridge
-/// 2. File output for regular logs using utils::SimpleLogger
+/// 2. File output for regular logs using log4rs
+/// 3. Creates a session-specific log file for each run with timestamp
 ///
 /// # Arguments
 /// * `output_dir` - The base output directory where log files will be stored
@@ -62,9 +63,16 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
     use indicatif_log_bridge::LogWrapper;
     use log::LevelFilter;
     use std::path::Path;
-
-    // We use the SimpleLogger from the utils crate, which already supports
-    // logging to both console and file
+    use log4rs::{
+        append::{console::ConsoleAppender, file::FileAppender, rolling_file::RollingFileAppender},
+        encode::pattern::PatternEncoder,
+        config::{Appender, Config, Root, Logger},
+        filter::threshold::ThresholdFilter,
+    };
+    use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+    use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+    use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+    use chrono::Local;
 
     // Get the log level from environment or use a default
     let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
@@ -80,55 +88,107 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
     // Create MultiProgress for progress bars
     let multi = MultiProgress::new();
 
-    // Set up logger for console with progress bars
+    // Ensure the logs directory exists
+    let logs_dir = Path::new(output_dir).join("logs");
+    if !logs_dir.exists() {
+        std::fs::create_dir_all(&logs_dir)?;
+    }
+
+    // Create timestamp for this session
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    
+    // Prepare log file paths
+    let main_log_path = logs_dir.join("ids.log");
+    let session_log_path = logs_dir.join(format!("ids_session_{}.log", timestamp));
+    let debug_log_path = logs_dir.join(format!("debug_{}.log", timestamp));
+
+    // Create console appender with colored output
+    let stdout = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{h({d(%Y-%m-%d %H:%M:%S)} - {h({l})} [{T}] {t} - {m}{n})}"
+        )))
+        .build();
+
+    // Create file appender for main log (append mode)
+    let main_log_file = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%Y-%m-%d %H:%M:%S)} - {l} [{T}] {t} - {m}{n}"
+        )))
+        .build(main_log_path.clone())?;
+
+    // Create file appender for session-specific log
+    let session_log_file = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%Y-%m-%d %H:%M:%S.%3f)} - {l} [{T}] {t} - {m}{n}"
+        )))
+        .build(session_log_path.clone())?;
+
+    // Create rolling file appender for debug logs with size trigger (10MB)
+    let size_trigger = SizeTrigger::new(10 * 1024 * 1024); // 10MB size trigger
+    let window_roller = FixedWindowRoller::builder()
+        .build(&format!("{}/debug_{}.{{}}.log", logs_dir.display(), timestamp), 5)
+        .unwrap();
+    let compound_policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(window_roller));
+    
+    let debug_log_file = RollingFileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%Y-%m-%d %H:%M:%S.%3f)} [{T}] {l} {M}:{L} - {m}{n}"
+        )))
+        .build(debug_log_path.clone(), Box::new(compound_policy))?;
+
+    // Configure the logging system
+    let config = Config::builder()
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+        .appender(Appender::builder().build("main_log", Box::new(main_log_file)))
+        .appender(Appender::builder().build("session_log", Box::new(session_log_file)))
+        .appender(
+            Appender::builder()
+                .filter(Box::new(ThresholdFilter::new(LevelFilter::Debug)))
+                .build("debug_log", Box::new(debug_log_file))
+        )
+        // Set up loggers for specific modules to capture more detailed logs
+        .logger(Logger::builder()
+            .appender("debug_log")
+            .additive(false)
+            .build("types", LevelFilter::Debug))
+        .logger(Logger::builder()
+            .appender("debug_log")
+            .additive(false)
+            .build("loader", LevelFilter::Debug))
+        // Root logger configuration
+        .build(
+            Root::builder()
+                .appender("stdout")
+                .appender("main_log")
+                .appender("session_log")
+                .appender("debug_log")
+                .build(log_level),
+        )?;
+    
+    // Initialize log4rs with the config
+    log4rs::init_config(config)?;
+
+    // Set up the log wrapper with indicatif for progress bars integration
     let env_logger = env_logger::Builder::new()
         .filter_level(log_level)
         .format_timestamp(Some(env_logger::TimestampPrecision::Seconds))
         .format_module_path(false)
         .build();
 
-    // Set up the log wrapper with indicatif for progress bars
+    // Try to initialize the log wrapper (may fail if logger is already initialized)
+    // This is okay because we already set up log4rs above
     if let Err(e) = LogWrapper::new(multi.clone(), env_logger).try_init() {
-        // If we can't initialize the logger, it may already be initialized
-        eprintln!("Note: Logger may already be initialized: {}", e);
-
-        // Just ensure we have the right log level set
-        log::set_max_level(log_level);
-    } else {
-        // Make sure the log level is correctly set
+        // If we can't initialize the wrapper, ensure we have the right log level
+        eprintln!("Note: Progress bar integration may be limited: {}", e);
         log::set_max_level(log_level);
     }
-
-    // Now the logger is set up for the console, add file output
-    // Create a log file in the output directory
-    let log_file_path = Path::new(output_dir).join("logs").join("ids.log");
-
-    // Ensure the directory exists
-    if let Some(parent) = log_file_path.parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
-    }
-
-    // Create the file for logging
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true) // Append rather than truncate
-        .open(&log_file_path)?;
-
-    // Write an initial entry to the log file
-    use std::io::Write;
-    writeln!(
-        file,
-        "\n{} - INFO: Logging initialized at {} level for session",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        log_level
-    )?;
 
     // Log that we've started
     log::info!("Application started with output directory: {}", output_dir);
-    log::info!("Log file: {}", log_file_path.display());
+    log::info!("Main log file: {}", main_log_path.display());
+    log::info!("Session log file: {}", session_log_path.display());
+    log::info!("Debug log file: {}", debug_log_path.display());
+    log::debug!("Debug logging enabled");
 
     Ok(())
 }
