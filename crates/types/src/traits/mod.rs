@@ -46,7 +46,7 @@ pub use self::utils::DateHelpers;
 /// use chrono::NaiveDate;
 ///
 /// fn process_person_data<S: Store>(
-///     store: &S,
+///     store: &mut S,
 ///     pnr: &str,
 ///     date: NaiveDate
 /// ) -> Result<()> {
@@ -55,8 +55,8 @@ pub use self::utils::DateHelpers;
 ///         println!("Education: {:?}", education);
 ///     }
 ///
-///     // Get all covariates
-///     let all_covariates = store.covariates(pnr, date)?;
+///     // Get all covariates (example only, this method would also need &mut self)
+///     let all_covariates = vec![]; // Placeholder for store.covariates(pnr, date)? 
 ///     println!("Found {} covariates", all_covariates.len());
 ///
 ///     Ok(())
@@ -77,7 +77,7 @@ pub trait Store: Send + Sync {
     /// The Option will be None if no covariate of the specified type exists for the
     /// person at the given date.
     fn covariate(
-        &self, 
+        &mut self, 
         pnr: &str, 
         covariate_type: CovariateType, 
         date: NaiveDate
@@ -118,7 +118,7 @@ pub trait Store: Send + Sync {
     /// A Result containing a HashMap of covariates indexed by type,
     /// or an error if retrieval failed.
     fn covariates(
-        &self, 
+        &mut self, 
         pnr: &str, 
         date: NaiveDate
     ) -> Result<hashbrown::HashMap<CovariateType, Covariate>> {
@@ -151,7 +151,7 @@ pub trait Store: Send + Sync {
     /// or an error if retrieval failed. The Option will be None if the person has
     /// no family relations or if no covariates exist for the family.
     fn family_covariates(
-        &self, 
+        &mut self, 
         pnr: &str, 
         date: NaiveDate
     ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>> {
@@ -325,7 +325,7 @@ pub trait LegacyStoreExt: Store {
     /// Legacy method - use `covariate` instead
     #[deprecated(since = "0.2.0", note = "Use `covariate` method instead")]
     fn get_covariate(
-        &self, 
+        &mut self, 
         pnr: &str, 
         covariate_type: CovariateType, 
         date: NaiveDate

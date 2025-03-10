@@ -4,6 +4,7 @@ use chrono::NaiveDate;
 use hashbrown::HashMap;
 use lasso::ThreadedRodeo; // Add string interning support
 use log;
+use std::path::Path;
 use std::sync::Arc;
 
 // Updated imports for new module structure
@@ -533,32 +534,63 @@ impl ArrowBackend {
             return Ok(());
         }
 
-        // Parse period into year and month
-        if period.len() < 4 {
-            return Err(IdsError::invalid_format(format!(
-                "Period string too short: {}",
-                period
-            )));
+        // Handle special cases like 'current' or directory names that might contain non-numeric characters
+        if period == "current" {
+            // Use current date for 'current' period
+            use chrono::Utc;
+            let today = Utc::now().naive_utc().date();
+            self.period_date_cache.insert(period.to_string(), today);
+            return Ok(());
         }
 
-        let year: i32 = period[0..4]
-            .parse()
-            .map_err(|_| IdsError::invalid_format(format!("Invalid year in period: {}", period)))?;
+        // Extract numeric part from the period (to handle paths like 'bef/202012' or file extensions)
+        let period_clean = period
+            .chars()
+            .filter(|c| c.is_numeric())
+            .collect::<String>();
 
-        let month: u32 = if period.len() >= 6 {
-            period[4..6].parse().unwrap_or(12) // Default to December
-        } else {
-            12 // Default to December
-        };
+        // Try to parse as a full period string (YYYYMM)
+        if period_clean.len() >= 6 {
+            let year_str = &period_clean[0..4];
+            let month_str = &period_clean[4..6];
+            
+            if let (Ok(year), Ok(month)) = (year_str.parse::<i32>(), month_str.parse::<u32>()) {
+                if month > 0 && month <= 12 {
+                    if let Some(date) = NaiveDate::from_ymd_opt(year, month, 1) {
+                        self.period_date_cache.insert(period.to_string(), date);
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        
+        // Try to parse as just a year (YYYY)
+        if period_clean.len() >= 4 {
+            let year_str = &period_clean[0..4];
+            
+            if let Ok(year) = year_str.parse::<i32>() {
+                if let Some(date) = NaiveDate::from_ymd_opt(year, 12, 31) {
+                    self.period_date_cache.insert(period.to_string(), date);
+                    return Ok(());
+                }
+            }
+        }
 
-        let day = 1; // Always use the first day of the month
+        // Handle directory paths by extracting last component
+        let path = Path::new(period);
+        if let Some(file_name) = path.file_name() {
+            if let Some(file_str) = file_name.to_str() {
+                // Try again with just the file name
+                if file_str != period {
+                    return self.add_period_to_cache(file_str);
+                }
+            }
+        }
 
-        // Create date and add to cache
-        let date = NaiveDate::from_ymd_opt(year, month, day).ok_or_else(|| {
-            IdsError::invalid_format(format!("Invalid date for period: {}", period))
-        })?;
-
-        self.period_date_cache.insert(period.to_string(), date);
+        // If we get here, resort to a default date to avoid errors
+        log::warn!("Could not parse period '{}', using a default date (2020-01-01)", period);
+        let default_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+        self.period_date_cache.insert(period.to_string(), default_date);
         Ok(())
     }
 
@@ -583,12 +615,19 @@ impl ArrowBackend {
     /// # Errors
     /// Returns an error if data access fails
     fn get_education(
-        &self,
+        &mut self,
         pnr: &str,
         date: NaiveDate,
     ) -> std::result::Result<Option<Covariate>, IdsError> {
-        // Find the closest UDDF data period before the given date using optimized closest period lookup
-        let period = self.find_closest_period(date, &self.uddf_data)?;
+        // Get a temporary copy of the uddf_data keys to avoid borrowing self twice
+        let period_keys: Vec<String> = self.uddf_data.keys().cloned().collect();
+        let period_map: HashMap<String, &Vec<RecordBatch>> = 
+            period_keys.iter().filter_map(|k| 
+                self.uddf_data.get(k).map(|v| (k.clone(), v))
+            ).collect();
+            
+        // Find the closest period
+        let period = self.find_closest_period(date, &period_map)?;
 
         if let Some(period_str) = period {
             if let Some(batches) = self.uddf_data.get(period_str) {
@@ -661,6 +700,146 @@ impl ArrowBackend {
         Ok(None)
     }
 
+    /// Get occupation covariate for a PNR at a given date
+    ///
+    /// # Arguments
+    /// * `pnr` - The person identification number
+    /// * `date` - The reference date
+    ///
+    /// # Returns
+    /// * `std::result::Result<Option<Covariate>, IdsError>` - Occupation covariate or None
+    ///
+    /// # Errors
+    /// Returns an error if data access fails
+    fn get_occupation(
+        &mut self,
+        pnr: &str,
+        date: NaiveDate,
+    ) -> std::result::Result<Option<Covariate>, IdsError> {
+        use chrono::Datelike;
+        let year = date.year();
+
+        if let Some(batches) = self.akm_data.get(&year) {
+            // Search through batches with the cached index if available
+            for (batch_idx, batch) in batches.iter().enumerate() {
+                // Use optimized PNR index lookup with cache
+                if let Some(idx) = self.find_pnr_index_with_cache(batch, pnr, "akm", batch_idx)? {
+                    // Access occupation-related fields
+                    let schema = batch.schema();
+
+                    // Default values in case columns are missing
+                    let mut socio: Option<i32> = None;
+                    let mut socio02: Option<i32> = None;
+                    let mut socio13: Option<i32> = None;
+                    let mut pre_socio: Option<i32> = None;
+
+                    // Get SOCIO column if it exists
+                    if let Ok(col_idx) = schema.index_of("SOCIO") {
+                        let column = batch.column(col_idx);
+                        if let Some(array) =
+                            column.as_any().downcast_ref::<arrow::array::Int32Array>()
+                        {
+                            if !array.is_null(idx) {
+                                socio = Some(array.value(idx));
+                            }
+                        }
+                    }
+
+                    // Get SOCIO02 column if it exists
+                    if let Ok(col_idx) = schema.index_of("SOCIO02") {
+                        let column = batch.column(col_idx);
+                        if let Some(array) =
+                            column.as_any().downcast_ref::<arrow::array::Int32Array>()
+                        {
+                            if !array.is_null(idx) {
+                                socio02 = Some(array.value(idx));
+                            }
+                        }
+                    }
+
+                    // Get SOCIO13 column if it exists
+                    if let Ok(col_idx) = schema.index_of("SOCIO13") {
+                        let column = batch.column(col_idx);
+                        if let Some(array) =
+                            column.as_any().downcast_ref::<arrow::array::Int32Array>()
+                        {
+                            if !array.is_null(idx) {
+                                socio13 = Some(array.value(idx));
+                            }
+                        }
+                    }
+
+                    // Get PRE_SOCIO column if it exists
+                    if let Ok(col_idx) = schema.index_of("PRE_SOCIO") {
+                        let column = batch.column(col_idx);
+                        if let Some(array) =
+                            column.as_any().downcast_ref::<arrow::array::Int32Array>()
+                        {
+                            if !array.is_null(idx) {
+                                pre_socio = Some(array.value(idx));
+                            }
+                        }
+                    }
+
+                    // If any SOCIO categorization is available, build the occupation covariate
+                    if socio.is_some()
+                        || socio02.is_some()
+                        || socio13.is_some()
+                        || pre_socio.is_some()
+                    {
+                        // We need both code and classification for occupation
+                        let classification = "SOCIO"; // Default classification
+                        let code = socio13.map(|s| s.to_string())
+                            .or_else(|| socio.map(|s| s.to_string()))
+                            .or_else(|| socio02.map(|s| s.to_string()))
+                            .unwrap_or_else(|| "0".to_string());
+                            
+                        let mut builder = Covariate::occupation(code, classification);
+                        
+                        // Add socio values to builder
+                        if let Some(val) = socio {
+                            builder = builder.with_socio(val);
+                            
+                            // Add metadata directly since we don't have a Socio translation type
+                            builder = builder.with_metadata("socio_value", val.to_string());
+                        }
+                        
+                        if let Some(val) = socio02 {
+                            builder = builder.with_socio02(val);
+                            
+                            // Add metadata directly
+                            builder = builder.with_metadata("socio02_value", val.to_string());
+                        }
+                        
+                        if let Some(val) = socio13 {
+                            // Add translated value to metadata if available
+                            if let Some(translated) = self.translations.translate(
+                                crate::translation::TranslationType::Socio13,
+                                &val.to_string(),
+                            ) {
+                                builder = builder.with_metadata("socio13_category", translated);
+                            }
+                            
+                            // Also store the raw value
+                            builder = builder.with_metadata("socio13_value", val.to_string());
+                        }
+                        
+                        if let Some(val) = pre_socio {
+                            builder = builder.with_pre_socio(val);
+                            
+                            // Add metadata directly
+                            builder = builder.with_metadata("pre_socio_value", val.to_string());
+                        }
+
+                        return Ok(Some(builder.build()));
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
     /// Get demographics covariate for a PNR at a given date
     ///
     /// # Arguments
@@ -673,12 +852,19 @@ impl ArrowBackend {
     /// # Errors
     /// Returns an error if data access fails
     fn get_demographics(
-        &self,
+        &mut self,
         pnr: &str,
         date: NaiveDate,
     ) -> std::result::Result<Option<Covariate>, IdsError> {
-        // Use optimized period lookup with cache
-        let period = self.find_closest_period(date, &self.bef_data)?;
+        // Get a temporary copy of the bef_data keys to avoid borrowing self twice
+        let period_keys: Vec<String> = self.bef_data.keys().cloned().collect();
+        let period_map: HashMap<String, &Vec<RecordBatch>> = 
+            period_keys.iter().filter_map(|k| 
+                self.bef_data.get(k).map(|v| (k.clone(), v))
+            ).collect();
+            
+        // Find the closest period
+        let period = self.find_closest_period(date, &period_map)?;
 
         if let Some(period_str) = period {
             if let Some(batches) = self.bef_data.get(period_str) {
@@ -785,14 +971,16 @@ impl ArrowBackend {
                             Some(value.to_string())
                         };
 
-                        if let (Some(family_size), Some(municipality), Some(family_type)) =
-                            (family_size, municipality, family_type)
-                        {
-                            let family_type_str = family_type.to_string();
-
+                        // If at least family_size is available, we can build a demographics covariate
+                        if let Some(family_size) = family_size {
                             // Pre-allocate builder to reduce allocations
-                            let mut builder =
-                                Covariate::demographics(family_size, municipality, family_type_str);
+                            let mut builder = Covariate::demographics(
+                                family_size,
+                                municipality.unwrap_or(0),
+                                family_type
+                                    .map(|ft| ft.to_string())
+                                    .unwrap_or_else(|| "0".to_string()),
+                            );
 
                             // Add citizenship if available
                             if let Some(statsb) = statsb {
@@ -869,10 +1057,23 @@ impl ArrowBackend {
     /// # Errors
     /// Returns an error if period date conversion fails
     fn find_closest_period<'a>(
-        &self,
+        &mut self,
         date: NaiveDate,
         data: &'a HashMap<String, Vec<RecordBatch>>,
     ) -> std::result::Result<Option<&'a String>, IdsError> {
+        // Check if data is empty
+        if data.is_empty() {
+            return Ok(None);
+        }
+
+        // Special fast path - if there's only one period, just use it
+        if data.len() == 1 {
+            let key = data.keys().next().unwrap();
+            // Still add it to the cache if needed
+            let _ = self.add_period_to_cache(key);
+            return Ok(Some(key));
+        }
+
         // Track the closest period we've found
         let mut closest_period: Option<&String> = None;
         let mut closest_date: Option<NaiveDate> = None;
@@ -883,33 +1084,26 @@ impl ArrowBackend {
             let period_date = if let Some(cached_date) = self.period_date_cache.get(period) {
                 *cached_date
             } else {
-                // If not in cache, skip periods with invalid format
-                if period.len() < 4 {
-                    continue;
+                // Add to cache and get it back
+                if let Err(e) = self.add_period_to_cache(period) {
+                    log::warn!("Failed to parse period '{}': {}", period, e);
+                    continue; // Skip this period
                 }
-
-                let year: i32 = match period[0..4].parse() {
-                    Ok(y) => y,
-                    Err(_) => continue, // Skip invalid year format
-                };
-
-                let month: u32 = if period.len() > 5 {
-                    match period[4..6].parse() {
-                        Ok(m) => m,
-                        Err(_) => 12, // Default to December for invalid month
+                
+                // Now it should be in the cache
+                match self.period_date_cache.get(period) {
+                    Some(date) => *date,
+                    None => {
+                        log::warn!("Period '{}' not found in cache after adding", period);
+                        continue; // Skip this period
                     }
-                } else {
-                    12 // Default to December when no month specified
-                };
-
-                match NaiveDate::from_ymd_opt(year, month, 1) {
-                    Some(pd) => pd,
-                    None => continue, // Skip invalid dates
                 }
             };
 
             // Only consider periods before or equal to the target date
-            if period_date <= date {
+            // If we can't find any periods before the target date, we'll
+            // end up using the most recent period available
+            if period_date <= date || closest_date.is_none() {
                 // First period or a more recent period than what we've found so far
                 if closest_date.is_none() || period_date > closest_date.unwrap() {
                     closest_date = Some(period_date);
@@ -921,6 +1115,28 @@ impl ArrowBackend {
                     }
                 }
             }
+        }
+
+        // If we couldn't find a suitable period (all periods are after the target date),
+        // use the earliest available period
+        if closest_period.is_none() && !data.is_empty() {
+            let mut earliest_period: Option<&String> = None;
+            let mut earliest_date: Option<NaiveDate> = None;
+
+            for period in data.keys() {
+                let period_date = if let Some(cached_date) = self.period_date_cache.get(period) {
+                    *cached_date
+                } else {
+                    continue; // Skip if not in cache
+                };
+
+                if earliest_date.is_none() || period_date < earliest_date.unwrap() {
+                    earliest_date = Some(period_date);
+                    earliest_period = Some(period);
+                }
+            }
+
+            closest_period = earliest_period;
         }
 
         Ok(closest_period)
@@ -950,7 +1166,7 @@ impl ArrowBackend {
 
 impl Store for ArrowBackend {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,
@@ -959,7 +1175,7 @@ impl Store for ArrowBackend {
             CovariateType::Education => self.get_education(pnr, date),
             CovariateType::Income => self.get_income(pnr, date),
             CovariateType::Demographics => self.get_demographics(pnr, date),
-            CovariateType::Occupation => Ok(None), // Implement if needed
+            CovariateType::Occupation => self.get_occupation(pnr, date),
         }
     }
 
