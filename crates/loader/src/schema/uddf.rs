@@ -5,18 +5,16 @@ use arrow_schema::{DataType, Field, Schema};
 /// # Fields
 /// - `PNR`: Unique personal identifier (non-nullable)
 /// - Various education fields (nullable)
+///
+/// This schema matches the format in the actual parquet files
+/// Converted from the Polars datatypes in schemas.py to Arrow datatypes
 #[must_use]
 pub fn uddf_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
-        Field::new("HFAUDD", DataType::Int32, true),
-        Field::new("HFPRIA", DataType::Int32, true),
-        Field::new("IGUDD", DataType::Int32, true),
-        Field::new("KILDE", DataType::Int32, true),
-        Field::new("AUDD", DataType::Int32, true),
-        Field::new("AUDD_NAVN", DataType::Utf8, true),
-        Field::new("UDD_START", DataType::Date32, true),
-        Field::new("UDD_SLUT", DataType::Date32, true),
-        // Include additional fields as needed
+        Field::new("HFAUDD", DataType::Utf8, true),
+        Field::new("HF_VFRA", DataType::Date32, true),
+        Field::new("HF_VTIL", DataType::Date32, true),
+        Field::new("INSTNR", DataType::Int32, true),
     ])
 }

@@ -45,21 +45,31 @@ impl RegisterPathConfig {
     /// A HashMap of register names to their resolved paths
     ///
     /// # Errors
-    /// Returns an error if the base path doesn't exist
+    /// Returns an error if a non-empty base path doesn't exist and is needed
     pub fn resolve_paths(&self) -> Result<HashMap<String, PathBuf>, IdsError> {
         let mut resolved = HashMap::new();
         let base_path_obj = Path::new(&self.base_path);
+        let using_custom_paths_only = !self.custom_paths.is_empty();
+        // We need a valid base path when:
+        // 1. We have no custom paths (need to load everything from base)
+        // 2. We have some custom paths but they might be relative paths needing the base
+        let need_base_path = self.custom_paths.is_empty() || !self.base_path.trim().is_empty();
 
-        if !base_path_obj.exists() {
+        // Only check if base path exists when it's not empty and we need it
+        if !self.base_path.trim().is_empty() && need_base_path && !base_path_obj.exists() {
             return Err(IdsError::invalid_operation(format!(
                 "Base path does not exist: {}",
                 self.base_path
             )));
         }
 
-        // Normalize base_path for easier comparison
-        let normalized_base_path = if let Ok(canonical) = base_path_obj.canonicalize() {
-            canonical.to_string_lossy().to_string()
+        // Normalize base_path for easier comparison (only if it exists)
+        let normalized_base_path = if !self.base_path.trim().is_empty() && base_path_obj.exists() {
+            if let Ok(canonical) = base_path_obj.canonicalize() {
+                canonical.to_string_lossy().to_string()
+            } else {
+                self.base_path.clone()
+            }
         } else {
             self.base_path.clone()
         };
@@ -79,9 +89,14 @@ impl RegisterPathConfig {
                 continue;
             }
 
-            // Prepend base_path for relative paths
-            let full_path = base_path_obj.join(path_obj);
-            resolved.insert(key.clone(), full_path);
+            // For relative paths, only prepend base_path if it's not empty
+            if !self.base_path.trim().is_empty() {
+                let full_path = base_path_obj.join(path_obj);
+                resolved.insert(key.clone(), full_path);
+            } else {
+                // When base_path is empty, treat custom paths as relative to current directory
+                resolved.insert(key.clone(), path_obj.to_path_buf());
+            }
         }
 
         Ok(resolved)
@@ -95,6 +110,13 @@ impl RegisterPathConfig {
     /// # Errors
     /// Returns an error if any of the paths don't exist
     pub fn validate(&self) -> Result<(), IdsError> {
+        // If we have an empty base path and no custom paths, fail early
+        if self.base_path.trim().is_empty() && self.custom_paths.is_empty() {
+            return Err(IdsError::invalid_operation(
+                "No base path or custom paths specified".to_string(),
+            ));
+        }
+        
         let resolved = self.resolve_paths()?;
         let mut invalid_paths = Vec::new();
 
