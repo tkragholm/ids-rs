@@ -163,7 +163,7 @@ impl DataStore {
 
 impl Store for DataStore {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,
@@ -173,8 +173,31 @@ impl Store for DataStore {
             return Ok(Some(cached));
         }
 
-        // If not in cache, get from backend
-        let result = self.backend.covariate(pnr, covariate_type, date)?;
+        // We're changing the implementation approach here
+        // Instead of trying to access the backend through Arc directly,
+        // we'll implement a fallback that doesn't require &mut self for covariate
+        
+        // The covariate function needs &mut self due to internal caching
+        // but we can't directly access the Arc as mutable when it's shared.
+        // For now, we'll return a "not implemented" error in this case,
+        // which will prompt users to restructure their code to avoid sharing
+        // the DataStore instance across threads.
+        if Arc::strong_count(&self.backend) > 1 {
+            return Err(IdsError::invalid_operation(
+                "Covariate lookup not available when DataStore is shared across threads. \
+                 Consider creating separate DataStore instances for each thread.",
+            ));
+        }
+        
+        // Safe case - we have exclusive access to the Arc
+        let result = if let Some(backend_mut) = Arc::get_mut(&mut self.backend) {
+            backend_mut.covariate(pnr, covariate_type, date)?
+        } else {
+            // This should never happen since we already checked strong_count
+            return Err(IdsError::invalid_operation(
+                "Unexpected shared backend state - unable to get mutable access",
+            ));
+        };
 
         // Store in cache if found
         if let Some(ref covariate) = result {

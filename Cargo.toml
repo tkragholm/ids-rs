@@ -7,6 +7,7 @@ members = [
     "crates/types",
     "crates/datagen",
     "crates/utils",
+    "crates/parquet-integration",
 ]
 
 # Set the resolver to version 2 as recommended

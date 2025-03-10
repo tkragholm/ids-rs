@@ -82,7 +82,7 @@ impl TimeVaryingBackend {
 
 impl Store for TimeVaryingBackend {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,

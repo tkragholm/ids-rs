@@ -342,7 +342,7 @@ pub trait LegacyStoreExt: Store {
     /// Legacy method - use `covariates` instead
     #[deprecated(since = "0.2.0", note = "Use `covariates` method instead")]
     fn get_covariates(
-        &self, 
+        &mut self, 
         pnr: &str, 
         date: NaiveDate
     ) -> Result<hashbrown::HashMap<CovariateType, Covariate>> {
@@ -352,7 +352,7 @@ pub trait LegacyStoreExt: Store {
     /// Legacy method - use `family_covariates` instead
     #[deprecated(since = "0.2.0", note = "Use `family_covariates` method instead")]
     fn get_family_covariates(
-        &self, 
+        &mut self, 
         pnr: &str, 
         date: NaiveDate
     ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>> {

@@ -17,6 +17,7 @@ arrow-array.workspace = true
 arrow-schema.workspace = true
 arrow-select.workspace = true
 parquet.workspace = true
+parquet-integration = { path = "../parquet-integration" }
 indicatif.workspace = true
 types = { path = "../types" }
 rayon.workspace = true

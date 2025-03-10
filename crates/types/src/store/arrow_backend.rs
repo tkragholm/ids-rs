@@ -514,7 +514,7 @@ impl ArrowBackend {
 
 impl Store for ArrowBackend {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,

@@ -621,9 +621,10 @@ impl ArrowBackend {
     ) -> std::result::Result<Option<Covariate>, IdsError> {
         // Get a temporary copy of the uddf_data keys to avoid borrowing self twice
         let period_keys: Vec<String> = self.uddf_data.keys().cloned().collect();
-        let period_map: HashMap<String, &Vec<RecordBatch>> = 
+        // Create a map of periods to owned record batch vectors
+        let period_map: HashMap<String, Vec<RecordBatch>> = 
             period_keys.iter().filter_map(|k| 
-                self.uddf_data.get(k).map(|v| (k.clone(), v))
+                self.uddf_data.get(k).map(|v| (k.clone(), v.clone()))
             ).collect();
             
         // Find the closest period
@@ -858,9 +859,10 @@ impl ArrowBackend {
     ) -> std::result::Result<Option<Covariate>, IdsError> {
         // Get a temporary copy of the bef_data keys to avoid borrowing self twice
         let period_keys: Vec<String> = self.bef_data.keys().cloned().collect();
-        let period_map: HashMap<String, &Vec<RecordBatch>> = 
+        // Create a map of periods to owned record batch vectors
+        let period_map: HashMap<String, Vec<RecordBatch>> = 
             period_keys.iter().filter_map(|k| 
-                self.bef_data.get(k).map(|v| (k.clone(), v))
+                self.bef_data.get(k).map(|v| (k.clone(), v.clone()))
             ).collect();
             
         // Find the closest period
