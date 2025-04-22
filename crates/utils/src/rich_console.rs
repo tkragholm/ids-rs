@@ -239,7 +239,7 @@ impl RichConsole {
         let top_border = format!(
             "{}{}{}{}{}",
             border_style.apply_to(box_chars.top_left),
-            border_style.apply_to(box_chars.horizontal.repeat(1)),
+            border_style.apply_to(box_chars.horizontal.to_string()),
             title_style.apply_to(title_with_padding),
             border_style.apply_to(box_chars.horizontal.repeat(right_border_len.saturating_sub(1))),
             border_style.apply_to(box_chars.top_right)
@@ -557,7 +557,7 @@ impl RichConsole {
             for &height in &heights {
                 if height > h {
                     line.push_str(&bar_style.apply_to("█").to_string());
-                    line.push_str(" ");
+                    line.push(' ');
                 } else {
                     line.push_str("  ");
                 }
