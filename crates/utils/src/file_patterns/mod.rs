@@ -1,302 +1,321 @@
-//! File utility functions for working with register data files
+//! File pattern utilities for finding and categorizing files.
 //!
-//! This module provides functions for finding, organizing, and analyzing register data files.
-//! It includes utilities for discovering files, determining file types, and extracting metadata
-//! from filenames.
+//! This module provides utilities for working with file patterns, including
+//! finding files that match specific patterns, detecting register types, and
+//! organizing files into groups.
 
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use std::fs;
-use std::io::{self, Error, ErrorKind};
+use std::io;
+use std::path::{Path, PathBuf};
+use regex::Regex;
 
-/// Find a parquet file across multiple base paths, trying various strategies
-///
-/// This function searches for a parquet file with the given filename in multiple base paths,
-/// trying various strategies:
-/// 1. Direct path
-/// 2. Adding .parquet extension if needed
-/// 3. Looking in subdirectories
+/// Find a parquet file by name in a list of base directories
 ///
 /// # Arguments
-/// * `base_paths` - Slice of base paths to search in
-/// * `filename` - Filename to search for
+/// * `base_paths` - The base directories to search in
+/// * `filename` - The filename to search for
 ///
 /// # Returns
-/// * `Result<PathBuf, io::Error>` - Path to the found file or error
+/// A Result containing the full path to the found file, or an error if not found
 pub fn find_parquet_file(base_paths: &[&Path], filename: &str) -> Result<PathBuf, io::Error> {
-    let filename_with_ext = if !filename.ends_with(".parquet") {
+    // Ensure filename ends with .parquet
+    let file_to_find = if !filename.ends_with(".parquet") {
         format!("{}.parquet", filename)
     } else {
         filename.to_string()
     };
     
-    // Try direct path
     for base_path in base_paths {
-        let path = base_path.join(&filename_with_ext);
-        if path.exists() && path.is_file() {
-            return Ok(path);
+        let full_path = base_path.join(&file_to_find);
+        if full_path.exists() {
+            return Ok(full_path);
         }
     }
     
-    // Look in subdirectories
-    for base_path in base_paths {
-        if let Ok(entries) = fs::read_dir(base_path) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path.is_dir() {
-                    let subpath = path.join(&filename_with_ext);
-                    if subpath.exists() && subpath.is_file() {
-                        return Ok(subpath);
-                    }
-                }
-            }
-        }
-    }
-    
-    Err(Error::new(
-        ErrorKind::NotFound,
-        format!("Could not find file {} in any of the provided paths", filename),
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("File not found: {}", filename),
     ))
 }
 
-/// Find all parquet files in a directory and its subdirectories
+/// Find all parquet files in a directory that match a pattern
 ///
 /// # Arguments
-/// * `dir` - Directory to search in
-/// * `pattern` - Optional pattern to filter filenames
+/// * `dir` - The directory to search in
+/// * `pattern` - An optional regex pattern to match against filenames
 ///
 /// # Returns
-/// * `Result<Vec<PathBuf>, io::Error>` - List of found files or error
+/// A Result containing a vector of paths to matching files, or an error
 pub fn find_all_parquet_files(dir: &Path, pattern: Option<&str>) -> Result<Vec<PathBuf>, io::Error> {
-    let mut files = Vec::new();
-    find_parquet_files_recursive(dir, &mut files, pattern)?;
-    Ok(files)
-}
-
-/// Recursive helper for find_all_parquet_files
-fn find_parquet_files_recursive(
-    dir: &Path,
-    files: &mut Vec<PathBuf>,
-    pattern: Option<&str>,
-) -> Result<(), io::Error> {
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
+    if !dir.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Directory not found: {}", dir.display()),
+        ));
+    }
+    
+    let regex = if let Some(pat) = pattern {
+        Some(Regex::new(pat).map_err(|e| {
+            io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid regex: {}", e))
+        })?)
+    } else {
+        None
+    };
+    
+    let mut result = Vec::new();
+    
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        
+        if path.is_file() && path.extension().map_or(false, |ext| ext == "parquet") {
+            let filename = path.file_name().unwrap().to_string_lossy();
             
-            if path.is_dir() {
-                find_parquet_files_recursive(&path, files, pattern)?;
-            } else if path.extension().is_some_and(|ext| ext == "parquet") {
-                let file_name = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("");
-                
-                let include = match pattern {
-                    Some(p) => file_name.contains(p),
-                    None => true,
-                };
-                
-                if include {
-                    files.push(path);
+            if let Some(ref re) = regex {
+                if re.is_match(&filename) {
+                    result.push(path);
                 }
+            } else {
+                result.push(path);
             }
         }
     }
-    Ok(())
+    
+    // Sort by modification time (newest first)
+    result.sort_by(|a, b| {
+        let a_metadata = std::fs::metadata(a).unwrap();
+        let b_metadata = std::fs::metadata(b).unwrap();
+        b_metadata.modified().unwrap().cmp(&a_metadata.modified().unwrap())
+    });
+    
+    Ok(result)
 }
 
-/// Group files by register type based on filename
-///
-/// This function organizes parquet files by their register type (akm, bef, ind, etc.)
-/// based on filename patterns.
+/// Group files by their register type
 ///
 /// # Arguments
-/// * `files` - List of file paths to organize
+/// * `files` - A vector of file paths
 ///
 /// # Returns
-/// * `HashMap<String, Vec<PathBuf>>` - Map of register type to file paths
+/// A HashMap mapping register types to vectors of file paths
 pub fn group_files_by_type(files: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>> {
-    let mut groups = HashMap::new();
+    let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
     
-    for path in files {
-        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            let register_type = if file_name.starts_with("akm") {
-                "akm"
-            } else if file_name.starts_with("bef") {
-                "bef"
-            } else if file_name.starts_with("ind") {
-                "ind"
-            } else if file_name.starts_with("uddf") {
-                "uddf"
-            } else if file_name == "family.parquet" || file_name == "families.parquet" {
-                "family"
+    for file in files {
+        if let Some(filename) = file.file_name() {
+            let filename_str = filename.to_string_lossy();
+            if let Some(register_type) = detect_register_type(&filename_str) {
+                groups.entry(register_type.to_string()).or_default().push(file);
             } else {
-                continue; // Skip unknown files
-            };
-            
-            groups.entry(register_type.to_string())
-                .or_insert_with(Vec::new)
-                .push(path);
+                groups.entry("unknown".to_string()).or_default().push(file);
+            }
         }
-    }
-    
-    // Sort files within each group by year/period
-    for files in groups.values_mut() {
-        files.sort_by(|a, b| {
-            let a_name = a.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            let b_name = b.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            
-            let a_year = extract_year_from_filename(a_name).unwrap_or(0);
-            let b_year = extract_year_from_filename(b_name).unwrap_or(0);
-            
-            a_year.cmp(&b_year)
-        });
     }
     
     groups
 }
 
-/// Extract year from a filename using a regex pattern
-///
-/// This function extracts a year (4 digits starting with 19 or 20) from a filename.
+/// Detect the register type from a filename
 ///
 /// # Arguments
-/// * `path` - Path to extract year from
+/// * `filename` - The filename to analyze
 ///
 /// # Returns
-/// * `Option<i32>` - Extracted year or None
-pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
-    // Look for a pattern of 4 digits that starts with 19 or 20
-    for i in 0..filename.len().saturating_sub(3) {
-        let slice = &filename[i..i+4];
-        if (slice.starts_with("19") || slice.starts_with("20")) && 
-           slice.chars().all(|c| c.is_ascii_digit()) {
-            return slice.parse::<i32>().ok();
+/// An Option containing the detected register type, or None if not detected
+pub fn detect_register_type(filename: &str) -> Option<&'static str> {
+    let patterns = [
+        ("akm", r"(?i)akm|arbejdsklassifikationsmodul"),
+        ("bef", r"(?i)bef|befolkning"),
+        ("ind", r"(?i)ind|indkomst"),
+        ("uddf", r"(?i)uddf|uddannelse"),
+        ("idan", r"(?i)idan|idanmark"),
+        ("lpr", r"(?i)lpr|landspatientregister"),
+    ];
+    
+    for (register_type, pattern) in &patterns {
+        if Regex::new(pattern).ok()?.is_match(filename) {
+            return Some(register_type);
         }
     }
+    
     None
 }
 
-/// Extract period (YYYYMM or YYYY format) from filename
-///
-/// This function tries to extract a period in either YYYYMM or YYYY format from a filename.
+/// Extract a period (YYYYMM or YYYY) from a filename
 ///
 /// # Arguments
-/// * `filename` - Filename to extract period from
+/// * `filename` - The filename to extract the period from
 ///
 /// # Returns
-/// * `Option<String>` - Extracted period or None
+/// An Option containing the period string, or None if not found
 pub fn extract_period_from_filename(filename: &str) -> Option<String> {
-    // First try to find a YYYYMM format
-    for i in 0..filename.len().saturating_sub(5) {
-        let slice = &filename[i..i+6];
-        if (slice.starts_with("19") || slice.starts_with("20")) && 
-           slice.chars().all(|c| c.is_ascii_digit()) {
-            let _year = &slice[0..4];
-            let month = &slice[4..6];
-            // Validate month is between 01-12
-            if let Ok(m) = month.parse::<u8>() {
-                if (1..=12).contains(&m) {
-                    return Some(slice.to_string());
-                }
-            }
-        }
+    // Match YYYYMM pattern (e.g., 202301)
+    let re_period = Regex::new(r"(?:^|[^\d])(\d{6})(?:[^\d]|$)").ok()?;
+    if let Some(cap) = re_period.captures(filename) {
+        return cap.get(1).map(|m| m.as_str().to_string());
     }
     
-    // If no YYYYMM found, fall back to just YYYY
-    extract_year_from_filename(filename).map(|y| y.to_string())
-}
-
-/// Detect register type from filename
-///
-/// # Arguments
-/// * `filename` - Filename to detect type from
-///
-/// # Returns
-/// * `Option<&'static str>` - Register type or None
-pub fn detect_register_type(filename: &str) -> Option<&'static str> {
-    if filename.starts_with("akm") {
-        Some("akm")
-    } else if filename.starts_with("bef") {
-        Some("bef")
-    } else if filename.starts_with("ind") {
-        Some("ind")
-    } else if filename.starts_with("uddf") {
-        Some("uddf")
-    } else if filename == "family.parquet" || filename == "families.parquet" {
-        Some("family")
-    } else {
-        None
+    // Match YYYY pattern (e.g., 2023)
+    let re_year = Regex::new(r"(?:^|[^\d])(\d{4})(?:[^\d]|$)").ok()?;
+    if let Some(cap) = re_year.captures(filename) {
+        return cap.get(1).map(|m| m.as_str().to_string());
     }
+    
+    None
 }
 
-/// Detect data structure in a directory
-///
-/// This function analyzes a directory to find register files and categorize them.
+/// Extract a year from a filename
 ///
 /// # Arguments
-/// * `base_dir` - Base directory to analyze
+/// * `filename` - The filename to extract the year from
 ///
 /// # Returns
-/// * `Result<HashMap<String, PathBuf>, io::Error>` - Map of register type to path
+/// An Option containing the year as an i32, or None if not found
+pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
+    let period = extract_period_from_filename(filename)?;
+    
+    // If we have a 6-digit period (YYYYMM), extract the year part
+    if period.len() == 6 {
+        return period[0..4].parse::<i32>().ok();
+    }
+    
+    // Otherwise, assume it's already a year
+    period.parse::<i32>().ok()
+}
+
+/// Detect the data structure in a directory by analyzing file patterns
+///
+/// # Arguments
+/// * `base_dir` - The base directory to analyze
+///
+/// # Returns
+/// A Result containing a HashMap mapping register types to file paths, or an error
 pub fn detect_data_structure(base_dir: &Path) -> Result<HashMap<String, PathBuf>, io::Error> {
-    let mut paths = HashMap::new();
+    let mut result = HashMap::new();
     
-    // First look for common structures
-    if base_dir.join("family.parquet").exists() {
-        paths.insert("family".to_string(), base_dir.join("family.parquet"));
-    } else if base_dir.join("families.parquet").exists() {
-        paths.insert("family".to_string(), base_dir.join("families.parquet"));
-    }
+    // Find all parquet files
+    let files = find_all_parquet_files(base_dir, None)?;
     
-    // Look for register directories
-    for register in &["akm", "bef", "ind", "uddf"] {
-        let register_dir = base_dir.join(register);
-        if register_dir.exists() && register_dir.is_dir() {
-            paths.insert(register.to_string(), register_dir);
+    // Group files by type
+    let grouped = group_files_by_type(files);
+    
+    // Pick the newest file for each type
+    for (register_type, files) in grouped {
+        if !files.is_empty() {
+            result.insert(register_type, files[0].clone());
         }
     }
     
-    // Look for register files directly in base dir
-    if let Ok(entries) = fs::read_dir(base_dir) {
-        for entry in entries.filter_map(Result::ok) {
-            let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "parquet") {
-                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if let Some(register_type) = detect_register_type(file_name) {
-                        if !paths.contains_key(register_type) {
-                            paths.insert(register_type.to_string(), path);
-                        }
-                    }
-                }
-            }
-        }
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{create_dir_all, File};
+    use std::io::Write;
+    use tempfile::tempdir;
+    
+    #[test]
+    fn test_extract_period_from_filename() {
+        assert_eq!(extract_period_from_filename("data_202301.csv"), Some("202301".to_string()));
+        assert_eq!(extract_period_from_filename("data_2023.csv"), Some("2023".to_string()));
+        assert_eq!(extract_period_from_filename("data.csv"), None);
     }
     
-    // Check for "registers" subdirectory
-    let registers_dir = base_dir.join("registers");
-    if registers_dir.exists() && registers_dir.is_dir() {
-        if let Ok(entries) = fs::read_dir(&registers_dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path.is_dir() {
-                    if let Some(dirname) = path.file_name().and_then(|n| n.to_str()) {
-                        if ["akm", "bef", "ind", "uddf"].contains(&dirname) {
-                            paths.insert(dirname.to_string(), path);
-                        }
-                    }
-                } else if path.extension().is_some_and(|ext| ext == "parquet") {
-                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                        if let Some(register_type) = detect_register_type(file_name) {
-                            if !paths.contains_key(register_type) {
-                                paths.insert(register_type.to_string(), path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    #[test]
+    fn test_extract_year_from_filename() {
+        assert_eq!(extract_year_from_filename("data_202301.csv"), Some(2023));
+        assert_eq!(extract_year_from_filename("data_2023.csv"), Some(2023));
+        assert_eq!(extract_year_from_filename("data.csv"), None);
     }
     
-    Ok(paths)
+    #[test]
+    fn test_detect_register_type() {
+        assert_eq!(detect_register_type("akm_2023.parquet"), Some("akm"));
+        assert_eq!(detect_register_type("befolkning_data.parquet"), Some("bef"));
+        assert_eq!(detect_register_type("indkomst_202301.parquet"), Some("ind"));
+        assert_eq!(detect_register_type("unknown_data.parquet"), None);
+    }
+    
+    #[test]
+    fn test_find_parquet_file() -> Result<(), io::Error> {
+        let temp_dir = tempdir()?;
+        let file_path = temp_dir.path().join("test.parquet");
+        
+        // Create a test file
+        let mut file = File::create(&file_path)?;
+        file.write_all(b"test data")?;
+        
+        let base_paths = vec![temp_dir.path()];
+        
+        // Test finding existing file with .parquet extension
+        let found = find_parquet_file(&base_paths.iter().collect::<Vec<&Path>>(), "test.parquet")?;
+        assert_eq!(found, file_path);
+        
+        // Test finding existing file without .parquet extension
+        let found = find_parquet_file(&base_paths.iter().collect::<Vec<&Path>>(), "test")?;
+        assert_eq!(found, file_path);
+        
+        // Test not finding non-existent file
+        let result = find_parquet_file(&base_paths.iter().collect::<Vec<&Path>>(), "nonexistent");
+        assert!(result.is_err());
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_find_all_parquet_files() -> Result<(), io::Error> {
+        let temp_dir = tempdir()?;
+        
+        // Create test files
+        let file1 = temp_dir.path().join("test1.parquet");
+        let file2 = temp_dir.path().join("test2.parquet");
+        let file3 = temp_dir.path().join("other.txt");
+        
+        File::create(&file1)?.write_all(b"test data 1")?;
+        File::create(&file2)?.write_all(b"test data 2")?;
+        File::create(&file3)?.write_all(b"not a parquet file")?;
+        
+        // Test finding all parquet files
+        let files = find_all_parquet_files(temp_dir.path(), None)?;
+        assert_eq!(files.len(), 2);
+        
+        // Test finding files matching pattern
+        let files = find_all_parquet_files(temp_dir.path(), Some(r"test1"))?;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0], file1);
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_group_files_by_type() -> Result<(), io::Error> {
+        let temp_dir = tempdir()?;
+        
+        // Create test files
+        let akm_file = temp_dir.path().join("akm_2023.parquet");
+        let bef_file = temp_dir.path().join("befolkning_2023.parquet");
+        let unknown_file = temp_dir.path().join("unknown_2023.parquet");
+        
+        File::create(&akm_file)?;
+        File::create(&bef_file)?;
+        File::create(&unknown_file)?;
+        
+        let files = vec![akm_file.clone(), bef_file.clone(), unknown_file.clone()];
+        
+        // Test grouping files by type
+        let grouped = group_files_by_type(files);
+        
+        assert_eq!(grouped.len(), 3);
+        assert_eq!(grouped["akm"].len(), 1);
+        assert_eq!(grouped["bef"].len(), 1);
+        assert_eq!(grouped["unknown"].len(), 1);
+        
+        assert_eq!(grouped["akm"][0], akm_file);
+        assert_eq!(grouped["bef"][0], bef_file);
+        assert_eq!(grouped["unknown"][0], unknown_file);
+        
+        Ok(())
+    }
 }
