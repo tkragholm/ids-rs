@@ -3,6 +3,7 @@ use covariates::balance::BalanceChecker;
 use log::{debug, info};
 use rand::Rng;
 use types::models::{Covariate, CovariateType};
+use types::storage::CacheKey;
 
 /// Performance metrics for cache analysis
 #[derive(Debug, Clone)]
@@ -128,7 +129,6 @@ fn estimate_memory_usage(checker: &BalanceChecker) -> usize {
 
 /// Populate the cache with some placeholder data for diagnostic purposes using standard test data
 fn populate_diagnostic_cache(checker: &BalanceChecker) {
-    use covariates::balance::legacy_cache::CacheKey;
     use log::debug;
 
     // Get real treatment dates to use
@@ -281,7 +281,6 @@ fn populate_diagnostic_cache(checker: &BalanceChecker) {
 
 /// Populate the cache with data using actual PNRs from matched pairs
 fn populate_diagnostic_cache_with_pnrs(checker: &BalanceChecker, pnrs: Vec<String>) {
-    use covariates::balance::legacy_cache::CacheKey;
 
     info!(
         "Initializing diagnostic cache with {} real PNRs from matched pairs",

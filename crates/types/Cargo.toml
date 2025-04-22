@@ -42,23 +42,3 @@ ahash = { version = "0.8.11", features = ["serde", "runtime-rng"] }
 
 [dev-dependencies]
 criterion = "0.5"
-
-[[bench]]
-name = "arrow_access"
-harness = false
-
-[[bench]]
-name = "pnr_lookup"
-harness = false
-
-[[bench]]
-name = "covariate_processing"
-harness = false
-
-[[bench]]
-name = "date_handling"
-harness = false
-
-[[bench]]
-name = "arrow_backend"
-harness = false

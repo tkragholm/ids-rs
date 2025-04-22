@@ -81,7 +81,6 @@ Provides functionality for checking covariate balance between treatment and cont
 - **balance/results.rs** - Data structures for balance check results
 - **balance/stats.rs** - Statistical functions for balance checking
 - **balance/memory.rs** - Memory management for large balance datasets
-- **balance/legacy_cache.rs** - Legacy caching mechanisms
 - **balance/mod.rs** - Balance module exports
 
 ### Reporting (`src/reporting/`)
