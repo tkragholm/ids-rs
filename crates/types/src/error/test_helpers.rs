@@ -267,7 +267,7 @@ mod tests {
         // Test bail! with simple message
         let result = (|| -> Result<()> {
             // Manual validation to test the pattern
-            return Err(IdsError::validation("This is a failure"));
+            Err(IdsError::validation("This is a failure"))
         })();
 
         assert!(result.is_err());
@@ -277,7 +277,7 @@ mod tests {
         let code = 404;
         let result = (|| -> Result<()> {
             // Manual validation with formatting
-            return Err(IdsError::validation(format!("Error code: {}", code)));
+            Err(IdsError::validation(format!("Error code: {}", code)))
         })();
 
         assert!(result.is_err());
@@ -286,7 +286,7 @@ mod tests {
         // Test bail! with specific error type
         let result = (|| -> Result<()> {
             // Direct error creation
-            return Err(IdsError::config("Invalid configuration"));
+            Err(IdsError::config("Invalid configuration"))
         })();
 
         assert!(result.is_err());
