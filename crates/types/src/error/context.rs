@@ -200,7 +200,7 @@ where
                     source: Box::new(e),
                     context: ctx,
                 })
-            } else if let Some(_) = error_ref.downcast_ref::<parquet::errors::ParquetError>() {
+            } else if error_ref.downcast_ref::<parquet::errors::ParquetError>().is_some() {
                 // For Parquet errors, create a generic DataAccess error with the source
                 Err(IdsError::DataAccess {
                     source: Box::new(e),

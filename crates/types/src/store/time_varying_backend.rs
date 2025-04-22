@@ -1,7 +1,7 @@
-use std::path::Path;
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use hashbrown::HashMap;
+use std::path::Path;
 
 use crate::{
     error::IdsError,
@@ -25,7 +25,7 @@ impl Default for TimeVaryingBackend {
 
 impl TimeVaryingBackend {
     /// Create a new time-varying backend
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             data: DashMap::new(),
@@ -73,7 +73,7 @@ impl TimeVaryingBackend {
         writer.flush().map_err(IdsError::Io)?;
         Ok(())
     }
-    
+
     /// Add family relation
     pub fn add_family_relation(&mut self, relation: FamilyRelations) {
         self.family_data.insert(relation.pnr.clone(), relation);
@@ -82,7 +82,7 @@ impl TimeVaryingBackend {
 
 impl Store for TimeVaryingBackend {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,

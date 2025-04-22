@@ -553,7 +553,7 @@ impl ArrowBackend {
         if period_clean.len() >= 6 {
             let year_str = &period_clean[0..4];
             let month_str = &period_clean[4..6];
-            
+
             if let (Ok(year), Ok(month)) = (year_str.parse::<i32>(), month_str.parse::<u32>()) {
                 if month > 0 && month <= 12 {
                     if let Some(date) = NaiveDate::from_ymd_opt(year, month, 1) {
@@ -563,11 +563,11 @@ impl ArrowBackend {
                 }
             }
         }
-        
+
         // Try to parse as just a year (YYYY)
         if period_clean.len() >= 4 {
             let year_str = &period_clean[0..4];
-            
+
             if let Ok(year) = year_str.parse::<i32>() {
                 if let Some(date) = NaiveDate::from_ymd_opt(year, 12, 31) {
                     self.period_date_cache.insert(period.to_string(), date);
@@ -588,9 +588,13 @@ impl ArrowBackend {
         }
 
         // If we get here, resort to a default date to avoid errors
-        log::warn!("Could not parse period '{}', using a default date (2020-01-01)", period);
+        log::warn!(
+            "Could not parse period '{}', using a default date (2020-01-01)",
+            period
+        );
         let default_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
-        self.period_date_cache.insert(period.to_string(), default_date);
+        self.period_date_cache
+            .insert(period.to_string(), default_date);
         Ok(())
     }
 
@@ -621,11 +625,11 @@ impl ArrowBackend {
     ) -> std::result::Result<Option<Covariate>, IdsError> {
         // Get a temporary copy of the uddf_data keys to avoid borrowing self twice
         let period_keys: Vec<String> = self.uddf_data.keys().cloned().collect();
-        let period_map: HashMap<String, &Vec<RecordBatch>> = 
-            period_keys.iter().filter_map(|k| 
-                self.uddf_data.get(k).map(|v| (k.clone(), v))
-            ).collect();
-            
+        let period_map: HashMap<String, Vec<RecordBatch>> = period_keys
+            .iter()
+            .filter_map(|k| self.uddf_data.get(k).map(|v| (k.clone(), v.clone())))
+            .collect();
+
         // Find the closest period
         let period = self.find_closest_period(date, &period_map)?;
 
@@ -789,28 +793,29 @@ impl ArrowBackend {
                     {
                         // We need both code and classification for occupation
                         let classification = "SOCIO"; // Default classification
-                        let code = socio13.map(|s| s.to_string())
+                        let code = socio13
+                            .map(|s| s.to_string())
                             .or_else(|| socio.map(|s| s.to_string()))
                             .or_else(|| socio02.map(|s| s.to_string()))
                             .unwrap_or_else(|| "0".to_string());
-                            
+
                         let mut builder = Covariate::occupation(code, classification);
-                        
+
                         // Add socio values to builder
                         if let Some(val) = socio {
                             builder = builder.with_socio(val);
-                            
+
                             // Add metadata directly since we don't have a Socio translation type
                             builder = builder.with_metadata("socio_value", val.to_string());
                         }
-                        
+
                         if let Some(val) = socio02 {
                             builder = builder.with_socio02(val);
-                            
+
                             // Add metadata directly
                             builder = builder.with_metadata("socio02_value", val.to_string());
                         }
-                        
+
                         if let Some(val) = socio13 {
                             // Add translated value to metadata if available
                             if let Some(translated) = self.translations.translate(
@@ -819,14 +824,14 @@ impl ArrowBackend {
                             ) {
                                 builder = builder.with_metadata("socio13_category", translated);
                             }
-                            
+
                             // Also store the raw value
                             builder = builder.with_metadata("socio13_value", val.to_string());
                         }
-                        
+
                         if let Some(val) = pre_socio {
                             builder = builder.with_pre_socio(val);
-                            
+
                             // Add metadata directly
                             builder = builder.with_metadata("pre_socio_value", val.to_string());
                         }
@@ -858,11 +863,11 @@ impl ArrowBackend {
     ) -> std::result::Result<Option<Covariate>, IdsError> {
         // Get a temporary copy of the bef_data keys to avoid borrowing self twice
         let period_keys: Vec<String> = self.bef_data.keys().cloned().collect();
-        let period_map: HashMap<String, &Vec<RecordBatch>> = 
-            period_keys.iter().filter_map(|k| 
-                self.bef_data.get(k).map(|v| (k.clone(), v))
-            ).collect();
-            
+        let period_map: HashMap<String, Vec<RecordBatch>> = period_keys
+            .iter()
+            .filter_map(|k| self.bef_data.get(k).map(|v| (k.clone(), v.clone())))
+            .collect();
+
         // Find the closest period
         let period = self.find_closest_period(date, &period_map)?;
 
@@ -1089,7 +1094,7 @@ impl ArrowBackend {
                     log::warn!("Failed to parse period '{}': {}", period, e);
                     continue; // Skip this period
                 }
-                
+
                 // Now it should be in the cache
                 match self.period_date_cache.get(period) {
                     Some(date) => *date,
@@ -1466,9 +1471,7 @@ impl ArrowAccess for ArrowBackend {
         _column: &str,
         _row: usize,
     ) -> std::result::Result<T, IdsError> {
-        Err(IdsError::invalid_operation(format!(
-            "ArrowBackend does not implement direct get_value. Use get_covariate instead."
-        )))
+        Err(IdsError::invalid_operation("ArrowBackend does not implement direct get_value. Use get_covariate instead.".to_string()))
     }
 
     fn get_optional_value<T: ArrowType>(
@@ -1476,14 +1479,10 @@ impl ArrowAccess for ArrowBackend {
         _column: &str,
         _row: usize,
     ) -> std::result::Result<Option<T>, IdsError> {
-        Err(IdsError::invalid_operation(format!(
-            "ArrowBackend does not implement direct get_optional_value. Use get_covariate instead."
-        )))
+        Err(IdsError::invalid_operation("ArrowBackend does not implement direct get_optional_value. Use get_covariate instead.".to_string()))
     }
     fn get_column(&self, _column: &str) -> std::result::Result<arrow::array::ArrayRef, IdsError> {
-        Err(IdsError::invalid_operation(format!(
-            "ArrowBackend does not implement direct get_column. Use get_covariate instead."
-        )))
+        Err(IdsError::invalid_operation("ArrowBackend does not implement direct get_column. Use get_covariate instead.".to_string()))
     }
 
     fn has_column(&self, _column: &str) -> bool {

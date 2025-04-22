@@ -264,7 +264,7 @@ pub fn load_parquet_files_parallel(
             ))
         })?;
         let path = entry.path();
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "parquet") {
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
             parquet_files.push(path);
         }
     }
@@ -321,7 +321,7 @@ pub fn load_parquet_files_parallel(
     let max_threads = std::env::var("IDS_MAX_THREADS")
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or_else(|| num_cpus::get())
+        .unwrap_or_else(num_cpus::get)
         .max(2); // At least 2 threads
 
     // Create a channel to collect results

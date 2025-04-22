@@ -58,7 +58,7 @@ pub fn load_family(
                 }
             }
         }
-    } else if path.exists() && path.extension().map_or(false, |ext| ext == "parquet") {
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
         // If the path is directly to a Parquet file
         path.to_path_buf()
     } else {
@@ -69,7 +69,7 @@ pub fn load_family(
     let schema = family_schema();
     
     // Load the Parquet file
-    let batches = if family_file.exists() && family_file.extension().map_or(false, |ext| ext == "parquet") {
+    let batches = if family_file.exists() && family_file.extension().is_some_and(|ext| ext == "parquet") {
         read_parquet(&family_file, Some(&schema), Some(&progress), pnr_filter)?
     } else {
         log::warn!("No family relation data found at {}", base_path);

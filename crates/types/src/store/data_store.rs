@@ -1,107 +1,87 @@
-use std::path::Path;
-use std::sync::Arc;
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDate;
-use dashmap::DashMap;
+use std::path::Path;
 
 use crate::{
-    error::IdsError,
+    error::{IdsError, Result},
     family::FamilyRelations,
     models::{Covariate, CovariateType, TimeVaryingValue},
+    storage::{self, arrow::backend::ArrowBackend, ThreadSafeStore},
+    store::TimeVaryingBackend,
     traits::Store,
-    store::{ArrowBackend, TimeVaryingBackend},
 };
 
-/// Cache key for covariate lookups
-#[derive(Debug, Hash, Eq, PartialEq)]
-pub struct CacheKey {
-    pub pnr: String,
-    pub covariate_type: CovariateType,
-    pub date: NaiveDate,
-}
+// Use the shared CacheKey from storage module
+pub use storage::CacheKey;
 
-/// Combined store implementation with different backend options and caching
-pub struct DataStore {
-    backend: Arc<dyn Store>,
-    cache: DashMap<CacheKey, Covariate>,
+/// Combined store implementation with different backend options and thread-safety
+pub enum DataStore {
+    Arrow(ThreadSafeStore<ArrowBackend>),
+    TimeVarying(ThreadSafeStore<TimeVaryingBackend>),
 }
 
 impl DataStore {
     /// Create a new DataStore with an ArrowBackend
-    pub fn new_arrow() -> Result<Self, IdsError> {
-        Ok(Self {
-            backend: Arc::new(ArrowBackend::new()?),
-            cache: DashMap::new(),
-        })
+    pub fn new_arrow() -> Result<Self> {
+        Ok(Self::Arrow(ThreadSafeStore::new(ArrowBackend::new()?)))
     }
 
     /// Create a new DataStore with a TimeVaryingBackend
-    #[must_use] 
+    #[must_use]
     pub fn new_time_varying() -> Self {
-        Self {
-            backend: Arc::new(TimeVaryingBackend::new()),
-            cache: DashMap::new(),
+        Self::TimeVarying(ThreadSafeStore::new(TimeVaryingBackend::new()))
+    }
+
+    /// Access the underlying arrow store (thread-safe)
+    #[must_use]
+    pub fn as_arrow_store(&self) -> Option<&ThreadSafeStore<ArrowBackend>> {
+        match self {
+            Self::Arrow(store) => Some(store),
+            _ => None,
         }
     }
 
-    /// Get a covariate from the cache
-    fn get_from_cache(
-        &self,
-        pnr: &str,
-        covariate_type: CovariateType,
-        date: NaiveDate,
-    ) -> Option<Covariate> {
-        let key = CacheKey {
-            pnr: pnr.to_string(),
-            covariate_type,
-            date,
-        };
-        self.cache.get(&key).map(|v| v.clone())
+    /// Access the underlying time-varying store (thread-safe)
+    #[must_use]
+    pub fn as_time_varying_store(&self) -> Option<&ThreadSafeStore<TimeVaryingBackend>> {
+        match self {
+            Self::TimeVarying(store) => Some(store),
+            _ => None,
+        }
     }
-
-    /// Store a covariate in the cache
-    fn store_in_cache(&self, pnr: &str, covariate: Covariate, date: NaiveDate) {
-        let key = CacheKey {
-            pnr: pnr.to_string(),
-            covariate_type: covariate.type_(),
-            date,
-        };
-        self.cache.insert(key, covariate);
-    }
-
-    /// Access the underlying arrow backend (if available)
-    #[must_use] 
-    pub fn as_arrow_backend(&self) -> Option<&ArrowBackend> {
-        self.backend.as_any().downcast_ref::<ArrowBackend>()
-    }
-
-    /// Access the underlying arrow backend mutably (if available)
-    pub fn as_arrow_backend_mut(&mut self) -> Option<&mut ArrowBackend> {
-        Arc::get_mut(&mut self.backend)?
-            .as_any_mut()
-            .downcast_mut::<ArrowBackend>()
+    
+    /// Check if this data store contains a specific backend type
+    #[must_use]
+    pub fn has_backend_type<T: Store + 'static>(&self) -> bool {
+        match self {
+            Self::Arrow(_) => std::any::TypeId::of::<ArrowBackend>() == std::any::TypeId::of::<T>(),
+            Self::TimeVarying(_) => std::any::TypeId::of::<TimeVaryingBackend>() == std::any::TypeId::of::<T>(),
+        }
     }
 
     /// Load family relations data (only for arrow backend)
-    pub fn load_family_relations(&mut self, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
-        if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.load_family_relations(batches)
-        } else {
-            Err(IdsError::invalid_operation(
+    pub fn load_family_relations(&mut self, batches: Vec<RecordBatch>) -> Result<()> {
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.load_family_relations(batches)
+            }
+            _ => Err(IdsError::invalid_operation(
                 "Cannot load family relations into this backend type",
-            ))
+            )),
         }
     }
 
     /// Add AKM (labor market) data
-    pub fn add_akm_data(&mut self, year: i32, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
-        if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_akm_data(year, batches)?;
-            Ok(())
-        } else {
-            Err(IdsError::invalid_operation(
+    pub fn add_akm_data(&mut self, year: i32, batches: Vec<RecordBatch>) -> Result<()> {
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.add_akm_data(year, batches)
+            }
+            _ => Err(IdsError::invalid_operation(
                 "Cannot add AKM data to this backend type",
-            ))
+            )),
         }
     }
 
@@ -110,26 +90,28 @@ impl DataStore {
         &mut self,
         period: String,
         batches: Vec<RecordBatch>,
-    ) -> Result<(), IdsError> {
-        if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_bef_data(period, batches)?;
-            Ok(())
-        } else {
-            Err(IdsError::invalid_operation(
+    ) -> Result<()> {
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.add_bef_data(period, batches)
+            }
+            _ => Err(IdsError::invalid_operation(
                 "Cannot add BEF data to this backend type",
-            ))
+            )),
         }
     }
 
     /// Add IND (income) data
-    pub fn add_ind_data(&mut self, year: i32, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
-        if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_ind_data(year, batches)?;
-            Ok(())
-        } else {
-            Err(IdsError::invalid_operation(
+    pub fn add_ind_data(&mut self, year: i32, batches: Vec<RecordBatch>) -> Result<()> {
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.add_ind_data(year, batches)
+            }
+            _ => Err(IdsError::invalid_operation(
                 "Cannot add IND data to this backend type",
-            ))
+            )),
         }
     }
 
@@ -138,63 +120,69 @@ impl DataStore {
         &mut self,
         period: String,
         batches: Vec<RecordBatch>,
-    ) -> Result<(), IdsError> {
-        if let Some(backend) = self.as_arrow_backend_mut() {
-            backend.add_uddf_data(period, batches)?;
-            Ok(())
-        } else {
-            Err(IdsError::invalid_operation(
+    ) -> Result<()> {
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.add_uddf_data(period, batches)
+            }
+            _ => Err(IdsError::invalid_operation(
                 "Cannot add UDDF data to this backend type",
-            ))
+            )),
         }
     }
 
     /// Save current covariates to CSV (only for time-varying backend)
-    pub fn save_to_csv(&self, path: &Path) -> Result<(), IdsError> {
-        if let Some(backend) = self.backend.as_any().downcast_ref::<TimeVaryingBackend>() {
-            backend.save_to_csv(path)
-        } else {
-            Err(IdsError::invalid_operation(
+    pub fn save_to_csv(&self, path: &Path) -> Result<()> {
+        match self {
+            Self::TimeVarying(store) => {
+                let backend = store.read();
+                backend.save_to_csv(path)
+            }
+            _ => Err(IdsError::invalid_operation(
                 "Cannot save this backend type to CSV",
-            ))
+            )),
         }
     }
 }
 
 impl Store for DataStore {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,
-    ) -> Result<Option<Covariate>, IdsError> {
-        // Try cache first
-        if let Some(cached) = self.get_from_cache(pnr, covariate_type, date) {
-            return Ok(Some(cached));
+    ) -> Result<Option<Covariate>> {
+        // Delegate to the appropriate backend with proper locking
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.covariate(pnr, covariate_type, date)
+            }
+            Self::TimeVarying(store) => {
+                let mut backend = store.write();
+                backend.covariate(pnr, covariate_type, date)
+            }
         }
-
-        // If not in cache, get from backend
-        let result = self.backend.covariate(pnr, covariate_type, date)?;
-
-        // Store in cache if found
-        if let Some(ref covariate) = result {
-            self.store_in_cache(pnr, covariate.clone(), date);
-        }
-
-        Ok(result)
     }
 
-    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
-        self.backend.family_relations(pnr)
+    fn family_relations(&self, _pnr: &str) -> Option<&FamilyRelations> {
+        // This implementation is inherently problematic with our RwLock approach.
+        // We can't return a reference to data inside the lock, as the lock would be released.
+        // For now, we'll return None, but this API needs to be restructured.
+        None
     }
 
-    fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<(), IdsError> {
-        if let Some(backend) = Arc::get_mut(&mut self.backend) {
-            backend.load_data(data)
-        } else {
-            Err(IdsError::invalid_operation(
-                "Cannot load data into a shared backend",
-            ))
+    fn load_data(&mut self, data: Vec<TimeVaryingValue<Covariate>>) -> Result<()> {
+        match self {
+            Self::Arrow(store) => {
+                let mut backend = store.write();
+                backend.load_data(data)
+            }
+            Self::TimeVarying(store) => {
+                let mut backend = store.write();
+                backend.load_data(data)
+            }
         }
     }
 

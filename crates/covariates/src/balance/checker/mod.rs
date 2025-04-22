@@ -5,17 +5,18 @@ mod paired_analysis;
 mod performance;
 
 use crate::balance::{
-    legacy_cache::{CacheKey, CovariateCache},
     metrics::BalanceMetrics,
     results::BalanceResults,
 };
+use types::storage::{CacheKey, CovariateCache, ThreadSafeStore};
 use crate::models::{CovariateSummary, MatchedPairDetail};
 use chrono::NaiveDate;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 use types::{
-    error::IdsError,
+    error::Result,
     models::{Covariate, CovariateType},
     storage::arrow::backend::ArrowBackend as ArrowStore,
+    traits::Store,
 };
 
 // Re-export important types and the builder
@@ -23,7 +24,7 @@ pub use self::builder::BalanceCheckerBuilder;
 
 /// Main balance checker for analyzing covariate balance between case and control groups
 pub struct BalanceChecker {
-    pub(crate) store: Arc<ArrowStore>,
+    pub(crate) store: ThreadSafeStore<ArrowStore>,
     pub(crate) cache: CovariateCache,
     pub(crate) metrics: BalanceMetrics,
     pub(crate) results: Option<BalanceResults>,
@@ -34,7 +35,7 @@ impl BalanceChecker {
     #[must_use]
     pub fn new(store: ArrowStore) -> Self {
         Self {
-            store: Arc::new(store),
+            store: ThreadSafeStore::new(store),
             cache: CovariateCache::new(100_000),
             metrics: BalanceMetrics::new(),
             results: None,
@@ -52,9 +53,22 @@ impl BalanceChecker {
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,
-    ) -> Result<Option<Covariate>, IdsError> {
+    ) -> Result<Option<Covariate>> {
         let key = CacheKey::new(pnr, covariate_type, date);
-        self.cache.get_or_load(&*self.store, key)
+        
+        // First check the cache
+        if let Some(value) = self.cache.get(&key) {
+            return Ok(value);
+        }
+        
+        // Not in cache, get from store
+        let mut store = self.store.write();
+        let value = store.covariate(pnr, covariate_type, date)?;
+        
+        // Cache the result
+        self.cache.insert(key, value.clone());
+        
+        Ok(value)
     }
     
     /// Backward compatibility method, deprecated
@@ -64,7 +78,7 @@ impl BalanceChecker {
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,
-    ) -> Result<Option<Covariate>, IdsError> {
+    ) -> Result<Option<Covariate>> {
         self.covariate(pnr, covariate_type, date)
     }
 
@@ -84,7 +98,7 @@ impl BalanceChecker {
     }
     
     /// Add a value to the cache (used for testing)
-    pub fn add_to_cache(&self, key: crate::balance::legacy_cache::CacheKey, value: Option<types::models::Covariate>) {
+    pub fn add_to_cache(&self, key: CacheKey, value: Option<types::models::Covariate>) {
         self.cache.insert(key, value);
     }
 

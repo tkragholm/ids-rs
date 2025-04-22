@@ -17,6 +17,12 @@ pub struct ValueProcessor {
     categorical_processor: CategoricalProcessor,
 }
 
+impl Default for ValueProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValueProcessor {
     /// Create a new ValueProcessor with default settings
     pub fn new() -> Self {

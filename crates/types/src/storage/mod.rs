@@ -10,19 +10,49 @@
 //! - `ArrowBackend`: Arrow-based storage backend implementation
 //! - `MemoryBackend`: Simple in-memory storage backend
 //! - `TimeVaryingBackend`: Backend for time-varying data
+//!
+//! Additionally, this module provides concurrency utilities for thread-safe
+//! access to storage backends:
+//!
+//! - `ThreadSafeStore`: Thread-safe wrapper for any Store implementation
+//! - `ShardedCache`: High-performance sharded cache for concurrent access
+//! - `CovariateCache`: Optimized cache for covariates with low contention
+
+use chrono::NaiveDate;
+use crate::models::CovariateType;
+
+/// Common cache key for covariate lookups
+/// Used across various caching implementations
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+pub struct CacheKey {
+    pub pnr: String,
+    pub covariate_type: CovariateType,
+    pub date: NaiveDate,
+}
+
+impl CacheKey {
+    /// Create a new cache key
+    #[must_use]
+    pub fn new(pnr: &str, covariate_type: CovariateType, date: NaiveDate) -> Self {
+        Self {
+            pnr: pnr.to_string(),
+            covariate_type,
+            date,
+        }
+    }
+}
 
 pub mod arrow;
 pub mod backends;
+pub mod concurrency;
 
 // Re-export public types
 pub use crate::store::DataStore;
 pub use crate::traits::Store as Backend;
 
-// Legacy re-exports
-#[doc(hidden)]
-pub use crate::store::arrow_backend::ArrowBackend as OldArrowBackend;
-#[doc(hidden)]
+// Export the consolidated backends
+pub use arrow::backend::ArrowBackend;
 pub use crate::store::time_varying_backend::TimeVaryingBackend;
 
-// Future imports that will replace the legacy ones
-pub use arrow::backend::ArrowBackend;
+// Export concurrency utilities
+pub use concurrency::{ThreadSafeStore, ShardedCache, CovariateCache};

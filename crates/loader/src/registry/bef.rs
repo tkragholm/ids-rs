@@ -66,7 +66,7 @@ pub fn load_bef(
     // Load the Parquet files
     let batches = if bef_path.is_dir() {
         load_parquet_files_parallel(&bef_path, Some(&schema), pnr_filter, Some(&progress))?
-    } else if path.exists() && path.extension().map_or(false, |ext| ext == "parquet") {
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
         // If the path is a direct Parquet file
         crate::formats::read_parquet(path, Some(&schema), Some(&progress), pnr_filter)?
     } else {

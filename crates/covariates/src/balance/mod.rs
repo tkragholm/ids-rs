@@ -5,8 +5,7 @@
 //! generating detailed reports.
 
 // Core functionality
-mod checker;    // Main balance checker implementation
-pub mod legacy_cache;  // Cache for covariate values
+pub mod checker;    // Main balance checker implementation
 mod memory;     // Memory management for large datasets
 pub mod metrics;    // Balance metrics calculations
 mod optimization; // Optimization strategies for processing

@@ -1,7 +1,13 @@
-use types::{error::IdsError, storage::arrow::backend::ArrowBackend as ArrowStore};
-use std::sync::Arc;
+use types::{
+    error::{IdsError, Result},
+    storage::{
+        arrow::backend::ArrowBackend as ArrowStore, 
+        CovariateCache,
+        ThreadSafeStore
+    },
+};
 use super::BalanceChecker;
-use crate::balance::{legacy_cache::CovariateCache, metrics::BalanceMetrics};
+use crate::balance::metrics::BalanceMetrics;
 
 /// Builder for BalanceChecker with configurable settings
 pub struct BalanceCheckerBuilder {
@@ -22,6 +28,7 @@ impl Default for BalanceCheckerBuilder {
 
 impl BalanceCheckerBuilder {
     /// Create a new builder with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -49,13 +56,13 @@ impl BalanceCheckerBuilder {
     /// # Errors
     /// 
     /// Returns an error if no store was provided
-    pub fn build(self) -> Result<BalanceChecker, IdsError> {
+    pub fn build(self) -> Result<BalanceChecker> {
         let store = self.store.ok_or_else(|| 
             IdsError::invalid_operation("Cannot build BalanceChecker without a store".to_string())
         )?;
         
         Ok(BalanceChecker {
-            store: Arc::new(store),
+            store: ThreadSafeStore::new(store),
             cache: CovariateCache::new(self.cache_capacity),
             metrics: BalanceMetrics::new(),
             results: None,

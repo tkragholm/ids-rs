@@ -66,9 +66,12 @@ impl BalanceChecker {
 
         let start = std::time::Instant::now();
 
+        // Get a write lock on the store for exclusive access during bulk operations
+        let mut store = self.store.write();
+        
         match self
             .cache
-            .bulk_load(&*self.store, pnrs, covariate_types, dates)
+            .bulk_load(&mut *store, pnrs, covariate_types, dates)
         {
             Ok(count) => {
                 let elapsed = start.elapsed();

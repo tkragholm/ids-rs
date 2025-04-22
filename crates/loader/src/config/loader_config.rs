@@ -49,7 +49,7 @@ impl RegisterPathConfig {
     pub fn resolve_paths(&self) -> Result<HashMap<String, PathBuf>, IdsError> {
         let mut resolved = HashMap::new();
         let base_path_obj = Path::new(&self.base_path);
-        let using_custom_paths_only = !self.custom_paths.is_empty();
+        let _using_custom_paths_only = !self.custom_paths.is_empty();
         // We need a valid base path when:
         // 1. We have no custom paths (need to load everything from base)
         // 2. We have some custom paths but they might be relative paths needing the base

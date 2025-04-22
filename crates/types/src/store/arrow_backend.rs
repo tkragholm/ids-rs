@@ -40,9 +40,9 @@ impl ArrowBackend {
     }
 
     /// Create a new empty ArrowBackend, used for diagnostic mode when data loading fails
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// This function will panic if it fails to create valid dates for the synthetic data.
     /// Since this is only used for diagnostic purposes and uses carefully constructed date values,
     /// the panics would indicate a serious programming error rather than a runtime condition.
@@ -63,7 +63,7 @@ impl ArrowBackend {
             let year = 1990 + (i % 30);
             let month = 1 + (i % 12) as u32;
             let day = 1 + (i % 28) as u32; // Always ≤ 28 to avoid invalid dates
-            
+
             let father_year = 1950 + (i % 30);
             let mother_year = 1955 + (i % 30);
 
@@ -71,10 +71,10 @@ impl ArrowBackend {
             // We explicitly document the panics here since this is diagnostic code only
             let birth_date = chrono::NaiveDate::from_ymd_opt(year, month, day)
                 .expect("Invalid synthetic birth date constructed in diagnostic mode");
-                
+
             let father_birth_date = chrono::NaiveDate::from_ymd_opt(father_year, month, day)
                 .expect("Invalid synthetic father birth date constructed in diagnostic mode");
-                
+
             let mother_birth_date = chrono::NaiveDate::from_ymd_opt(mother_year, month, day)
                 .expect("Invalid synthetic mother birth date constructed in diagnostic mode");
 
@@ -222,16 +222,22 @@ impl ArrowBackend {
                         Ok(idx) => batch.column(idx),
                         Err(_) => continue, // Column not found, try next batch
                     };
-                    
-                    let array = column.as_any().downcast_ref::<arrow::array::Float64Array>()
-                        .ok_or_else(|| IdsError::data_loading("Income column not a float array".to_string()))?;
-                    let amount = if array.is_null(idx) { None } else { Some(array.value(idx)) };
+
+                    let array = column
+                        .as_any()
+                        .downcast_ref::<arrow::array::Float64Array>()
+                        .ok_or_else(|| {
+                            IdsError::data_loading("Income column not a float array".to_string())
+                        })?;
+                    let amount = if array.is_null(idx) {
+                        None
+                    } else {
+                        Some(array.value(idx))
+                    };
                     if let Some(amount) = amount {
-                        return Ok(Some(Covariate::income(
-                            amount,
-                            "DKK",
-                            "PERINDKIALT_13",
-                        ).build()));
+                        return Ok(Some(
+                            Covariate::income(amount, "DKK", "PERINDKIALT_13").build(),
+                        ));
                     }
                 }
             }
@@ -248,65 +254,81 @@ impl ArrowBackend {
                     // Use direct access for better performance - get all values at once
                     // Get values directly from the batch
                     let schema = batch.schema();
-                    
+
                     // Get family size
                     let family_size: Option<i32> = match schema.index_of("ANTPERSF") {
                         Ok(col_idx) => {
                             let array = batch.column(col_idx);
                             if array.is_null(idx) {
                                 None
-                            } else if let Some(typed_array) = array.as_any().downcast_ref::<arrow::array::Int32Array>() {
+                            } else if let Some(typed_array) =
+                                array.as_any().downcast_ref::<arrow::array::Int32Array>()
+                            {
                                 Some(typed_array.value(idx))
                             } else {
-                                return Err(IdsError::data_loading("ANTPERSF not an int32 array".to_string()));
+                                return Err(IdsError::data_loading(
+                                    "ANTPERSF not an int32 array".to_string(),
+                                ));
                             }
-                        },
-                        Err(_) => None
+                        }
+                        Err(_) => None,
                     };
-                    
+
                     // Get municipality
                     let municipality: Option<i32> = match schema.index_of("KOM") {
                         Ok(col_idx) => {
                             let array = batch.column(col_idx);
                             if array.is_null(idx) {
                                 None
-                            } else if let Some(typed_array) = array.as_any().downcast_ref::<arrow::array::Int32Array>() {
+                            } else if let Some(typed_array) =
+                                array.as_any().downcast_ref::<arrow::array::Int32Array>()
+                            {
                                 Some(typed_array.value(idx))
                             } else {
-                                return Err(IdsError::data_loading("KOM not an int32 array".to_string()));
+                                return Err(IdsError::data_loading(
+                                    "KOM not an int32 array".to_string(),
+                                ));
                             }
-                        },
-                        Err(_) => None
+                        }
+                        Err(_) => None,
                     };
-                    
+
                     // Get family type
                     let family_type: Option<i32> = match schema.index_of("FAMILIE_TYPE") {
                         Ok(col_idx) => {
                             let array = batch.column(col_idx);
                             if array.is_null(idx) {
                                 None
-                            } else if let Some(typed_array) = array.as_any().downcast_ref::<arrow::array::Int32Array>() {
+                            } else if let Some(typed_array) =
+                                array.as_any().downcast_ref::<arrow::array::Int32Array>()
+                            {
                                 Some(typed_array.value(idx))
                             } else {
-                                return Err(IdsError::data_loading("FAMILIE_TYPE not an int32 array".to_string()));
+                                return Err(IdsError::data_loading(
+                                    "FAMILIE_TYPE not an int32 array".to_string(),
+                                ));
                             }
-                        },
-                        Err(_) => None
+                        }
+                        Err(_) => None,
                     };
-                    
+
                     // Get citizenship
                     let statsb: Option<String> = match schema.index_of("STATSB") {
                         Ok(col_idx) => {
                             let array = batch.column(col_idx);
                             if array.is_null(idx) {
                                 None
-                            } else if let Some(typed_array) = array.as_any().downcast_ref::<arrow::array::StringArray>() {
+                            } else if let Some(typed_array) =
+                                array.as_any().downcast_ref::<arrow::array::StringArray>()
+                            {
                                 Some(typed_array.value(idx).to_string())
                             } else {
-                                return Err(IdsError::data_loading("STATSB not a string array".to_string()));
+                                return Err(IdsError::data_loading(
+                                    "STATSB not a string array".to_string(),
+                                ));
                             }
-                        },
-                        Err(_) => None
+                        }
+                        Err(_) => None,
                     };
 
                     if let (Some(family_size), Some(municipality), Some(family_type)) =
@@ -321,16 +343,13 @@ impl ArrowBackend {
                         // Add citizenship if available
                         if let Some(statsb) = statsb {
                             builder = builder.with_citizenship(statsb.clone());
-                            
+
                             // Add translated value to metadata
                             if let Some(translated) = self
                                 .translations
                                 .translate(crate::translation::TranslationType::Statsb, &statsb)
                             {
-                                builder = builder.with_metadata(
-                                    "statsb_translated",
-                                    translated,
-                                );
+                                builder = builder.with_metadata("statsb_translated", translated);
                             }
                         }
 
@@ -366,25 +385,21 @@ impl ArrowBackend {
             ));
         }
 
-        RecordBatch::try_new(batch.schema(), columns).map_err(|e| {
-            IdsError::invalid_operation(format!("Failed to create sliced batch: {e}"))
-        })
+        RecordBatch::try_new(batch.schema(), columns)
+            .map_err(|e| IdsError::invalid_operation(format!("Failed to create sliced batch: {e}")))
     }
 
     /// Create an optimized string array
-    pub fn create_optimized_string_array(
-        &self,
-        strings: &[String],
-    ) -> Result<StringArray> {
+    pub fn create_optimized_string_array(&self, strings: &[String]) -> Result<StringArray> {
         ArrowUtils::create_optimized_string_array(strings, strings.len())
     }
 
     /// Find closest period date
-    /// 
+    ///
     /// # Arguments
     /// * `date` - The target date
     /// * `data` - The data map to search in
-    /// 
+    ///
     /// # Returns
     /// * `Result<Option<&'a String>>` - The closest period or None
     fn find_closest_period<'a>(
@@ -399,22 +414,22 @@ impl ArrowBackend {
                 if p.len() < 4 {
                     return false; // Period string too short for YYYY format
                 }
-                
+
                 let year: i32 = match p[0..4].parse() {
                     Ok(y) => y,
                     Err(_) => return false, // Skip invalid year format
                 };
-                
+
                 let month: u32 = if p.len() > 5 {
                     // Parse month safely, defaulting to December (12) for invalid input
                     match p[4..6].parse::<u32>() {
                         Ok(m) if m >= 1 && m <= 12 => m, // Valid month range
-                        _ => 12, // Default to December for invalid month
+                        _ => 12,                         // Default to December for invalid month
                     }
                 } else {
                     12 // Default to December when no month specified
                 };
-                
+
                 // Only include periods that can be converted to valid dates and are before or equal to target date
                 NaiveDate::from_ymd_opt(year, month, 1)
                     .is_some_and(|period_date| period_date <= date)
@@ -423,16 +438,13 @@ impl ArrowBackend {
     }
 
     /// Load family relations from batches
-    /// 
+    ///
     /// # Arguments
     /// * `family_batches` - The batches containing family relation data
-    /// 
+    ///
     /// # Returns
     /// * `Result<()>` - Success or an error
-    pub fn load_family_relations(
-        &mut self,
-        mut family_batches: Vec<RecordBatch>,
-    ) -> Result<()> {
+    pub fn load_family_relations(&mut self, mut family_batches: Vec<RecordBatch>) -> Result<()> {
         // Optimize batches before loading
         for batch in &mut family_batches {
             // Validate batch
@@ -449,25 +461,25 @@ impl ArrowBackend {
         self.family_data = family_store.get_relations().clone();
         Ok(())
     }
-    
+
     // Helper methods to support the Arrow implementation
-    
+
     /// Find the index of a PNR in a batch
-    /// 
+    ///
     /// # Arguments
     /// * `batch` - The batch to search
     /// * `pnr` - The PNR to find
-    /// 
+    ///
     /// # Returns
     /// * `Result<Option<usize>>` - The index or None
     fn find_pnr_index(&self, batch: &RecordBatch, pnr: &str) -> Result<Option<usize>> {
         if !batch.schema().fields().iter().any(|f| f.name() == "PNR") {
             return Ok(None);
         }
-        
+
         let pnr_idx = batch.schema().index_of("PNR")?;
         let pnr_array = batch.column(pnr_idx);
-        
+
         if let Some(string_array) = pnr_array.as_any().downcast_ref::<StringArray>() {
             for i in 0..string_array.len() {
                 if !string_array.is_null(i) && string_array.value(i) == pnr {
@@ -475,31 +487,36 @@ impl ArrowBackend {
                 }
             }
         }
-        
+
         Ok(None)
     }
-    
+
     /// Get a string array from a batch
-    /// 
+    ///
     /// # Arguments
     /// * `batch` - The batch to get the array from
     /// * `column_name` - The column name
-    /// 
+    ///
     /// # Returns
     /// * `Result<&'a StringArray>` - The string array or an error
-    fn get_string_array<'a>(&self, batch: &'a RecordBatch, column_name: &str) -> Result<&'a StringArray> {
+    fn get_string_array<'a>(
+        &self,
+        batch: &'a RecordBatch,
+        column_name: &str,
+    ) -> Result<&'a StringArray> {
         let col_idx = batch.schema().index_of(column_name)?;
         let array = batch.column(col_idx);
-        
-        array.as_any().downcast_ref::<StringArray>()
-            .ok_or_else(|| IdsError::data_loading(format!("Column {} is not a string array", column_name)))
+
+        array.as_any().downcast_ref::<StringArray>().ok_or_else(|| {
+            IdsError::data_loading(format!("Column {} is not a string array", column_name))
+        })
     }
-    
+
     /// Validate a batch
-    /// 
+    ///
     /// # Arguments
     /// * `batch` - The batch to validate
-    /// 
+    ///
     /// # Returns
     /// * `Result<()>` - Success or an error
     fn validate_batch(&self, batch: &RecordBatch) -> Result<()> {
@@ -507,14 +524,14 @@ impl ArrowBackend {
         if batch.num_rows() == 0 {
             return Err(IdsError::data_loading("Empty batch".to_string()));
         }
-        
+
         Ok(())
     }
 }
 
 impl Store for ArrowBackend {
     fn covariate(
-        &self,
+        &mut self,
         pnr: &str,
         covariate_type: CovariateType,
         date: NaiveDate,

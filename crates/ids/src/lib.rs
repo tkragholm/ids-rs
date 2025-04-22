@@ -38,9 +38,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     initialize_logging_with_files(&cli.output_dir)?;
 
     // Execute the requested command
-    let result = dispatch_command(&cli)?;
+    dispatch_command(&cli)?;
 
-    Ok(result)
+    Ok(())
 }
 
 /// Initialize logging with progress bars and file output

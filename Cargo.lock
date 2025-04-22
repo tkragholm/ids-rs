@@ -33,6 +33,7 @@ dependencies = [
  "const-random",
  "getrandom 0.2.15",
  "once_cell",
+ "serde",
  "version_check",
  "zerocopy 0.7.35",
 ]
@@ -3440,6 +3441,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 name = "types"
 version = "1.2.5"
 dependencies = [
+ "ahash",
  "anyhow",
  "arrow",
  "arrow-array",
@@ -3454,6 +3456,7 @@ dependencies = [
  "lasso",
  "log",
  "num_cpus",
+ "parking_lot 0.12.3",
  "parquet",
  "polars",
  "rand 0.9.0",

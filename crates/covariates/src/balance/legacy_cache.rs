@@ -2,38 +2,12 @@ use chrono::NaiveDate;
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use parking_lot::{Mutex, RwLock};
-use rayon::prelude::*;
 use std::hash::Hash;
 use std::sync::Arc;
 use types::models::{Covariate, CovariateType};
+use types::storage::CacheKey;
 use types::traits::Store;
 use types::IdsError;
-
-#[derive(Hash, Eq, PartialEq, Clone)]
-pub struct CacheKey {
-    pub pnr: String,
-    pub covariate_type: CovariateType,
-    pub date: NaiveDate,
-}
-
-impl CacheKey {
-    pub fn new(pnr: &str, covariate_type: CovariateType, date: NaiveDate) -> Self {
-        // Use smaller string allocation strategy - most PNRs are Danish CPR numbers of consistent length
-        let pnr = pnr.to_string();
-
-        Self {
-            pnr,
-            covariate_type,
-            date,
-        }
-    }
-
-    // Fast equality check for common case of matching PNRs
-    #[inline]
-    pub fn matches(&self, pnr: &str, covariate_type: CovariateType, date: NaiveDate) -> bool {
-        self.pnr == pnr && self.covariate_type == covariate_type && self.date == date
-    }
-}
 
 /// Number of shards to use for the cache to reduce contention
 const NUM_SHARDS: usize = 32;
@@ -189,7 +163,7 @@ impl CovariateCache {
 
     pub fn get_or_load(
         &self,
-        store: &impl Store,
+        store: &mut impl Store,
         key: CacheKey,
     ) -> Result<Option<Covariate>, IdsError> {
         // First check the primary cache (sharded for better read performance)
@@ -225,7 +199,7 @@ impl CovariateCache {
     /// This implementation uses sharding to minimize lock contention
     pub fn bulk_load(
         &self,
-        store: &impl Store,
+        store: &mut impl Store,
         pnrs: &[String],
         covariate_types: &[CovariateType],
         dates: &[NaiveDate],
@@ -261,24 +235,14 @@ impl CovariateCache {
         // Then filter by secondary cache
         missing_keys.retain(|(key, _, _, _)| !self.secondary_cache.contains_key(key));
 
-        // Process the missing keys in parallel chunks
-        const CHUNK_SIZE: usize = 1000;
-
-        // Use rayon for parallel processing of chunks
-        let loaded_entries: Vec<(CacheKey, Option<Covariate>)> = missing_keys
-            .par_chunks(CHUNK_SIZE)
-            .flat_map(|chunk| {
-                let mut batch_results = Vec::with_capacity(chunk.len());
-
-                for (key, pnr, cov_type, date) in chunk {
-                    if let Ok(value) = store.covariate(pnr, *cov_type, *date) {
-                        batch_results.push((key.clone(), value.clone()));
-                    }
-                }
-
-                batch_results
-            })
-            .collect();
+        // Process the missing keys serially since we can't pass mutable references to threads
+        let mut loaded_entries: Vec<(CacheKey, Option<Covariate>)> = Vec::new();
+        
+        for (key, pnr, cov_type, date) in &missing_keys {
+            if let Ok(value) = store.covariate(pnr, *cov_type, *date) {
+                loaded_entries.push((key.clone(), value.clone()));
+            }
+        }
 
         let entry_count = loaded_entries.len();
 
@@ -300,7 +264,7 @@ impl CovariateCache {
     /// Optimized for parallel fetching with minimal lock contention
     pub fn prefetch_for_subjects(
         &self,
-        store: &impl Store,
+        store: &mut impl Store,
         pnrs: &[String],
         covariate_types: &[CovariateType],
         dates: &[NaiveDate],

@@ -65,7 +65,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
         // but ONLY if the path doesn't already have directory components
         if let Some(base) = base_dir {
             // Don't do this if the family path already has directory components
-            if family_obj.parent().map_or(true, |p| p == Path::new("")) {
+            if family_obj.parent().is_none_or(|p| p == Path::new("")) {
                 let cov_path = Path::new(base).join(family_obj.file_name().unwrap_or_default());
                 let cov_str = cov_path.to_string_lossy().to_string();
 

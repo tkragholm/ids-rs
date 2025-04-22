@@ -163,7 +163,7 @@ impl<T: ArrowAccess> ArrowAccessExt for T {
     }
     
     fn is_column_type(&self, column: &str, data_type: &DataType) -> bool {
-        if let Some(field) = self.schema().field_with_name(column).ok() {
+        if let Ok(field) = self.schema().field_with_name(column) {
             return field.data_type() == data_type;
         }
         false
