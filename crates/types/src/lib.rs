@@ -66,6 +66,8 @@ pub mod utils;
 
 // Internal modules - considered implementation details
 // Only public for backward compatibility
+// To maintain backward compatibility while encouraging use of the newer APIs,
+// these modules are exported with #[doc(hidden)] to discourage their use.
 #[doc(hidden)]
 pub mod arrow;
 #[doc(hidden)]
@@ -87,19 +89,6 @@ pub use self::store::DataStore;
 pub use self::storage::arrow::ArrowBackend;
 pub use self::traits::{Store, DateHelpers};
 
-// Re-exports for backwards compatibility
-// These will be deprecated in a future release
-#[doc(hidden)]
-pub use self::arrow as arrow_utils;
-#[doc(hidden)]
-pub use self::error::prelude::ErrorContext as Context;
-#[doc(hidden)]
-pub use self::store as storage_old;
-
-// Type aliases for backward compatibility during transition
+// Type aliases for backward compatibility
 #[doc(hidden)]
 pub type OldFamilyRelations = family::relations::FamilyRelations;
-#[doc(hidden)]
-pub type SamplingError = error::IdsError;
-#[doc(hidden)]
-pub type IdsResult<T> = error::Result<T>;

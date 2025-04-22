@@ -46,10 +46,11 @@ We've completed streamlining our caching approach by standardizing on a single c
 
 ## Remaining Tasks
 
-### 2. Remove Legacy Compatibility Code
-- [ ] Remove deprecated traits and methods
-- [ ] Simplify type hierarchies and trait bounds
-- [ ] Eliminate redundant compatibility layers
+### 2. ✅ Remove Legacy Compatibility Code
+- [x] Removed deprecated traits (LegacyStoreExt, LegacyFamilyAccess, LegacyTimeVaryingAccess, LegacyStore)
+- [x] Removed deprecated methods with `get_` prefix from all models
+- [x] Removed legacy compatibility re-exports from prelude.rs
+- [x] Updated module visibility to discourage use of legacy modules
 
 ### 3. Consolidate Utility Functions
 - [ ] Identify common utility functions (e.g., period finding, PNR lookups)

@@ -23,7 +23,7 @@ pub mod utils;
 use crate::{
     error::Result,
     models::{Covariate, CovariateType, TimeVaryingValue},
-    OldFamilyRelations,
+    family::relations::FamilyRelations,
 };
 use chrono::NaiveDate;
 
@@ -93,7 +93,7 @@ pub trait Store: Send + Sync {
     ///
     /// An Option containing a reference to the family relations if they exist,
     /// or None if no family relations exist for the person.
-    fn family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations>;
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
 
     /// Loads data into the store.
     ///
@@ -214,7 +214,7 @@ pub trait FamilyAccess {
     ///
     /// An Option containing a reference to the family relations if they exist,
     /// or None if no family relations exist for the person.
-    fn family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations>;
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations>;
 
     /// Returns the parents' PNRs for a person.
     ///
@@ -294,7 +294,7 @@ pub trait TimeVaryingAccess<T> {
 
 // Implement FamilyAccess for any type that implements Store
 impl<T: Store> FamilyAccess for T {
-    fn family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations> {
+    fn family_relations(&self, pnr: &str) -> Option<&FamilyRelations> {
         Store::family_relations(self, pnr)
     }
 
@@ -308,117 +308,3 @@ impl<T: Store> FamilyAccess for T {
     }
 }
 
-/// Legacy compatibility trait for the Store interface
-///
-/// This trait provides backward compatibility for code that uses the old
-/// method names with `get_` prefixes. New code should use the Store trait
-/// methods directly without the `get_` prefix.
-///
-/// This trait is automatically implemented for any type that implements Store.
-#[doc(hidden)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Use Store trait methods without 'get_' prefix instead"
-)]
-pub trait LegacyStoreExt: Store {
-    /// Legacy method - use `covariate` instead
-    #[deprecated(since = "0.2.0", note = "Use `covariate` method instead")]
-    fn get_covariate(
-        &mut self,
-        pnr: &str,
-        covariate_type: CovariateType,
-        date: NaiveDate,
-    ) -> Result<Option<Covariate>> {
-        self.covariate(pnr, covariate_type, date)
-    }
-
-    /// Legacy method - use `family_relations` instead
-    #[deprecated(since = "0.2.0", note = "Use `family_relations` method instead")]
-    fn get_family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations> {
-        self.family_relations(pnr)
-    }
-
-    /// Legacy method - use `covariates` instead
-    #[deprecated(since = "0.2.0", note = "Use `covariates` method instead")]
-    fn get_covariates(
-        &mut self,
-        pnr: &str,
-        date: NaiveDate,
-    ) -> Result<hashbrown::HashMap<CovariateType, Covariate>> {
-        self.covariates(pnr, date)
-    }
-
-    /// Legacy method - use `family_covariates` instead
-    #[deprecated(since = "0.2.0", note = "Use `family_covariates` method instead")]
-    fn get_family_covariates(
-        &mut self,
-        pnr: &str,
-        date: NaiveDate,
-    ) -> Result<Option<hashbrown::HashMap<CovariateType, Covariate>>> {
-        self.family_covariates(pnr, date)
-    }
-}
-
-// Automatically implement LegacyStoreExt for any type that implements Store
-#[allow(deprecated)]
-impl<T: Store> LegacyStoreExt for T {}
-
-/// Legacy compatibility trait for the FamilyAccess interface
-///
-/// This trait provides backward compatibility for code that uses the old
-/// method names with `get_` prefixes. New code should use the FamilyAccess trait
-/// methods directly without the `get_` prefix.
-///
-/// This trait is automatically implemented for any type that implements FamilyAccess.
-#[doc(hidden)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Use FamilyAccess trait methods without 'get_' prefix instead"
-)]
-pub trait LegacyFamilyAccess: FamilyAccess {
-    /// Legacy method - use `family_relations` instead
-    #[deprecated(since = "0.2.0", note = "Use `family_relations` method instead")]
-    fn get_family_relations(&self, pnr: &str) -> Option<&OldFamilyRelations> {
-        self.family_relations(pnr)
-    }
-
-    /// Legacy method - use `parents` instead
-    #[deprecated(since = "0.2.0", note = "Use `parents` method instead")]
-    fn get_parents(&self, pnr: &str) -> Option<(Option<String>, Option<String>)> {
-        self.parents(pnr)
-    }
-
-    /// Legacy method - use `birth_date` instead
-    #[deprecated(since = "0.2.0", note = "Use `birth_date` method instead")]
-    fn get_birth_date(&self, pnr: &str) -> Option<NaiveDate> {
-        self.birth_date(pnr)
-    }
-}
-
-// Automatically implement LegacyFamilyAccess for any type that implements FamilyAccess
-#[allow(deprecated)]
-impl<T: FamilyAccess> LegacyFamilyAccess for T {}
-
-/// Legacy compatibility trait for the TimeVaryingAccess interface
-///
-/// This trait provides backward compatibility for code that uses the old
-/// method names with `get_` prefixes. New code should use the TimeVaryingAccess trait
-/// methods directly without the `get_` prefix.
-///
-/// This trait is automatically implemented for any type that implements TimeVaryingAccess.
-#[doc(hidden)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Use TimeVaryingAccess trait methods without 'get_' prefix instead"
-)]
-pub trait LegacyTimeVaryingAccess<T>: TimeVaryingAccess<T> {
-    /// Legacy method - use `at_date` instead
-    #[deprecated(since = "0.2.0", note = "Use `at_date` method instead")]
-    fn get_at_date(&self, pnr: &str, date: NaiveDate) -> Option<Vec<T>> {
-        self.at_date(pnr, date)
-    }
-}
-
-// Automatically implement LegacyTimeVaryingAccess for any type that implements TimeVaryingAccess
-#[allow(deprecated)]
-impl<T, A: TimeVaryingAccess<T>> LegacyTimeVaryingAccess<T> for A {}

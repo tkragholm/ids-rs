@@ -9,12 +9,6 @@ impl Covariate {
         self.type_
     }
     
-    /// Get the type of this covariate (legacy method)
-    #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use type_() instead")]
-    pub const fn get_type(&self) -> CovariateType {
-        self.type_()
-    }
 
     /// Create a new education covariate using the builder pattern
     #[must_use]
@@ -137,11 +131,6 @@ impl Covariate {
         }
     }
     
-    #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use education_level() instead")]
-    pub fn get_education_level(&self) -> Option<String> {
-        self.education_level()
-    }
 
     #[must_use]
     pub fn isced_code(&self) -> Option<String> {
@@ -152,12 +141,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use isced_code() instead")]
-    pub fn get_isced_code(&self) -> Option<String> {
-        self.isced_code()
-    }
 
-    #[must_use]
+    
     pub const fn education_years(&self) -> Option<f32> {
         match &self.value {
             CovariateValue::Education { years, .. } => *years,
@@ -166,13 +151,9 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use education_years() instead")]
-    pub const fn get_education_years(&self) -> Option<f32> {
-        self.education_years()
-    }
 
     // Income accessors
-    #[must_use]
+    
     pub const fn income_amount(&self) -> Option<f64> {
         match &self.value {
             CovariateValue::Income { amount, .. } => Some(*amount),
@@ -181,12 +162,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use income_amount() instead")]
-    pub const fn get_income_amount(&self) -> Option<f64> {
-        self.income_amount()
-    }
 
-    #[must_use]
+    
     pub fn currency(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Income { currency, .. } => Some(currency.clone()),
@@ -195,12 +172,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use currency() instead")]
-    pub fn get_currency(&self) -> Option<String> {
-        self.currency()
-    }
 
-    #[must_use]
+    
     pub fn income_type_code(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Income { type_code, .. } => Some(type_code.clone()),
@@ -209,12 +182,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use income_type_code() instead")]
-    pub fn get_income_type_code(&self) -> Option<String> {
-        self.income_type_code()
-    }
     
-    #[must_use]
+    
     pub const fn wage_income(&self) -> Option<f64> {
         match &self.value {
             CovariateValue::Income { wage_income, .. } => *wage_income,
@@ -223,12 +192,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use wage_income() instead")]
-    pub const fn get_wage_income(&self) -> Option<f64> {
-        self.wage_income()
-    }
     
-    #[must_use]
+    
     pub const fn employment_status(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Income { employment_status, .. } => *employment_status,
@@ -237,13 +202,9 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use employment_status() instead")]
-    pub const fn get_employment_status(&self) -> Option<i32> {
-        self.employment_status()
-    }
 
     // Occupation accessors
-    #[must_use]
+    
     pub fn occupation_code(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Occupation { code, .. } => Some(code.clone()),
@@ -252,12 +213,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use occupation_code() instead")]
-    pub fn get_occupation_code(&self) -> Option<String> {
-        self.occupation_code()
-    }
 
-    #[must_use]
+    
     pub fn classification(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Occupation { classification, .. } => Some(classification.clone()),
@@ -266,12 +223,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use classification() instead")]
-    pub fn get_classification(&self) -> Option<String> {
-        self.classification()
-    }
     
-    #[must_use]
+    
     pub const fn socio(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Occupation { socio, .. } => *socio,
@@ -280,12 +233,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use socio() instead")]
-    pub const fn get_socio(&self) -> Option<i32> {
-        self.socio()
-    }
     
-    #[must_use]
+    
     pub const fn socio02(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Occupation { socio02, .. } => *socio02,
@@ -294,12 +243,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use socio02() instead")]
-    pub const fn get_socio02(&self) -> Option<i32> {
-        self.socio02()
-    }
     
-    #[must_use]
+    
     pub const fn pre_socio(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Occupation { pre_socio, .. } => *pre_socio,
@@ -308,13 +253,9 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use pre_socio() instead")]
-    pub const fn get_pre_socio(&self) -> Option<i32> {
-        self.pre_socio()
-    }
 
     // Demographics accessors
-    #[must_use]
+    
     pub const fn family_size(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Demographics { family_size, .. } => Some(*family_size),
@@ -323,12 +264,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use family_size() instead")]
-    pub const fn get_family_size(&self) -> Option<i32> {
-        self.family_size()
-    }
 
-    #[must_use]
+    
     pub const fn municipality(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Demographics { municipality, .. } => Some(*municipality),
@@ -337,12 +274,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use municipality() instead")]
-    pub const fn get_municipality(&self) -> Option<i32> {
-        self.municipality()
-    }
 
-    #[must_use]
+    
     pub fn family_type(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Demographics { family_type, .. } => Some(family_type.clone()),
@@ -351,12 +284,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use family_type() instead")]
-    pub fn get_family_type(&self) -> Option<String> {
-        self.family_type()
-    }
     
-    #[must_use]
+    
     pub fn civil_status(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Demographics { civil_status, .. } => civil_status.clone(),
@@ -365,12 +294,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use civil_status() instead")]
-    pub fn get_civil_status(&self) -> Option<String> {
-        self.civil_status()
-    }
     
-    #[must_use]
+    
     pub fn gender(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Demographics { gender, .. } => gender.clone(),
@@ -379,12 +304,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use gender() instead")]
-    pub fn get_gender(&self) -> Option<String> {
-        self.gender()
-    }
     
-    #[must_use]
+    
     pub fn citizenship(&self) -> Option<String> {
         match &self.value {
             CovariateValue::Demographics { citizenship, .. } => citizenship.clone(),
@@ -393,12 +314,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use citizenship() instead")]
-    pub fn get_citizenship(&self) -> Option<String> {
-        self.citizenship()
-    }
     
-    #[must_use]
+    
     pub const fn age(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Demographics { age, .. } => *age,
@@ -407,12 +324,8 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use age() instead")]
-    pub const fn get_age(&self) -> Option<i32> {
-        self.age()
-    }
     
-    #[must_use]
+    
     pub const fn children_count(&self) -> Option<i32> {
         match &self.value {
             CovariateValue::Demographics { children_count, .. } => *children_count,
@@ -421,10 +334,6 @@ impl Covariate {
     }
     
     #[must_use]
-    #[deprecated(since = "0.2.0", note = "Use children_count() instead")]
-    pub const fn get_children_count(&self) -> Option<i32> {
-        self.children_count()
-    }
 
     /// Add metadata to this covariate
     pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {

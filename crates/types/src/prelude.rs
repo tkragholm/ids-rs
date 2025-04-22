@@ -77,17 +77,7 @@ pub use crate::traits::{
     Cacheable,
 };
 
-// Legacy traits (for backward compatibility)
-// The following legacy traits are used for backward compatibility
-// but are not intended to be used in new code
-#[doc(hidden)]
-#[allow(deprecated, unused_imports)]
-pub use crate::traits::{
-    access::LegacyStore,
-    LegacyStoreExt,
-    LegacyFamilyAccess,
-    LegacyTimeVaryingAccess
-};
+// Legacy traits have been removed in this version
 
 // Utilities
 pub use crate::utils::date::{format_date, parse_date, parse_year};
