@@ -51,10 +51,10 @@ pub fn create_default_config<T>(path: impl AsRef<Path>, default_config: T) -> Re
 where
     T: Serialize,
 {
-    if !path.as_ref().exists() {
-        save_config(&default_config, path)
-    } else {
+    if path.as_ref().exists() {
         Ok(())
+    } else {
+        save_config(&default_config, path)
     }
 }
 

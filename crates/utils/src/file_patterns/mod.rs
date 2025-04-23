@@ -19,10 +19,10 @@ use std::path::{Path, PathBuf};
 /// A Result containing the full path to the found file, or an error if not found
 pub fn find_parquet_file(base_paths: &[&Path], filename: &str) -> Result<PathBuf, io::Error> {
     // Ensure filename ends with .parquet
-    let file_to_find = if !filename.ends_with(".parquet") {
-        format!("{}.parquet", filename)
-    } else {
+    let file_to_find = if filename.ends_with(".parquet") {
         filename.to_string()
+    } else {
+        format!("{filename}.parquet")
     };
 
     for base_path in base_paths {
@@ -34,7 +34,7 @@ pub fn find_parquet_file(base_paths: &[&Path], filename: &str) -> Result<PathBuf
 
     Err(io::Error::new(
         io::ErrorKind::NotFound,
-        format!("File not found: {}", filename),
+        format!("File not found: {filename}"),
     ))
 }
 
@@ -59,7 +59,7 @@ pub fn find_all_parquet_files(
 
     let regex = if let Some(pat) = pattern {
         Some(Regex::new(pat).map_err(|e| {
-            io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid regex: {}", e))
+            io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid regex: {e}"))
         })?)
     } else {
         None
@@ -71,7 +71,7 @@ pub fn find_all_parquet_files(
         let entry = entry?;
         let path = entry.path();
 
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "parquet") {
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
             let filename = path.file_name().unwrap().to_string_lossy();
 
             if let Some(ref re) = regex {
@@ -103,8 +103,8 @@ pub fn find_all_parquet_files(
 /// * `files` - A vector of file paths
 ///
 /// # Returns
-/// A HashMap mapping register types to vectors of file paths
-pub fn group_files_by_type(files: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>> {
+/// A `HashMap` mapping register types to vectors of file paths
+#[must_use] pub fn group_files_by_type(files: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>> {
     let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
     for file in files {
@@ -131,7 +131,7 @@ pub fn group_files_by_type(files: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>>
 ///
 /// # Returns
 /// An Option containing the detected register type, or None if not detected
-pub fn detect_register_type(filename: &str) -> Option<&'static str> {
+#[must_use] pub fn detect_register_type(filename: &str) -> Option<&'static str> {
     let patterns = [
         ("akm", r"(?i)akm|arbejdsklassifikationsmodul"),
         ("bef", r"(?i)bef|befolkning"),
@@ -157,7 +157,7 @@ pub fn detect_register_type(filename: &str) -> Option<&'static str> {
 ///
 /// # Returns
 /// An Option containing the period string, or None if not found
-pub fn extract_period_from_filename(filename: &str) -> Option<String> {
+#[must_use] pub fn extract_period_from_filename(filename: &str) -> Option<String> {
     // Match YYYYMM pattern (e.g., 202301)
     let re_period = Regex::new(r"(?:^|[^\d])(\d{6})(?:[^\d]|$)").ok()?;
     if let Some(cap) = re_period.captures(filename) {
@@ -180,7 +180,7 @@ pub fn extract_period_from_filename(filename: &str) -> Option<String> {
 ///
 /// # Returns
 /// An Option containing the year as an i32, or None if not found
-pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
+#[must_use] pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
     let period = extract_period_from_filename(filename)?;
 
     // If we have a 6-digit period (YYYYMM), extract the year part
@@ -198,7 +198,7 @@ pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
 /// * `base_dir` - The base directory to analyze
 ///
 /// # Returns
-/// A Result containing a HashMap mapping register types to file paths, or an error
+/// A Result containing a `HashMap` mapping register types to file paths, or an error
 pub fn detect_data_structure(base_dir: &Path) -> Result<HashMap<String, PathBuf>, io::Error> {
     let mut result = HashMap::new();
 

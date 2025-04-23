@@ -50,47 +50,47 @@ pub trait PnrValidationUtils {
     fn age_from_pnr(pnr: &str, reference_date: &NaiveDate) -> Result<u32>;
 }
 
-/// Implementation of PnrValidationUtils
+/// Implementation of `PnrValidationUtils`
 pub struct PnrValidationUtilsImpl;
 
 impl PnrValidationUtils for PnrValidationUtilsImpl {
     fn validate_pnr(pnr: &str) -> Result<()> {
         // Check format: DDMMYY-XXXX
         let re = regex::Regex::new(r"^(\d{2})(\d{2})(\d{2})-(\d{4})$")
-            .map_err(|e| validation_error(format!("Regex error: {}", e)))?;
+            .map_err(|e| validation_error(format!("Regex error: {e}")))?;
 
         let captures = re
             .captures(pnr)
-            .ok_or_else(|| validation_error(format!("Invalid PNR format: {}", pnr)))?;
+            .ok_or_else(|| validation_error(format!("Invalid PNR format: {pnr}")))?;
 
         let day = captures
             .get(1)
             .unwrap()
             .as_str()
             .parse::<u32>()
-            .map_err(|_| validation_error(format!("Invalid day in PNR: {}", pnr)))?;
+            .map_err(|_| validation_error(format!("Invalid day in PNR: {pnr}")))?;
 
         let month = captures
             .get(2)
             .unwrap()
             .as_str()
             .parse::<u32>()
-            .map_err(|_| validation_error(format!("Invalid month in PNR: {}", pnr)))?;
+            .map_err(|_| validation_error(format!("Invalid month in PNR: {pnr}")))?;
 
         let year = captures
             .get(3)
             .unwrap()
             .as_str()
             .parse::<u32>()
-            .map_err(|_| validation_error(format!("Invalid year in PNR: {}", pnr)))?;
+            .map_err(|_| validation_error(format!("Invalid year in PNR: {pnr}")))?;
 
         // Basic validation
-        if month < 1 || month > 12 {
-            return Err(validation_error(format!("Invalid month in PNR: {}", pnr)));
+        if !(1..=12).contains(&month) {
+            return Err(validation_error(format!("Invalid month in PNR: {pnr}")));
         }
 
-        if day < 1 || day > 31 {
-            return Err(validation_error(format!("Invalid day in PNR: {}", pnr)));
+        if !(1..=31).contains(&day) {
+            return Err(validation_error(format!("Invalid day in PNR: {pnr}")));
         }
 
         // Convert to full year (assuming 1900s for now, but could be extended)
@@ -98,7 +98,7 @@ impl PnrValidationUtils for PnrValidationUtilsImpl {
 
         // Check if the date is valid
         if NaiveDate::from_ymd_opt(full_year as i32, month, day).is_none() {
-            return Err(validation_error(format!("Invalid date in PNR: {}", pnr)));
+            return Err(validation_error(format!("Invalid date in PNR: {pnr}")));
         }
 
         Ok(())
@@ -110,7 +110,7 @@ impl PnrValidationUtils for PnrValidationUtilsImpl {
 
         // Extract date components
         let re = regex::Regex::new(r"^(\d{2})(\d{2})(\d{2})-(\d{4})$")
-            .map_err(|e| validation_error(format!("Regex error: {}", e)))?;
+            .map_err(|e| validation_error(format!("Regex error: {e}")))?;
 
         let captures = re.captures(pnr).unwrap(); // Safe due to validation
         let day = captures.get(1).unwrap().as_str();
@@ -118,10 +118,10 @@ impl PnrValidationUtils for PnrValidationUtilsImpl {
         let year = captures.get(3).unwrap().as_str();
 
         // Convert to full year (assuming 1900s for now)
-        let full_year = format!("19{}", year);
+        let full_year = format!("19{year}");
 
         // Parse date
-        let date_str = format!("{}-{}-{}", full_year, month, day);
+        let date_str = format!("{full_year}-{month}-{day}");
         DateParsingUtilsImpl::parse_iso(&date_str)
     }
 
@@ -131,7 +131,7 @@ impl PnrValidationUtils for PnrValidationUtilsImpl {
 
         // Get the last digit
         let re = regex::Regex::new(r"^(\d{2})(\d{2})(\d{2})-(\d{4})$")
-            .map_err(|e| validation_error(format!("Regex error: {}", e)))?;
+            .map_err(|e| validation_error(format!("Regex error: {e}")))?;
 
         let captures = re.captures(pnr).unwrap(); // Safe due to validation
         let sequence = captures.get(4).unwrap().as_str();
@@ -159,39 +159,39 @@ impl PnrValidationUtils for PnrValidationUtilsImpl {
 pub fn parse_pnr(pnr: &str) -> Result<(u32, u32, u32, u16)> {
     // Check format: DDMMYY-XXXX
     let re = regex::Regex::new(r"^(\d{2})(\d{2})(\d{2})-(\d{4})$")
-        .map_err(|e| validation_error(format!("Regex error: {}", e)))?;
+        .map_err(|e| validation_error(format!("Regex error: {e}")))?;
 
     let captures = re
         .captures(pnr)
-        .ok_or_else(|| validation_error(format!("Invalid PNR format: {}", pnr)))?;
+        .ok_or_else(|| validation_error(format!("Invalid PNR format: {pnr}")))?;
 
     let day = captures
         .get(1)
         .unwrap()
         .as_str()
         .parse::<u32>()
-        .map_err(|_| validation_error(format!("Invalid day in PNR: {}", pnr)))?;
+        .map_err(|_| validation_error(format!("Invalid day in PNR: {pnr}")))?;
 
     let month = captures
         .get(2)
         .unwrap()
         .as_str()
         .parse::<u32>()
-        .map_err(|_| validation_error(format!("Invalid month in PNR: {}", pnr)))?;
+        .map_err(|_| validation_error(format!("Invalid month in PNR: {pnr}")))?;
 
     let year = captures
         .get(3)
         .unwrap()
         .as_str()
         .parse::<u32>()
-        .map_err(|_| validation_error(format!("Invalid year in PNR: {}", pnr)))?;
+        .map_err(|_| validation_error(format!("Invalid year in PNR: {pnr}")))?;
 
     let sequence = captures
         .get(4)
         .unwrap()
         .as_str()
         .parse::<u16>()
-        .map_err(|_| validation_error(format!("Invalid sequence in PNR: {}", pnr)))?;
+        .map_err(|_| validation_error(format!("Invalid sequence in PNR: {pnr}")))?;
 
     Ok((day, month, year, sequence))
 }

@@ -56,7 +56,7 @@ pub trait StringFormattingUtils {
     fn pad(s: &str, width: usize, pad_char: Option<char>, right_align: Option<bool>) -> String;
 }
 
-/// Implementation of StringFormattingUtils
+/// Implementation of `StringFormattingUtils`
 pub struct StringFormattingUtilsImpl;
 
 impl StringFormattingUtils for StringFormattingUtilsImpl {
@@ -95,7 +95,7 @@ impl StringFormattingUtils for StringFormattingUtilsImpl {
         if s.starts_with(prefix) {
             s.to_string()
         } else {
-            format!("{}{}", prefix, s)
+            format!("{prefix}{s}")
         }
     }
 
@@ -103,7 +103,7 @@ impl StringFormattingUtils for StringFormattingUtilsImpl {
         if s.ends_with(suffix) {
             s.to_string()
         } else {
-            format!("{}{}", s, suffix)
+            format!("{s}{suffix}")
         }
     }
 
@@ -118,9 +118,9 @@ impl StringFormattingUtils for StringFormattingUtilsImpl {
         let padding = char_to_pad.to_string().repeat(width - s.len());
 
         if align_right {
-            format!("{}{}", padding, s)
+            format!("{padding}{s}")
         } else {
-            format!("{}{}", s, padding)
+            format!("{s}{padding}")
         }
     }
 }
@@ -135,7 +135,7 @@ impl StringFormattingUtils for StringFormattingUtilsImpl {
 /// # Returns
 ///
 /// A truncated string, with an ellipsis if truncated.
-pub fn truncate(input: &str, max_length: usize) -> String {
+#[must_use] pub fn truncate(input: &str, max_length: usize) -> String {
     if input.len() <= max_length {
         input.to_string()
     } else {
@@ -152,7 +152,7 @@ pub fn truncate(input: &str, max_length: usize) -> String {
 /// # Returns
 ///
 /// A sanitized string that can be used as an identifier.
-pub fn sanitize_identifier(input: &str) -> String {
+#[must_use] pub fn sanitize_identifier(input: &str) -> String {
     input
         .chars()
         .map(|c| {

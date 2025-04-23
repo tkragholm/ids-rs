@@ -24,7 +24,7 @@ impl SimpleLogger {
             // Create the directory structure if it doesn't exist
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
-                    .with_context(|| format!("Failed to create log directory: {:?}", parent))?;
+                    .with_context(|| format!("Failed to create log directory: {parent:?}"))?;
             }
 
             Some(
@@ -32,7 +32,7 @@ impl SimpleLogger {
                     .create(true)
                     .append(true)
                     .open(path)
-                    .with_context(|| format!("Failed to open log file: {:?}", path))?,
+                    .with_context(|| format!("Failed to open log file: {path:?}"))?,
             )
         } else {
             None
@@ -120,13 +120,11 @@ pub fn setup_logger(
 
     // Initialize the global logger
     match log::set_boxed_logger(Box::new(logger)) {
-        Ok(_) => {
+        Ok(()) => {
             // Set the maximum log level based on both console and file levels
             log::set_max_level(std::cmp::max(console_level, file_level));
             log::info!(
-                "Logger initialized with console level: {:?}, file level: {:?}",
-                console_level,
-                file_level
+                "Logger initialized with console level: {console_level:?}, file level: {file_level:?}"
             );
             Ok(())
         }
@@ -146,7 +144,7 @@ pub struct PerformanceTimer {
 
 impl PerformanceTimer {
     /// Create a new performance timer with the given operation name
-    pub fn new(operation_name: &str) -> Self {
+    #[must_use] pub fn new(operation_name: &str) -> Self {
         Self {
             name: operation_name.to_string(),
             start: Instant::now(),
@@ -156,7 +154,7 @@ impl PerformanceTimer {
     }
 
     /// Create a new performance timer that doesn't log its results
-    pub fn silent(operation_name: &str) -> Self {
+    #[must_use] pub fn silent(operation_name: &str) -> Self {
         Self {
             name: operation_name.to_string(),
             start: Instant::now(),
@@ -182,7 +180,7 @@ impl PerformanceTimer {
                 "PERF:".bright_magenta().bold(),
                 self.name.yellow(),
                 "completed in".dimmed(),
-                format!("{:.2?}", total_duration).green()
+                format!("{total_duration:.2?}").green()
             );
 
             // Log checkpoints if any
@@ -215,23 +213,23 @@ impl PerformanceTimer {
     }
 
     /// Get the elapsed time without finishing the timer
-    pub fn elapsed(&self) -> Duration {
+    #[must_use] pub fn elapsed(&self) -> Duration {
         self.start.elapsed()
     }
 
     /// Format a time duration in a human-readable format
-    pub fn format_duration(duration: Duration) -> String {
+    #[must_use] pub fn format_duration(duration: Duration) -> String {
         let secs = duration.as_secs();
         let millis = duration.subsec_millis();
 
         if secs == 0 {
-            format!("{} ms", millis)
+            format!("{millis} ms")
         } else if secs < 60 {
-            format!("{}.{:03} s", secs, millis)
+            format!("{secs}.{millis:03} s")
         } else {
             let mins = secs / 60;
             let secs = secs % 60;
-            format!("{}m {}s", mins, secs)
+            format!("{mins}m {secs}s")
         }
     }
 }
@@ -250,7 +248,7 @@ where
         "PERF:".bright_magenta().bold(),
         operation_name.yellow(),
         "completed in".dimmed(),
-        format!("{:.2?}", duration).green()
+        format!("{duration:.2?}").green()
     );
 
     result
@@ -321,7 +319,7 @@ impl ConsoleOutput {
     }
 
     /// Format a percentage with appropriate color based on value
-    pub fn format_percentage(value: f64) -> colored::ColoredString {
+    #[must_use] pub fn format_percentage(value: f64) -> colored::ColoredString {
         let percentage = format!("{:.2}%", value * 100.0);
         if value >= 0.9 {
             percentage.green()
@@ -333,7 +331,7 @@ impl ConsoleOutput {
     }
 
     /// Format a number with appropriate units (K, M, B)
-    pub fn format_number(num: usize) -> String {
+    #[must_use] pub fn format_number(num: usize) -> String {
         if num < 1_000 {
             num.to_string()
         } else if num < 1_000_000 {
@@ -347,8 +345,8 @@ impl ConsoleOutput {
 
     /// Print a progress status
     pub fn status(step: usize, total: usize, description: &str) {
-        let progress = format!("[{}/{}]", step, total).blue();
-        println!("{} {}", progress, description);
+        let progress = format!("[{step}/{total}]").blue();
+        println!("{progress} {description}");
     }
 
     /// Print a table with headers and rows
@@ -385,7 +383,7 @@ impl ConsoleOutput {
             for (i, cell) in row.iter().enumerate() {
                 if i < widths.len() {
                     let padding = " ".repeat(widths[i].saturating_sub(cell.len()));
-                    print!("{}{} │ ", cell, padding);
+                    print!("{cell}{padding} │ ");
                 }
             }
             println!();

@@ -16,7 +16,7 @@ pub fn validation_error<T: std::fmt::Display>(msg: T) -> IdsError {
 
 pub fn logging_error<T: std::fmt::Display>(msg: T) -> IdsError {
     // Since Logging variant was removed, use Other variant instead
-    IdsError::other(format!("Logging error: {}", msg))
+    IdsError::other(format!("Logging error: {msg}"))
 }
 
 // Simplified helper for converting errors with context

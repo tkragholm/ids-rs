@@ -44,7 +44,7 @@ pub enum BoxStyle {
 
 impl BoxChars {
     /// Get a set of box drawing characters based on a style
-    pub fn from_style(style: BoxStyle) -> Self {
+    #[must_use] pub fn from_style(style: BoxStyle) -> Self {
         match style {
             BoxStyle::Single => Self {
                 top_left: "┌",
@@ -116,22 +116,22 @@ impl BoxChars {
 }
 
 impl RichConsole {
-    /// Create a new RichConsole instance
-    pub fn new() -> Self {
+    /// Create a new `RichConsole` instance
+    #[must_use] pub fn new() -> Self {
         let term = Term::stdout();
         let (width, _) = term.size();
         Self { term, width }
     }
 
-    /// Create a new RichConsole instance for stderr
-    pub fn for_stderr() -> Self {
+    /// Create a new `RichConsole` instance for stderr
+    #[must_use] pub fn for_stderr() -> Self {
         let term = Term::stderr();
         let (width, _) = term.size();
         Self { term, width }
     }
 
     /// Get the current terminal width
-    pub fn width(&self) -> u16 {
+    #[must_use] pub fn width(&self) -> u16 {
         self.width
     }
 
@@ -236,7 +236,7 @@ impl RichConsole {
 
         // Top border with title
         let title_len = console::measure_text_width(title);
-        let title_with_padding = format!(" {} ", title);
+        let title_with_padding = format!(" {title} ");
         let title_with_padding_len = title_len + 2; // Add space on each side
 
         let left_border_len = 2; // The top-left corner + 1 horizontal
@@ -335,7 +335,7 @@ impl RichConsole {
         V: Display,
     {
         let key = key.as_ref();
-        let value_str = format!("{}", value);
+        let value_str = format!("{value}");
 
         // Format with key-value styling
         let formatted_line = format!(
@@ -418,16 +418,16 @@ impl RichConsole {
 
         self.term.write_line(&format!(
             "{} {}",
-            status_style.apply_to(format!("[{}]", status)),
+            status_style.apply_to(format!("[{status}]")),
             message_style.apply_to(message)
         ))?;
         Ok(())
     }
 
     /// Format a number with commas and appropriate scale (K, M, B)
-    pub fn format_number(num: usize) -> String {
+    #[must_use] pub fn format_number(num: usize) -> String {
         if num < 1_000 {
-            format!("{}", num)
+            format!("{num}")
         } else if num < 1_000_000 {
             format!("{:.2}K", num as f64 / 1_000.0)
         } else if num < 1_000_000_000 {
@@ -438,23 +438,23 @@ impl RichConsole {
     }
 
     /// Format a duration in a human-readable way
-    pub fn format_duration(duration: std::time::Duration) -> String {
+    #[must_use] pub fn format_duration(duration: std::time::Duration) -> String {
         let total_secs = duration.as_secs();
         let millis = duration.subsec_millis();
 
         if total_secs == 0 {
-            format!("{}ms", millis)
+            format!("{millis}ms")
         } else if total_secs < 60 {
-            format!("{}.{:03}s", total_secs, millis)
+            format!("{total_secs}.{millis:03}s")
         } else {
             let mins = total_secs / 60;
             let secs = total_secs % 60;
             if mins < 60 {
-                format!("{}m {}s", mins, secs)
+                format!("{mins}m {secs}s")
             } else {
                 let hours = mins / 60;
                 let mins = mins % 60;
-                format!("{}h {}m", hours, mins)
+                format!("{hours}h {mins}m")
             }
         }
     }

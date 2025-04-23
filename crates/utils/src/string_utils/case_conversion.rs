@@ -51,7 +51,7 @@ pub trait StringCaseUtils {
     fn to_kebab_case(s: &str) -> String;
 }
 
-/// Implementation of StringCaseUtils
+/// Implementation of `StringCaseUtils`
 pub struct StringCaseUtilsImpl;
 
 impl StringCaseUtils for StringCaseUtilsImpl {

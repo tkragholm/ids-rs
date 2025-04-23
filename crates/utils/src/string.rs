@@ -21,7 +21,7 @@ pub trait StringUtils {
     fn truncate(s: &str, max_length: usize) -> String;
 }
 
-/// Implementation of StringUtils
+/// Implementation of `StringUtils`
 pub struct StringUtilsImpl;
 
 impl StringUtils for StringUtilsImpl {

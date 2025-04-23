@@ -183,7 +183,7 @@ impl PnrPool {
 ///
 /// # Returns
 /// A PNR string in the format DD-MM-YY-XXXX
-pub fn generate_pnr(date: &NaiveDate, sequence: u16) -> String {
+#[must_use] pub fn generate_pnr(date: &NaiveDate, sequence: u16) -> String {
     format!("{}-{:04}", date.format("%d%m%y"), sequence % 10000)
 }
 
@@ -196,7 +196,7 @@ pub fn generate_pnr(date: &NaiveDate, sequence: u16) -> String {
 ///
 /// # Returns
 /// A vector of PNRs
-pub fn generate_test_pnrs(size: usize, start_year: i32, end_year: i32) -> Vec<String> {
+#[must_use] pub fn generate_test_pnrs(size: usize, start_year: i32, end_year: i32) -> Vec<String> {
     let mut rng = rand::rng();
     let mut pnrs = Vec::with_capacity(size);
 

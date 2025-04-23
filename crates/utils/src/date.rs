@@ -31,7 +31,7 @@ pub trait DateUtils {
     fn age_at(birth_date: NaiveDate, reference_date: NaiveDate) -> u32;
 }
 
-/// Implementation of DateUtils
+/// Implementation of `DateUtils`
 pub struct DateUtilsImpl;
 
 impl DateUtils for DateUtilsImpl {

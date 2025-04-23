@@ -58,7 +58,7 @@ pub trait DateUtils {
     fn create_date(year: i32, month: u32, day: u32) -> Result<NaiveDate>;
 }
 
-/// Implementation of DateUtils
+/// Implementation of `DateUtils`
 pub struct DateUtilsImpl;
 
 impl DateUtils for DateUtilsImpl {
@@ -100,16 +100,16 @@ impl DateUtils for DateUtilsImpl {
 
     fn create_date(year: i32, month: u32, day: u32) -> Result<NaiveDate> {
         NaiveDate::from_ymd_opt(year, month, day)
-            .ok_or_else(|| validation_error(format!("Invalid date: {}-{}-{}", year, month, day)))
+            .ok_or_else(|| validation_error(format!("Invalid date: {year}-{month}-{day}")))
     }
 }
 
 /// Comprehensive trait for date-related helpers with consistent error handling
 pub trait DateHelpers {
-    /// Convert to NaiveDate
+    /// Convert to `NaiveDate`
     ///
     /// # Returns
-    /// * `Result<NaiveDate>` - The date as a NaiveDate or an error
+    /// * `Result<NaiveDate>` - The date as a `NaiveDate` or an error
     ///
     /// # Errors
     /// Returns an error if the conversion fails
@@ -121,7 +121,7 @@ pub trait DateHelpers {
     /// * `Result<i32>` - The year as an i32 or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn year(&self) -> Result<i32>;
 
     /// Calculate age at a reference date
@@ -134,7 +134,7 @@ pub trait DateHelpers {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - The conversion to NaiveDate fails
+    /// - The conversion to `NaiveDate` fails
     /// - The calculation yields an invalid age (e.g., negative)
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32>;
 
@@ -147,7 +147,7 @@ pub trait DateHelpers {
     /// * `Result<bool>` - True if the date is in the specified year, false otherwise
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn is_in_year(&self, year: i32) -> Result<bool>;
 
     /// Get month from date
@@ -156,7 +156,7 @@ pub trait DateHelpers {
     /// * `Result<u32>` - The month as a u32 (1-12) or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn month(&self) -> Result<u32>;
 
     /// Get day from date
@@ -165,7 +165,7 @@ pub trait DateHelpers {
     /// * `Result<u32>` - The day as a u32 (1-31) or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn day(&self) -> Result<u32>;
 
     /// Get the quarter (1-4) for this date
@@ -174,7 +174,7 @@ pub trait DateHelpers {
     /// * `Result<u32>` - The quarter (1-4) or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn quarter(&self) -> Result<u32> {
         Ok(((self.month()? - 1) / 3) + 1)
     }

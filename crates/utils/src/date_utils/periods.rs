@@ -63,7 +63,7 @@ pub trait DatePeriodUtils {
     fn to_year_string(date: NaiveDate) -> String;
 }
 
-/// Implementation of DatePeriodUtils
+/// Implementation of `DatePeriodUtils`
 pub struct DatePeriodUtilsImpl;
 
 impl DatePeriodUtils for DatePeriodUtilsImpl {
@@ -108,7 +108,7 @@ impl DatePeriodUtils for DatePeriodUtilsImpl {
 ///
 /// # Returns
 /// An Option containing the period string, or None if no period was found
-pub fn extract_period_from_filename(filename: &str) -> Option<String> {
+#[must_use] pub fn extract_period_from_filename(filename: &str) -> Option<String> {
     // Match YYYYMM pattern (e.g., 202301)
     let re_period = regex::Regex::new(r"(?:^|[^\d])(\d{6})(?:[^\d]|$)").ok()?;
     if let Some(cap) = re_period.captures(filename) {
@@ -131,7 +131,7 @@ pub fn extract_period_from_filename(filename: &str) -> Option<String> {
 ///
 /// # Returns
 /// An Option containing the year as an i32, or None if no year was found
-pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
+#[must_use] pub fn extract_year_from_filename(filename: &str) -> Option<i32> {
     let period = extract_period_from_filename(filename)?;
 
     // If we have a 6-digit period (YYYYMM), extract the year part

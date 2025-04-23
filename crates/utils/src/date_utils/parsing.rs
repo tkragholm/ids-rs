@@ -44,7 +44,7 @@ pub trait DateParsingUtils {
     fn parse_period(period_str: &str) -> Result<NaiveDate>;
 }
 
-/// Implementation of DateParsingUtils
+/// Implementation of `DateParsingUtils`
 pub struct DateParsingUtilsImpl;
 
 impl DateParsingUtils for DateParsingUtilsImpl {
@@ -71,43 +71,39 @@ impl DateParsingUtils for DateParsingUtilsImpl {
 
     fn parse_iso(date_str: &str) -> Result<NaiveDate> {
         NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|e| {
-            date_parse_error(format!("Failed to parse ISO date '{}': {}", date_str, e))
+            date_parse_error(format!("Failed to parse ISO date '{date_str}': {e}"))
         })
     }
 
     fn parse_year(year_str: &str) -> Result<i32> {
         year_str
             .parse::<i32>()
-            .map_err(|e| validation_error(format!("Failed to parse year '{}': {}", year_str, e)))
+            .map_err(|e| validation_error(format!("Failed to parse year '{year_str}': {e}")))
     }
 
     fn parse_period(period_str: &str) -> Result<NaiveDate> {
         if period_str.len() != 6 {
             return Err(validation_error(format!(
-                "Invalid period format (expected YYYYMM): {}",
-                period_str
+                "Invalid period format (expected YYYYMM): {period_str}"
             )));
         }
 
         let year = Self::parse_year(&period_str[0..4])?;
         let month = period_str[4..6].parse::<u32>().map_err(|e| {
             validation_error(format!(
-                "Failed to parse month in period '{}': {}",
-                period_str, e
+                "Failed to parse month in period '{period_str}': {e}"
             ))
         })?;
 
-        if month < 1 || month > 12 {
+        if !(1..=12).contains(&month) {
             return Err(validation_error(format!(
-                "Invalid month in period '{}': {}",
-                period_str, month
+                "Invalid month in period '{period_str}': {month}"
             )));
         }
 
         NaiveDate::from_ymd_opt(year, month, 1).ok_or_else(|| {
             validation_error(format!(
-                "Invalid date for period '{}': {}-{}-01",
-                period_str, year, month
+                "Invalid date for period '{period_str}': {year}-{month}-01"
             ))
         })
     }

@@ -59,7 +59,7 @@ pub trait StringParsingUtils {
     fn parse_optional_f64(s: &str, error_msg: &str) -> Result<Option<f64>>;
 }
 
-/// Implementation of StringParsingUtils
+/// Implementation of `StringParsingUtils`
 pub struct StringParsingUtilsImpl;
 
 impl StringParsingUtils for StringParsingUtilsImpl {

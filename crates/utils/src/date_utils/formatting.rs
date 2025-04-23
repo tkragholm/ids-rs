@@ -32,7 +32,7 @@ pub trait DateFormattingUtils {
     ) -> String;
 }
 
-/// Implementation of DateFormattingUtils
+/// Implementation of `DateFormattingUtils`
 pub struct DateFormattingUtilsImpl;
 
 impl DateFormattingUtils for DateFormattingUtilsImpl {
@@ -71,7 +71,7 @@ impl DateFormattingUtils for DateFormattingUtilsImpl {
 ///
 /// This function will not error, but will return a placeholder string
 /// if the date is None.
-pub fn format_date(date: Option<NaiveDate>, format: Option<&str>) -> String {
+#[must_use] pub fn format_date(date: Option<NaiveDate>, format: Option<&str>) -> String {
     let format_str = format.unwrap_or("%Y-%m-%d");
     match date {
         Some(d) => d.format(format_str).to_string(),
