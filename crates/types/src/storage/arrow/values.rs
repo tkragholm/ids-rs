@@ -10,40 +10,40 @@ use crate::error::Result;
 /// Arrow data throughout the codebase.
 #[derive(Clone)]
 pub struct ArrowValue {
-    /// The underlying Arrow RecordBatch containing the data
+    /// The underlying Arrow `RecordBatch` containing the data
     pub batch: Arc<RecordBatch>,
 }
 
 impl ArrowValue {
-    /// Create a new ArrowValue from a RecordBatch
+    /// Create a new `ArrowValue` from a `RecordBatch`
     ///
     /// # Arguments
-    /// * `batch` - The RecordBatch to wrap
+    /// * `batch` - The `RecordBatch` to wrap
     ///
     /// # Returns
     /// * `ArrowValue` - The wrapped value
-    pub fn new(batch: RecordBatch) -> Self {
+    #[must_use] pub fn new(batch: RecordBatch) -> Self {
         Self {
             batch: Arc::new(batch),
         }
     }
 
-    /// Create a new ArrowValue from an Arc-wrapped RecordBatch
+    /// Create a new `ArrowValue` from an Arc-wrapped `RecordBatch`
     ///
     /// # Arguments
-    /// * `batch` - The RecordBatch to wrap, already in an Arc
+    /// * `batch` - The `RecordBatch` to wrap, already in an Arc
     ///
     /// # Returns
     /// * `ArrowValue` - The wrapped value
-    pub fn from_arc(batch: Arc<RecordBatch>) -> Self {
+    #[must_use] pub fn from_arc(batch: Arc<RecordBatch>) -> Self {
         Self { batch }
     }
 
-    /// Get the underlying RecordBatch
+    /// Get the underlying `RecordBatch`
     ///
     /// # Returns
-    /// * `&RecordBatch` - Reference to the wrapped RecordBatch
-    pub fn batch(&self) -> &RecordBatch {
+    /// * `&RecordBatch` - Reference to the wrapped `RecordBatch`
+    #[must_use] pub fn batch(&self) -> &RecordBatch {
         &self.batch
     }
 
@@ -51,7 +51,7 @@ impl ArrowValue {
     ///
     /// # Returns
     /// * `usize` - The number of rows
-    pub fn row_count(&self) -> usize {
+    #[must_use] pub fn row_count(&self) -> usize {
         self.batch.num_rows()
     }
 
@@ -59,11 +59,11 @@ impl ArrowValue {
     ///
     /// # Returns
     /// * `bool` - True if the batch has no rows, false otherwise
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.batch.num_rows() == 0
     }
 
-    /// Create an empty ArrowValue with the same schema
+    /// Create an empty `ArrowValue` with the same schema
     ///
     /// # Returns
     /// * `Result<ArrowValue>` - Empty batch with the same schema

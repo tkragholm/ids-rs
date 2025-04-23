@@ -15,10 +15,10 @@ pub struct CovariateVariableConfig {
     /// Variable type (Numeric, Categorical, Binary)
     pub variable_type: VariableType,
 
-    /// Field accessor method in the Covariate struct (e.g., "get_age", "get_family_size")
+    /// Field accessor method in the Covariate struct (e.g., "`get_age`", "`get_family_size`")
     pub accessor: String,
 
-    /// Translation map to use for categorical variables (e.g., "family_type", "civst")
+    /// Translation map to use for categorical variables (e.g., "`family_type`", "civst")
     pub translation: Option<String>,
 
     /// Description of the variable
@@ -67,7 +67,7 @@ impl CovariatesConfig {
     }
 
     /// Get a covariate type configuration by type
-    pub fn get_covariate_type(
+    #[must_use] pub fn get_covariate_type(
         &self,
         covariate_type: CovariateType,
     ) -> Option<&CovariateTypeConfig> {
@@ -77,7 +77,7 @@ impl CovariatesConfig {
     }
 
     /// Get a default configuration with all standard covariate types and variables
-    pub fn default_config() -> Self {
+    #[must_use] pub fn default_config() -> Self {
         // Demographics variables
         let demographics_variables = vec![
             CovariateVariableConfig {

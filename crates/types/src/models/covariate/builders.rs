@@ -29,7 +29,7 @@ impl EducationBuilder {
     }
 
     /// Add years of education to this education covariate
-    pub fn with_years(mut self, years: f32) -> Self {
+    #[must_use] pub fn with_years(mut self, years: f32) -> Self {
         self.years = Some(years);
         self
     }
@@ -41,7 +41,7 @@ impl EducationBuilder {
     }
 
     /// Build the education covariate
-    pub fn build(self) -> Covariate {
+    #[must_use] pub fn build(self) -> Covariate {
         Covariate {
             type_: CovariateType::Education,
             value: CovariateValue::Education {
@@ -80,13 +80,13 @@ impl IncomeBuilder {
     }
 
     /// Add wage income to this income covariate
-    pub fn with_wage_income(mut self, wage_income: f64) -> Self {
+    #[must_use] pub fn with_wage_income(mut self, wage_income: f64) -> Self {
         self.wage_income = Some(wage_income);
         self
     }
 
     /// Add employment status to this income covariate
-    pub fn with_employment_status(mut self, status: i32) -> Self {
+    #[must_use] pub fn with_employment_status(mut self, status: i32) -> Self {
         self.employment_status = Some(status);
         self
     }
@@ -98,7 +98,7 @@ impl IncomeBuilder {
     }
 
     /// Build the income covariate
-    pub fn build(self) -> Covariate {
+    #[must_use] pub fn build(self) -> Covariate {
         Covariate {
             type_: CovariateType::Income,
             value: CovariateValue::Income {
@@ -139,19 +139,19 @@ impl OccupationBuilder {
     }
 
     /// Add socio code to this occupation covariate
-    pub fn with_socio(mut self, socio: i32) -> Self {
+    #[must_use] pub fn with_socio(mut self, socio: i32) -> Self {
         self.socio = Some(socio);
         self
     }
 
     /// Add socio02 code to this occupation covariate
-    pub fn with_socio02(mut self, socio02: i32) -> Self {
+    #[must_use] pub fn with_socio02(mut self, socio02: i32) -> Self {
         self.socio02 = Some(socio02);
         self
     }
 
-    /// Add pre_socio code to this occupation covariate
-    pub fn with_pre_socio(mut self, pre_socio: i32) -> Self {
+    /// Add `pre_socio` code to this occupation covariate
+    #[must_use] pub fn with_pre_socio(mut self, pre_socio: i32) -> Self {
         self.pre_socio = Some(pre_socio);
         self
     }
@@ -163,7 +163,7 @@ impl OccupationBuilder {
     }
 
     /// Build the occupation covariate
-    pub fn build(self) -> Covariate {
+    #[must_use] pub fn build(self) -> Covariate {
         Covariate {
             type_: CovariateType::Occupation,
             value: CovariateValue::Occupation {
@@ -228,19 +228,19 @@ impl DemographicsBuilder {
     }
 
     /// Add age to this demographics covariate
-    pub fn with_age(mut self, age: i32) -> Self {
+    #[must_use] pub fn with_age(mut self, age: i32) -> Self {
         self.age = Some(age);
         self
     }
 
     /// Add children count to this demographics covariate
-    pub fn with_children_count(mut self, count: i32) -> Self {
+    #[must_use] pub fn with_children_count(mut self, count: i32) -> Self {
         self.children_count = Some(count);
         self
     }
 
     /// Add all demographic extras at once
-    pub fn with_extras(mut self, extras: DemographicExtras) -> Self {
+    #[must_use] pub fn with_extras(mut self, extras: DemographicExtras) -> Self {
         self.civil_status = extras.civil_status;
         self.gender = extras.gender;
         self.citizenship = extras.citizenship;
@@ -256,7 +256,7 @@ impl DemographicsBuilder {
     }
 
     /// Build the demographics covariate
-    pub fn build(self) -> Covariate {
+    #[must_use] pub fn build(self) -> Covariate {
         Covariate {
             type_: CovariateType::Demographics,
             value: CovariateValue::Demographics {

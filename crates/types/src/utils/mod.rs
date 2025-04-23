@@ -39,7 +39,7 @@ pub mod date {
     ///
     /// This function will not error, but will return a placeholder string
     /// if the date is None.
-    pub fn format_date(date: Option<NaiveDate>, format: Option<&str>) -> String {
+    #[must_use] pub fn format_date(date: Option<NaiveDate>, format: Option<&str>) -> String {
         let format_str = format.unwrap_or("%Y-%m-%d");
         match date {
             Some(d) => d.format(format_str).to_string(),
@@ -47,9 +47,9 @@ pub mod date {
         }
     }
 
-    /// Parses a date string using the DateHelpers trait.
+    /// Parses a date string using the `DateHelpers` trait.
     ///
-    /// This is a convenience wrapper around the DateHelpers trait that
+    /// This is a convenience wrapper around the `DateHelpers` trait that
     /// provides a more ergonomic API for date parsing.
     ///
     /// # Parameters
@@ -62,7 +62,7 @@ pub mod date {
     pub fn parse_date(date_str: &str) -> Result<NaiveDate> {
         // Try to parse date in format 'YYYY-MM-DD'
         NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|e| {
-            IdsError::invalid_date(format!("Failed to parse date '{}': {}", date_str, e))
+            IdsError::invalid_date(format!("Failed to parse date '{date_str}': {e}"))
         })
     }
 
@@ -77,7 +77,7 @@ pub mod date {
     /// A Result containing the parsed year, or an error if parsing failed.
     pub fn parse_year(year_str: &str) -> Result<i32> {
         year_str.parse::<i32>().map_err(|e| {
-            IdsError::invalid_format(format!("Failed to parse year '{}': {}", year_str, e))
+            IdsError::invalid_format(format!("Failed to parse year '{year_str}': {e}"))
         })
     }
 }
@@ -93,7 +93,7 @@ pub mod string {
     /// # Returns
     ///
     /// A sanitized string that can be used as an identifier.
-    pub fn sanitize_identifier(input: &str) -> String {
+    #[must_use] pub fn sanitize_identifier(input: &str) -> String {
         input
             .chars()
             .map(|c| {
@@ -116,7 +116,7 @@ pub mod string {
     /// # Returns
     ///
     /// A truncated string, with an ellipsis if truncated.
-    pub fn truncate(input: &str, max_length: usize) -> String {
+    #[must_use] pub fn truncate(input: &str, max_length: usize) -> String {
         if input.len() <= max_length {
             input.to_string()
         } else {

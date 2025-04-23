@@ -4,12 +4,11 @@ use arrow::{array::Array, record_batch::RecordBatch};
 use chrono::NaiveDate;
 use hashbrown::HashMap;
 
-/// Convert an Arrow Date32 value (days since epoch) to a NaiveDate
+/// Convert an Arrow Date32 value (days since epoch) to a `NaiveDate`
 fn convert_date32_to_naive_date(days_since_epoch: i32) -> Result<NaiveDate> {
     NaiveDate::from_num_days_from_ce_opt(days_since_epoch).ok_or_else(|| {
         IdsError::date_conversion(format!(
-            "Could not convert {} days since epoch to date",
-            days_since_epoch
+            "Could not convert {days_since_epoch} days since epoch to date"
         ))
     })
 }
@@ -52,7 +51,7 @@ impl FamilyStore {
         self.relations.insert(relation.pnr.clone(), relation);
     }
 
-    /// Load family relations from a set of Arrow RecordBatches
+    /// Load family relations from a set of Arrow `RecordBatches`
     pub fn load_family_relations(&mut self, batches: Vec<RecordBatch>) -> Result<()> {
         for batch in batches {
             self.process_batch(&batch)?;

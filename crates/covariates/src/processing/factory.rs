@@ -17,7 +17,7 @@ pub struct ConfigurableProcessorImpl {
 
 impl ConfigurableProcessorImpl {
     /// Create a new processor from configuration
-    pub fn new(config: &CovariateTypeConfig) -> Self {
+    #[must_use] pub fn new(config: &CovariateTypeConfig) -> Self {
         let mut variables = HashMap::new();
 
         // Register all variables with their types
@@ -87,7 +87,7 @@ pub struct ConfigurableVariableProcessorImpl {
 
 impl ConfigurableVariableProcessorImpl {
     /// Create a new variable processor from configuration
-    pub fn new(config: &CovariateVariableConfig, covariate_type: CovariateType) -> Self {
+    #[must_use] pub fn new(config: &CovariateVariableConfig, covariate_type: CovariateType) -> Self {
         Self {
             name: config.name.clone(),
             variable_type: config.variable_type,
@@ -100,7 +100,7 @@ impl ConfigurableVariableProcessorImpl {
     }
 
     /// Create a new variable processor with translation maps
-    pub fn with_translation_maps(
+    #[must_use] pub fn with_translation_maps(
         config: &CovariateVariableConfig,
         covariate_type: CovariateType,
         translation_maps: TranslationMaps,
@@ -121,7 +121,7 @@ impl ConfigurableVariableProcessorImpl {
         // Simple hash function to convert categorical values to numeric
         let mut hash = 0.0;
         for (i, b) in value.bytes().enumerate() {
-            hash += (b as f64) * (i + 1) as f64;
+            hash += f64::from(b) * (i + 1) as f64;
         }
         hash
     }
@@ -134,32 +134,32 @@ impl ConfigurableVariableProcessorImpl {
 
         match self.accessor.as_str() {
             // Demographics accessors - support both old and new method names
-            "get_family_size" | "family_size" => covariate.family_size().map(|v| v as f64),
-            "get_municipality" | "municipality" => covariate.municipality().map(|v| v as f64),
+            "get_family_size" | "family_size" => covariate.family_size().map(f64::from),
+            "get_municipality" | "municipality" => covariate.municipality().map(f64::from),
             "get_family_type" | "family_type" => {
                 covariate.family_type().and_then(|v| v.parse::<f64>().ok())
             }
             "get_civil_status" | "civil_status" => covariate
                 .civil_status()
-                .map(|v| v.bytes().next().unwrap_or(0) as f64), // unwrap_or(0) is safe - default to 0 if empty string
+                .map(|v| f64::from(v.bytes().next().unwrap_or(0))), // unwrap_or(0) is safe - default to 0 if empty string
             "get_gender" | "gender" => covariate
                 .gender()
-                .map(|v| v.bytes().next().unwrap_or(0) as f64), // unwrap_or(0) is safe - default to 0 if empty string
+                .map(|v| f64::from(v.bytes().next().unwrap_or(0))), // unwrap_or(0) is safe - default to 0 if empty string
             "get_citizenship" | "citizenship" => covariate.citizenship().map(|v| {
                 let mut hash = 0.0;
                 for (i, b) in v.bytes().enumerate() {
-                    hash += (b as f64) * (i + 1) as f64;
+                    hash += f64::from(b) * (i + 1) as f64;
                 }
                 hash
             }),
-            "get_age" | "age" => covariate.age().map(|v| v as f64),
-            "get_children_count" | "children_count" => covariate.children_count().map(|v| v as f64),
+            "get_age" | "age" => covariate.age().map(f64::from),
+            "get_children_count" | "children_count" => covariate.children_count().map(f64::from),
 
             // Income accessors
             "get_income_amount" | "income_amount" => covariate.income_amount(),
             "get_wage_income" | "wage_income" => covariate.wage_income(),
             "get_employment_status" | "employment_status" => {
-                covariate.employment_status().map(|v| v as f64)
+                covariate.employment_status().map(f64::from)
             }
 
             // Education accessors
@@ -170,7 +170,7 @@ impl ConfigurableVariableProcessorImpl {
                 .isced_code()
                 .map(|v| self.categorical_to_numeric(&v)),
             "get_education_years" | "education_years" => {
-                covariate.education_years().map(|v| v as f64)
+                covariate.education_years().map(f64::from)
             }
 
             // Occupation accessors
@@ -180,9 +180,9 @@ impl ConfigurableVariableProcessorImpl {
             "get_classification" | "classification" => covariate
                 .classification()
                 .map(|v| self.categorical_to_numeric(&v)),
-            "get_socio" | "socio" => covariate.socio().map(|v| v as f64),
-            "get_socio02" | "socio02" => covariate.socio02().map(|v| v as f64),
-            "get_pre_socio" | "pre_socio" => covariate.pre_socio().map(|v| v as f64),
+            "get_socio" | "socio" => covariate.socio().map(f64::from),
+            "get_socio02" | "socio02" => covariate.socio02().map(f64::from),
+            "get_pre_socio" | "pre_socio" => covariate.pre_socio().map(f64::from),
 
             // Unknown accessor
             _ => {
@@ -359,7 +359,7 @@ pub struct ProcessorFactory {
 
 impl ProcessorFactory {
     /// Create a new factory from configuration
-    pub fn new(config: CovariatesConfig) -> Self {
+    #[must_use] pub fn new(config: CovariatesConfig) -> Self {
         Self {
             config,
             translation_maps: None,
@@ -367,13 +367,13 @@ impl ProcessorFactory {
     }
 
     /// Set translation maps for the factory
-    pub fn with_translation_maps(mut self, translation_maps: TranslationMaps) -> Self {
+    #[must_use] pub fn with_translation_maps(mut self, translation_maps: TranslationMaps) -> Self {
         self.translation_maps = Some(translation_maps);
         self
     }
 
     /// Create a processor for a covariate type
-    pub fn create_processor(
+    #[must_use] pub fn create_processor(
         &self,
         covariate_type: CovariateType,
     ) -> Option<Box<dyn CovariateProcessor>> {
@@ -385,7 +385,7 @@ impl ProcessorFactory {
     }
 
     /// Create a processor for a specific variable
-    pub fn create_variable_processor(
+    #[must_use] pub fn create_variable_processor(
         &self,
         covariate_type: CovariateType,
         variable_name: &str,

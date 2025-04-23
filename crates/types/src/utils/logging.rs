@@ -47,20 +47,19 @@ pub fn init_logger_with_level(level: &str) -> Result<()> {
         "error" => log::LevelFilter::Error,
         _ => {
             return Err(IdsError::validation(format!(
-                "Invalid log level: {}",
-                level
+                "Invalid log level: {level}"
             )))
         }
     };
 
     log::set_max_level(log_level);
-    log::info!("Logging initialized at {} level", level);
+    log::info!("Logging initialized at {level} level");
     Ok(())
 }
 
 /// Logs a message at the debug level.
 ///
-/// This macro is a convenience wrapper around log::debug! that is conditionally compiled
+/// This macro is a convenience wrapper around `log::debug`! that is conditionally compiled
 /// based on the logging feature.
 #[macro_export]
 macro_rules! log_debug {
@@ -71,7 +70,7 @@ macro_rules! log_debug {
 
 /// Logs a message at the info level.
 ///
-/// This macro is a convenience wrapper around log::info! that is conditionally compiled
+/// This macro is a convenience wrapper around `log::info`! that is conditionally compiled
 /// based on the logging feature.
 #[macro_export]
 macro_rules! log_info {
@@ -82,7 +81,7 @@ macro_rules! log_info {
 
 /// Logs a message at the warn level.
 ///
-/// This macro is a convenience wrapper around log::warn! that is conditionally compiled
+/// This macro is a convenience wrapper around `log::warn`! that is conditionally compiled
 /// based on the logging feature.
 #[macro_export]
 macro_rules! log_warn {
@@ -93,7 +92,7 @@ macro_rules! log_warn {
 
 /// Logs a message at the error level.
 ///
-/// This macro is a convenience wrapper around log::error! that is conditionally compiled
+/// This macro is a convenience wrapper around `log::error`! that is conditionally compiled
 /// based on the logging feature.
 #[macro_export]
 macro_rules! log_error {

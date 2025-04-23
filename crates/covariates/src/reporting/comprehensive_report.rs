@@ -85,19 +85,18 @@ impl ComprehensiveReport {
 
             // Normalize for display
             let max_count = histogram.iter().copied().max().unwrap_or(1);
-            let scale = 40.0 / max_count as f64;
+            let scale = 40.0 / f64::from(max_count);
 
-            content.push_str(&format!("{} (mean: {:.3}):\n", variable, mean));
+            content.push_str(&format!("{variable} (mean: {mean:.3}):\n"));
 
             for (i, &count) in histogram.iter().enumerate() {
                 let lower = -0.5 + i as f64 * 0.1;
                 let upper = lower + 0.1;
-                let bar_len = (count as f64 * scale).round() as usize;
+                let bar_len = (f64::from(count) * scale).round() as usize;
                 let bar = "#".repeat(bar_len);
 
                 content.push_str(&format!(
-                    "[{:.1}, {:.1}): {} {}\n",
-                    lower, upper, bar, count
+                    "[{lower:.1}, {upper:.1}): {bar} {count}\n"
                 ));
             }
             content.push('\n');
@@ -128,7 +127,7 @@ impl ComprehensiveReport {
             let case_bar = "#".repeat(case_bar_len);
             let control_bar = "#".repeat(control_bar_len);
 
-            content.push_str(&format!("{}:\n", var));
+            content.push_str(&format!("{var}:\n"));
             content.push_str(&format!(
                 "Cases:    {} {:.1}%\n",
                 case_bar,
@@ -234,7 +233,7 @@ impl ComprehensiveReport {
         Ok(())
     }
 
-    pub fn summarize_matched_pair_balance(&self) -> HashMap<String, Vec<f64>> {
+    #[must_use] pub fn summarize_matched_pair_balance(&self) -> HashMap<String, Vec<f64>> {
         let mut summaries: HashMap<String, Vec<f64>> = HashMap::new();
 
         for detail in &self.results.matched_pair_details {
@@ -275,10 +274,10 @@ impl ComprehensiveReport {
 
             wtr.write_record([
                 &variable,
-                &format!("{:.3}", mean_diff),
-                &format!("{:.3}", median_diff),
-                &format!("{:.3}", max_diff),
-                &format!("{:.1}", large_diff_pct),
+                &format!("{mean_diff:.3}"),
+                &format!("{median_diff:.3}"),
+                &format!("{max_diff:.3}"),
+                &format!("{large_diff_pct:.1}"),
                 &std_diffs.len().to_string(),
             ])?;
         }

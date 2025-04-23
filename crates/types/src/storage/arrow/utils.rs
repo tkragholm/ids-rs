@@ -67,8 +67,7 @@ impl ArrowUtils {
             Ok(filtered) if filtered.num_rows() > 0 => Ok(Some(filtered)),
             Ok(_) => Ok(None), // Empty result
             Err(e) => Err(IdsError::invalid_operation(format!(
-                "Failed to filter batch: {}",
-                e
+                "Failed to filter batch: {e}"
             ))),
         }
     }
@@ -79,7 +78,7 @@ impl ArrowUtils {
     /// * `schema` - The schema for the empty batch
     ///
     /// # Returns
-    /// A new empty RecordBatch with the provided schema
+    /// A new empty `RecordBatch` with the provided schema
     ///
     /// # Errors
     /// Returns an error if the empty batch cannot be created
@@ -106,8 +105,7 @@ impl ArrowUtils {
         let fields_len = fields.len();
         RecordBatch::try_new(schema_arc, columns).map_err(|err| {
             IdsError::invalid_operation(format!(
-                "Failed to create empty batch with {} fields: {}",
-                fields_len, err
+                "Failed to create empty batch with {fields_len} fields: {err}"
             ))
         })
     }
@@ -124,7 +122,7 @@ impl ArrowUtils {
             .ok_or_else(|| IdsError::invalid_date("Failed to create Unix epoch date (1970-01-01)"))
     }
 
-    /// Convert NaiveDate to days since epoch (for Date32 arrays) safely
+    /// Convert `NaiveDate` to days since epoch (for Date32 arrays) safely
     ///
     /// # Arguments
     /// * `date` - The date to convert
@@ -224,7 +222,7 @@ impl ArrowUtils {
     /// * `capacity` - Capacity hint for buffer allocation
     ///
     /// # Returns
-    /// An optimized StringArray
+    /// An optimized `StringArray`
     ///
     /// # Errors
     /// Returns an error if array creation fails

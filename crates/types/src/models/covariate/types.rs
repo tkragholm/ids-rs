@@ -47,7 +47,7 @@ pub enum CovariateValue {
         currency: String,
         /// Type of income
         type_code: String,
-        /// Wage income (LOENMV_13)
+        /// Wage income (`LOENMV_13`)
         wage_income: Option<f64>,
         /// Employment status code (BESKST13)
         employment_status: Option<i32>,
@@ -62,7 +62,7 @@ pub enum CovariateValue {
         socio: Option<i32>,
         /// Alternative socioeconomic status (SOCIO02)
         socio02: Option<i32>,
-        /// Preliminary socioeconomic status (PRE_SOCIO)
+        /// Preliminary socioeconomic status (`PRE_SOCIO`)
         pre_socio: Option<i32>,
     },
     /// Demographic information

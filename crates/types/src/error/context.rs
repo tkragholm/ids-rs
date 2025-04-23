@@ -48,7 +48,7 @@ pub trait ErrorContext<T, E> {
         C: Display + Send + Sync + 'static;
 }
 
-/// Legacy version of ErrorContext that doesn't require thread-safety bounds
+/// Legacy version of `ErrorContext` that doesn't require thread-safety bounds
 ///
 /// This trait is provided for backwards compatibility with existing code.
 pub trait LegacyErrorContext<T, E: Display + 'static> {
@@ -59,7 +59,7 @@ pub trait LegacyErrorContext<T, E: Display + 'static> {
         C: Display;
 }
 
-/// Maps an error type to the appropriate IdsError variant based on common patterns
+/// Maps an error type to the appropriate `IdsError` variant based on common patterns
 fn map_error_type<E: StdError + Send + Sync + 'static>(error: E, context: &str) -> IdsError {
     // Get the error as a trait object for pattern matching
     let error_ref = &error as &dyn StdError;
@@ -69,7 +69,7 @@ fn map_error_type<E: StdError + Send + Sync + 'static>(error: E, context: &str) 
         // Preserve io::Error kind
         IdsError::Io(std::io::Error::new(
             io_err.kind(),
-            format!("{}: {}", context, error),
+            format!("{context}: {error}"),
         ))
     } else if let Some(_arrow_err) = error_ref.downcast_ref::<arrow::error::ArrowError>() {
         // Arrow errors get special treatment with the ArrowWithContext variant
@@ -87,20 +87,20 @@ fn map_error_type<E: StdError + Send + Sync + 'static>(error: E, context: &str) 
         // CSV errors get converted to CSV variant
         IdsError::Csv(csv::Error::from(std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!("{}: {}", context, error),
+            format!("{context}: {error}"),
         )))
     } else if let Some(_date_err) = error_ref.downcast_ref::<chrono::format::ParseError>() {
         // Date parsing errors
-        IdsError::InvalidDate(format!("{}: {}", context, error))
+        IdsError::InvalidDate(format!("{context}: {error}"))
     } else if let Some(_parse_int_err) = error_ref.downcast_ref::<std::num::ParseIntError>() {
         // Integer parsing errors
-        IdsError::type_conversion(format!("{}: {}", context, error))
+        IdsError::type_conversion(format!("{context}: {error}"))
     } else if let Some(_parse_float_err) = error_ref.downcast_ref::<std::num::ParseFloatError>() {
         // Float parsing errors
-        IdsError::type_conversion(format!("{}: {}", context, error))
+        IdsError::type_conversion(format!("{context}: {error}"))
     } else if let Some(_json_err) = error_ref.downcast_ref::<serde_json::Error>() {
         // JSON parsing errors - create a proper JSON error
-        IdsError::invalid_format(format!("{}: {}", context, error))
+        IdsError::invalid_format(format!("{context}: {error}"))
     } else {
         // For any other error type, use DataAccess with rich context
         IdsError::DataAccess {
@@ -113,7 +113,7 @@ fn map_error_type<E: StdError + Send + Sync + 'static>(error: E, context: &str) 
 /// Helper function to add context to Result types
 ///
 /// This function preserves type information for known error types while adding context.
-/// It's designed to be more intelligent about error conversion than a simple map_err.
+/// It's designed to be more intelligent about error conversion than a simple `map_err`.
 #[inline]
 pub fn with_context<T, E, C, F>(result: std::result::Result<T, E>, context_fn: F) -> Result<T>
 where
@@ -128,7 +128,7 @@ where
             let ctx = context_fn().to_string();
 
             // Create a descriptive error message that combines all previous context
-            let error_description = format!("{}", e);
+            let error_description = format!("{e}");
 
             // Create an appropriate IdsError that preserves context
             // Check if we're already dealing with an IdsError
@@ -137,7 +137,7 @@ where
                     match ids_err {
                         // For Validation errors, preserve the error type with chained context
                         super::IdsError::Validation(_) => {
-                            super::IdsError::Validation(format!("{}: {}", ctx, error_description))
+                            super::IdsError::Validation(format!("{ctx}: {error_description}"))
                         }
                         // For DataAccess errors, preserve their structure and source
                         super::IdsError::DataAccess {
@@ -145,7 +145,7 @@ where
                             context: _,
                         } => {
                             // Create a new DataAccess error with updated context
-                            let new_context = format!("{}: {}", ctx, error_description);
+                            let new_context = format!("{ctx}: {error_description}");
                             let boxed_error = Box::new(std::io::Error::new(
                                 std::io::ErrorKind::Other,
                                 error_description,
@@ -170,7 +170,7 @@ where
 
 /// Helper function to replace error with context for Result types
 ///
-/// Unlike with_context, this function is designed to replace the error message entirely
+/// Unlike `with_context`, this function is designed to replace the error message entirely
 /// with the provided context, rather than adding to it. This is useful when the original
 /// error message isn't helpful or relevant.
 #[inline]
@@ -248,7 +248,7 @@ impl<T, E: Display + 'static> LegacyErrorContext<T, E> for std::result::Result<T
             Ok(value) => Ok(value),
             Err(err) => {
                 let context = context_fn().to_string();
-                let message = format!("{}: {}", context, err);
+                let message = format!("{context}: {err}");
 
                 // Special case for io::Error to preserve behavior expected by the utils crate
                 if let Some(io_err) = (&err as &dyn std::any::Any).downcast_ref::<std::io::Error>()

@@ -46,7 +46,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 /// Initialize logging with progress bars and file output
 ///
 /// Sets up a combined logging system with:
-/// 1. Console output with progress bar integration via indicatif_log_bridge
+/// 1. Console output with progress bar integration via `indicatif_log_bridge`
 /// 2. File output for regular logs using log4rs
 /// 3. Creates a session-specific log file for each run with timestamp
 ///
@@ -99,8 +99,8 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
 
     // Prepare log file paths
     let main_log_path = logs_dir.join("ids.log");
-    let session_log_path = logs_dir.join(format!("ids_session_{}.log", timestamp));
-    let debug_log_path = logs_dir.join(format!("debug_{}.log", timestamp));
+    let session_log_path = logs_dir.join(format!("ids_session_{timestamp}.log"));
+    let debug_log_path = logs_dir.join(format!("debug_{timestamp}.log"));
 
     // Create console appender with colored output
     let stdout = ConsoleAppender::builder()
@@ -186,12 +186,12 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
     // This is okay because we already set up log4rs above
     if let Err(e) = LogWrapper::new(multi.clone(), env_logger).try_init() {
         // If we can't initialize the wrapper, ensure we have the right log level
-        eprintln!("Note: Progress bar integration may be limited: {}", e);
+        eprintln!("Note: Progress bar integration may be limited: {e}");
         log::set_max_level(log_level);
     }
 
     // Log that we've started
-    log::info!("Application started with output directory: {}", output_dir);
+    log::info!("Application started with output directory: {output_dir}");
     log::info!("Main log file: {}", main_log_path.display());
     log::info!("Session log file: {}", session_log_path.display());
     log::info!("Debug log file: {}", debug_log_path.display());

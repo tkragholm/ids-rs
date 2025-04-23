@@ -86,7 +86,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Family Size",
-            |covariate| covariate.family_size().map(|val| val as f64),
+            |covariate| covariate.family_size().map(f64::from),
         )?;
         results.add_summary(summary);
         results.add_missing_rate("Family Size".to_string(), missing_rates.0, missing_rates.1);
@@ -97,7 +97,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Municipality",
-            |covariate| covariate.municipality().map(|val| val as f64),
+            |covariate| covariate.municipality().map(f64::from),
         )?;
         results.add_summary(summary);
         results.add_missing_rate("Municipality".to_string(), missing_rates.0, missing_rates.1);
@@ -170,7 +170,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Age",
-            |covariate| covariate.age().map(|val| val as f64),
+            |covariate| covariate.age().map(f64::from),
         )?;
         results.add_summary(summary);
         results.add_missing_rate("Age".to_string(), missing_rates.0, missing_rates.1);
@@ -182,7 +182,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Demographics,
             "Children Count",
-            |covariate| covariate.children_count().map(|val| val as f64),
+            |covariate| covariate.children_count().map(f64::from),
         )?;
         results.add_summary(summary);
         results.add_missing_rate(
@@ -207,7 +207,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Income,
             "Income",
-            |covariate| covariate.income_amount(),
+            types::Covariate::income_amount,
         )?;
 
         results.add_summary(summary);
@@ -222,7 +222,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Income,
             "Wage Income",
-            |covariate| covariate.wage_income(),
+            types::Covariate::wage_income,
         )?;
 
         results.add_summary(summary);
@@ -235,7 +235,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Income,
             "Employment Status",
-            |covariate| covariate.employment_status().map(|val| val as f64),
+            |covariate| covariate.employment_status().map(f64::from),
         )?;
 
         results.add_summary(summary);
@@ -319,7 +319,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Education,
             "Education Years",
-            |covariate| covariate.education_years().map(|y| y as f64),
+            |covariate| covariate.education_years().map(f64::from),
         )?;
 
         results.add_summary(years_summary);
@@ -408,7 +408,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Occupation,
             "SOCIO",
-            |covariate| covariate.socio().map(|val| val as f64),
+            |covariate| covariate.socio().map(f64::from),
         )?;
 
         results.add_summary(socio_summary);
@@ -444,7 +444,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Occupation,
             "SOCIO02",
-            |covariate| covariate.socio02().map(|val| val as f64),
+            |covariate| covariate.socio02().map(f64::from),
         )?;
 
         results.add_summary(socio02_summary);
@@ -480,7 +480,7 @@ impl BalanceChecker {
             controls,
             CovariateType::Occupation,
             "Previous Socioeconomic Status",
-            |covariate| covariate.pre_socio().map(|val| val as f64),
+            |covariate| covariate.pre_socio().map(f64::from),
         )?;
 
         results.add_summary(pre_socio_summary);

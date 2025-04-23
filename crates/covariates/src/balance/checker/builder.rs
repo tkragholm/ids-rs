@@ -5,7 +5,7 @@ use types::{
     storage::{arrow::backend::ArrowBackend as ArrowStore, CovariateCache, ThreadSafeStore},
 };
 
-/// Builder for BalanceChecker with configurable settings
+/// Builder for `BalanceChecker` with configurable settings
 pub struct BalanceCheckerBuilder {
     store: Option<ArrowStore>,
     cache_capacity: usize,
@@ -29,25 +29,25 @@ impl BalanceCheckerBuilder {
         Self::default()
     }
 
-    /// Set the data store for the BalanceChecker
-    pub fn with_store(mut self, store: ArrowStore) -> Self {
+    /// Set the data store for the `BalanceChecker`
+    #[must_use] pub fn with_store(mut self, store: ArrowStore) -> Self {
         self.store = Some(store);
         self
     }
 
-    /// Set the cache capacity for the BalanceChecker
-    pub fn with_cache_capacity(mut self, capacity: usize) -> Self {
+    /// Set the cache capacity for the `BalanceChecker`
+    #[must_use] pub fn with_cache_capacity(mut self, capacity: usize) -> Self {
         self.cache_capacity = capacity;
         self
     }
 
-    /// Enable or disable debug mode for the BalanceChecker
-    pub fn with_debug_mode(mut self, debug: bool) -> Self {
+    /// Enable or disable debug mode for the `BalanceChecker`
+    #[must_use] pub fn with_debug_mode(mut self, debug: bool) -> Self {
         self.debug_mode = debug;
         self
     }
 
-    /// Build the BalanceChecker with the configured settings
+    /// Build the `BalanceChecker` with the configured settings
     ///
     /// # Errors
     ///

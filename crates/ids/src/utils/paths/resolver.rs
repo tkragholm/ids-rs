@@ -47,9 +47,9 @@ pub fn check_path_exists(path: &str, path_type: &str) -> bool {
     };
 
     if exists {
-        log::info!("Found {} at {} ({})", path_type, path, path_type_str);
+        log::info!("Found {path_type} at {path} ({path_type_str})");
     } else {
-        log::warn!("{} not found at {}", path_type, path);
+        log::warn!("{path_type} not found at {path}");
     }
     exists
 }

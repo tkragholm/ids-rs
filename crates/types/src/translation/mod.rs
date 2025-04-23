@@ -29,8 +29,7 @@ impl TranslationMaps {
             }
             Err(e) => {
                 log::warn!(
-                    "Failed to load translation maps from files: {}. Using embedded maps instead.",
-                    e
+                    "Failed to load translation maps from files: {e}. Using embedded maps instead."
                 );
                 Ok(Self::load_embedded())
             }
@@ -170,7 +169,7 @@ fn parse_embedded_json(json_str: &str) -> HashMap<String, String> {
     match serde_json::from_str(json_str) {
         Ok(map) => map,
         Err(e) => {
-            log::error!("Failed to parse embedded JSON: {}", e);
+            log::error!("Failed to parse embedded JSON: {e}");
             HashMap::new()
         }
     }
@@ -178,7 +177,7 @@ fn parse_embedded_json(json_str: &str) -> HashMap<String, String> {
 
 fn load_translation_map(path: &str) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
     // Log the attempted path
-    log::info!("Loading translation map from path: {}", path);
+    log::info!("Loading translation map from path: {path}");
 
     // Try locations in order of priority:
     // 1. Check if there's an environment variable specifying mappings directory
@@ -206,7 +205,7 @@ fn load_translation_map(path: &str) -> Result<HashMap<String, String>, Box<dyn s
     let file_result = File::open(Path::new(path));
 
     if let Err(ref e) = file_result {
-        log::warn!("Failed to open translation map at {}: {}", path, e);
+        log::warn!("Failed to open translation map at {path}: {e}");
 
         // Try with current directory
         let current_dir = std::env::current_dir()?;

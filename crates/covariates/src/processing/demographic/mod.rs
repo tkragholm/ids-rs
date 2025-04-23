@@ -12,7 +12,7 @@ pub struct DemographicsProcessor {
 
 impl DemographicsProcessor {
     /// Create a new demographics processor
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             name: "Demographics".to_string(),
         }
@@ -53,7 +53,7 @@ impl CovariateProcessor for DemographicsProcessor {
         }
 
         // Example implementation for age
-        covariate.age().map(|age| age as f64)
+        covariate.age().map(f64::from)
     }
 
     fn process_categorical(&self, covariate: &Covariate) -> Option<String> {

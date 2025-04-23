@@ -12,7 +12,7 @@ pub struct EducationProcessor {
 
 impl EducationProcessor {
     /// Create a new education processor
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             name: "Education".to_string(),
         }
@@ -48,7 +48,7 @@ impl CovariateProcessor for EducationProcessor {
         }
 
         // Example implementation for education years
-        covariate.education_years().map(|years| years as f64)
+        covariate.education_years().map(f64::from)
     }
 
     fn process_categorical(&self, covariate: &Covariate) -> Option<String> {

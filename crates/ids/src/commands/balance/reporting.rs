@@ -45,7 +45,7 @@ pub fn generate_all_reports(
     let report = ComprehensiveReport::new(balance_result.clone());
     if let Err(e) = report.save_to_files(&report_dir) {
         ConsoleOutput::error(&format!("Failed to generate report files: {e}"));
-        error!("Failed to generate report files: {}", e);
+        error!("Failed to generate report files: {e}");
     } else {
         ConsoleOutput::success(&format!(
             "Comprehensive report saved to {}",
@@ -57,7 +57,7 @@ pub fn generate_all_reports(
     let plots_dir = Path::new(config.output_dir).join("plots");
     if let Err(e) = report.generate_plots(&plots_dir) {
         ConsoleOutput::error(&format!("Failed to generate plots: {e}"));
-        error!("Failed to generate plots: {}", e);
+        error!("Failed to generate plots: {e}");
     } else {
         ConsoleOutput::success(&format!("Plots generated in {}", plots_dir.display()));
     }

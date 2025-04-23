@@ -25,7 +25,7 @@ impl Default for BalanceResults {
 }
 
 impl BalanceResults {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             summaries: Vec::new(),
             missing_data_rates: HashMap::new(),
@@ -46,7 +46,7 @@ impl BalanceResults {
         self.matched_pair_details.push(detail);
     }
 
-    /// Combine another BalanceResults into this one
+    /// Combine another `BalanceResults` into this one
     pub fn combine(&mut self, other: BalanceResults) {
         // Add all summaries
         self.summaries.extend(other.summaries);

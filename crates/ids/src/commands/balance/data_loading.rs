@@ -116,7 +116,7 @@ pub fn setup_data_paths(
         base.to_string()
     } else if has_custom_paths {
         ConsoleOutput::warning("No base covariate directory specified, using custom paths only");
-        "".to_string()
+        String::new()
     } else {
         ConsoleOutput::error("No covariate directory or custom paths specified");
         return Err(crate::core::IdsError::config(
@@ -172,7 +172,7 @@ pub fn load_register_data(
         Err(e) => {
             ConsoleOutput::error(&format!("Failed to load register data: {e}"));
             ConsoleOutput::warning("Will continue in diagnostic mode with limited functionality");
-            error!("Failed to load register data: {}", e);
+            error!("Failed to load register data: {e}");
 
             // Create a diagnostic mode store with no data
             use crate::diagnostic::BalanceCheckerDiagnostic;
@@ -192,7 +192,7 @@ pub fn load_register_data(
         "Register data loaded in {}",
         format_duration_short(load_time)
     ));
-    info!("Register data loaded in {:?}", load_time);
+    info!("Register data loaded in {load_time:?}");
 
     Ok(store)
 }

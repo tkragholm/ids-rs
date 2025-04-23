@@ -21,7 +21,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
     let is_family = register_type == "family";
 
     // Log the input path
-    log::debug!("Normalizing {} path: {}", register_type, path);
+    log::debug!("Normalizing {register_type} path: {path}");
 
     // Special handling for family files to make them more robust
     if is_family {
@@ -32,7 +32,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
         let mut family_path = path.to_string();
         if !family_path.ends_with(".parquet") {
             family_path = format!("{family_path}.parquet");
-            log::debug!("Added .parquet extension to family path: {}", family_path);
+            log::debug!("Added .parquet extension to family path: {family_path}");
         }
 
         let family_obj = Path::new(&family_path);
@@ -41,7 +41,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
         if family_obj.is_absolute() {
             let exists = check_path_exists(&family_path, "family file (absolute)");
             if exists {
-                log::info!("Found family file at absolute path: {}", family_path);
+                log::info!("Found family file at absolute path: {family_path}");
                 return family_path;
             }
         }
@@ -54,8 +54,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
         let exists = check_path_exists(&relative_str, "family file (relative to current dir)");
         if exists {
             log::info!(
-                "Found family file relative to current dir: {}",
-                relative_str
+                "Found family file relative to current dir: {relative_str}"
             );
             return relative_str;
         }
@@ -70,7 +69,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
 
                 let exists = check_path_exists(&cov_str, "family file (in base dir)");
                 if exists {
-                    log::info!("Found family file in base dir: {}", cov_str);
+                    log::info!("Found family file in base dir: {cov_str}");
                     return cov_str;
                 }
             }
@@ -87,29 +86,26 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
     // Standard handling for non-family register directories
     if path_obj.is_absolute() {
         // If the path is absolute, use it as-is
-        log::debug!("Using absolute path for {}: {}", register_type, path);
+        log::debug!("Using absolute path for {register_type}: {path}");
         let _ = check_path_exists(path, &format!("{register_type} (absolute)"));
         path.to_string()
     } else if let Some(base) = base_dir {
         // Check if the path already starts with the base_dir to avoid duplication
         if path.contains(base) {
-            log::debug!("Path already contains base_dir ({}): {}", base, path);
+            log::debug!("Path already contains base_dir ({base}): {path}");
             let _ = check_path_exists(path, &format!("{register_type} (with base_dir)"));
             path.to_string()
         } else {
             let full_path = Path::new(base).join(path).to_string_lossy().to_string();
             log::debug!(
-                "Combining base_dir and path: {} + {} -> {}",
-                base,
-                path,
-                full_path
+                "Combining base_dir and path: {base} + {path} -> {full_path}"
             );
             let _ = check_path_exists(&full_path, &format!("{register_type} (combined)"));
             full_path
         }
     } else {
         // No base directory provided, use the path as-is
-        log::debug!("Using path as-is (no base directory): {}", path);
+        log::debug!("Using path as-is (no base directory): {path}");
         let _ = check_path_exists(path, register_type);
         path.to_string()
     }

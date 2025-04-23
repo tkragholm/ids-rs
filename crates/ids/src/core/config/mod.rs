@@ -57,6 +57,6 @@ impl Default for EnvironmentVariables {
 }
 
 /// Load environment variables and return configured settings
-pub fn load_environment_config() -> EnvironmentVariables {
+#[must_use] pub fn load_environment_config() -> EnvironmentVariables {
     EnvironmentVariables::default()
 }

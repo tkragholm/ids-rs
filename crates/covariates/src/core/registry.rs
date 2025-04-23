@@ -17,7 +17,7 @@ pub struct CovariateProcessorRegistry {
 
 impl CovariateProcessorRegistry {
     /// Create a new registry with all standard processors
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         let mut registry = Self {
             processors: HashMap::new(),
         };
@@ -32,12 +32,12 @@ impl CovariateProcessorRegistry {
     }
 
     /// Create a new registry from configuration
-    pub fn from_config(config: CovariatesConfig) -> Self {
+    #[must_use] pub fn from_config(config: CovariatesConfig) -> Self {
         Self::from_config_with_translations(config, None)
     }
 
     /// Create a new registry from configuration with translation maps
-    pub fn from_config_with_translations(
+    #[must_use] pub fn from_config_with_translations(
         config: CovariatesConfig,
         translation_maps: Option<TranslationMaps>,
     ) -> Self {
@@ -59,7 +59,7 @@ impl CovariateProcessorRegistry {
             }
             Err(e) => {
                 // Log the error but continue with empty registry
-                log::warn!("Failed to create processors: {}", e);
+                log::warn!("Failed to create processors: {e}");
             }
         }
 
@@ -73,22 +73,22 @@ impl CovariateProcessorRegistry {
     }
 
     /// Get a processor by covariate type
-    pub fn get(&self, covariate_type: CovariateType) -> Option<&dyn CovariateProcessor> {
-        self.processors.get(&covariate_type).map(|p| p.as_ref())
+    #[must_use] pub fn get(&self, covariate_type: CovariateType) -> Option<&dyn CovariateProcessor> {
+        self.processors.get(&covariate_type).map(std::convert::AsRef::as_ref)
     }
 
     /// Get all registered processors
-    pub fn get_all(&self) -> Vec<&dyn CovariateProcessor> {
-        self.processors.values().map(|p| p.as_ref()).collect()
+    #[must_use] pub fn get_all(&self) -> Vec<&dyn CovariateProcessor> {
+        self.processors.values().map(std::convert::AsRef::as_ref).collect()
     }
 
     /// Get all covariate types
-    pub fn get_all_types(&self) -> Vec<CovariateType> {
+    #[must_use] pub fn get_all_types(&self) -> Vec<CovariateType> {
         self.processors.keys().copied().collect()
     }
 
     /// Get all processors for a specific covariate type
-    pub fn get_processors_for_type(
+    #[must_use] pub fn get_processors_for_type(
         &self,
         covariate_type: CovariateType,
     ) -> Vec<&dyn CovariateProcessor> {

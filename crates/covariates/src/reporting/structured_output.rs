@@ -52,7 +52,7 @@ impl StructuredOutputManager {
 
         for dir in &dirs {
             fs::create_dir_all(dir).map_err(|e| {
-                IdsError::io_error(format!("Failed to create directory {:?}: {}", dir, e))
+                IdsError::io_error(format!("Failed to create directory {dir:?}: {e}"))
             })?;
         }
 
@@ -73,7 +73,7 @@ impl StructuredOutputManager {
     }
 
     /// Enable debug mode with more detailed output
-    pub fn with_debug_mode(mut self, debug: bool) -> Self {
+    #[must_use] pub fn with_debug_mode(mut self, debug: bool) -> Self {
         self.debug_mode = debug;
         self
     }
@@ -85,7 +85,7 @@ impl StructuredOutputManager {
     }
 
     /// Get the path to the specified output directory
-    pub fn get_dir_path(&self, dir_type: OutputDirType) -> PathBuf {
+    #[must_use] pub fn get_dir_path(&self, dir_type: OutputDirType) -> PathBuf {
         match dir_type {
             OutputDirType::Base => self.base_dir.clone(),
             OutputDirType::Report => self.report_dir.clone(),
@@ -112,7 +112,7 @@ impl StructuredOutputManager {
         let prefix = filename_prefix.unwrap_or("balance");
 
         // Output covariate balance
-        let covariate_path = balance_dir.join(format!("{}_covariate_balance.csv", prefix));
+        let covariate_path = balance_dir.join(format!("{prefix}_covariate_balance.csv"));
         self.write_csv_data(
             &covariate_path,
             "Variable,Mean (Cases),Mean (Controls),Standardized Difference,Variance Ratio",
@@ -129,17 +129,17 @@ impl StructuredOutputManager {
         )?;
 
         // Output missing data rates
-        let missing_path = balance_dir.join(format!("{}_missing_data_rates.csv", prefix));
+        let missing_path = balance_dir.join(format!("{prefix}_missing_data_rates.csv"));
         let missing_header = "Variable,Case Missing Rate,Control Missing Rate";
         let missing_rates: Vec<String> = results
             .missing_data_rates
             .iter()
-            .map(|(var, (case_rate, ctrl_rate))| format!("{},{},{}", var, case_rate, ctrl_rate))
+            .map(|(var, (case_rate, ctrl_rate))| format!("{var},{case_rate},{ctrl_rate}"))
             .collect();
         self.write_csv_data(&missing_path, missing_header, &missing_rates)?;
 
         // Generate standardized difference statistics
-        let std_diff_path = balance_dir.join(format!("{}_std_differences.csv", prefix));
+        let std_diff_path = balance_dir.join(format!("{prefix}_std_differences.csv"));
         let std_diff_header = "Variable,Min,Max,Mean,StdDev,AbsMean";
         let mut var_stats: HashMap<String, Vec<f64>> = HashMap::new();
 
@@ -156,7 +156,7 @@ impl StructuredOutputManager {
             .iter()
             .map(|(var, values)| {
                 if values.is_empty() {
-                    return format!("{},0.0,0.0,0.0,0.0,0.0", var);
+                    return format!("{var},0.0,0.0,0.0,0.0,0.0");
                 }
 
                 let sum: f64 = values.iter().sum();
@@ -168,8 +168,8 @@ impl StructuredOutputManager {
                 format!(
                     "{},{},{},{},{},{}",
                     var,
-                    values.iter().cloned().fold(f64::INFINITY, f64::min),
-                    values.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                    values.iter().copied().fold(f64::INFINITY, f64::min),
+                    values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
                     mean,
                     std_dev,
                     abs_mean
@@ -196,7 +196,7 @@ impl StructuredOutputManager {
         let prefix = filename_prefix.unwrap_or("matching");
 
         // Main matched pairs CSV
-        let pairs_path = matching_dir.join(format!("{}_pairs.csv", prefix));
+        let pairs_path = matching_dir.join(format!("{prefix}_pairs.csv"));
         let pairs_header = "case_id,case_pnr,case_birth_date,case_treatment_date,control_id,control_pnr,control_birth_date,birth_date_diff_days,mother_age_diff_days,father_age_diff_days";
 
         let pairs_data: Vec<String> = matched_pairs
@@ -223,7 +223,7 @@ impl StructuredOutputManager {
         self.write_csv_data(&pairs_path, pairs_header, &pairs_data)?;
 
         // Matching statistics
-        let stats_path = matching_dir.join(format!("{}_stats.csv", prefix));
+        let stats_path = matching_dir.join(format!("{prefix}_stats.csv"));
         let stats_header =
             "case_id,n_controls,avg_birth_diff,max_birth_diff,avg_mother_diff,avg_father_diff";
 
@@ -453,7 +453,7 @@ impl StructuredOutputManager {
         );
 
         fs::write(&index_path, html_content)
-            .map_err(|e| IdsError::io_error(format!("Failed to write index.html: {}", e)))?;
+            .map_err(|e| IdsError::io_error(format!("Failed to write index.html: {e}")))?;
 
         Ok(())
     }
@@ -467,7 +467,7 @@ impl StructuredOutputManager {
     ) -> Result<(), IdsError> {
         let content = format!("{}\n{}", header, data.join("\n"));
         fs::write(path, content)
-            .map_err(|e| IdsError::io_error(format!("Failed to write CSV data: {}", e)))
+            .map_err(|e| IdsError::io_error(format!("Failed to write CSV data: {e}")))
     }
 
     /// Generate a detailed HTML report for balance analysis
@@ -478,7 +478,7 @@ impl StructuredOutputManager {
     ) -> Result<(), IdsError> {
         let report_dir = self.get_dir_path(OutputDirType::Report);
         let prefix = filename_prefix.unwrap_or("balance");
-        let report_path = report_dir.join(format!("{}_report.html", prefix));
+        let report_path = report_dir.join(format!("{prefix}_report.html"));
 
         // Group variables by category
         let mut demographic_rows = String::new();
@@ -555,7 +555,7 @@ impl StructuredOutputManager {
             ),
         ]
         .iter()
-        .cloned()
+        .copied()
         .collect();
 
         for summary in &results.summaries {
@@ -655,11 +655,11 @@ impl StructuredOutputManager {
         let mut missing_data_rows = String::new();
         for (var, (case_rate, ctrl_rate)) in &results.missing_data_rates {
             missing_data_rows.push_str(&format!(
-                r#"<tr>
+                r"<tr>
                     <td>{}</td>
                     <td>{:.2}%</td>
                     <td>{:.2}%</td>
-                </tr>"#,
+                </tr>",
                 var,
                 case_rate * 100.0,
                 ctrl_rate * 100.0
@@ -847,7 +847,7 @@ impl StructuredOutputManager {
         );
 
         fs::write(&report_path, html_content).map_err(|e| {
-            IdsError::io_error(format!("Failed to write balance HTML report: {}", e))
+            IdsError::io_error(format!("Failed to write balance HTML report: {e}"))
         })?;
 
         Ok(())
@@ -861,7 +861,7 @@ impl StructuredOutputManager {
     ) -> Result<(), IdsError> {
         let report_dir = self.get_dir_path(OutputDirType::Report);
         let prefix = filename_prefix.unwrap_or("matching");
-        let report_path = report_dir.join(format!("{}_report.html", prefix));
+        let report_path = report_dir.join(format!("{prefix}_report.html"));
 
         // Generate summary statistics
         let total_cases = matched_pairs.len();
@@ -878,19 +878,19 @@ impl StructuredOutputManager {
 
         // Calculate birth date difference statistics
         let mut birth_diffs: Vec<i64> = Vec::new();
-        for record in matched_pairs.iter() {
+        for record in matched_pairs {
             for control in &record.controls {
                 birth_diffs.push(control.birth_date_diff);
             }
         }
 
-        let avg_birth_diff = if !birth_diffs.is_empty() {
-            birth_diffs.iter().sum::<i64>() as f64 / birth_diffs.len() as f64
-        } else {
+        let avg_birth_diff = if birth_diffs.is_empty() {
             0.0
+        } else {
+            birth_diffs.iter().sum::<i64>() as f64 / birth_diffs.len() as f64
         };
 
-        let max_birth_diff = birth_diffs.iter().cloned().max().unwrap_or(0);
+        let max_birth_diff = birth_diffs.iter().copied().max().unwrap_or(0);
 
         // Generate case summary rows
         let mut case_summary_rows = String::new();
@@ -908,13 +908,13 @@ impl StructuredOutputManager {
             };
 
             case_summary_rows.push_str(&format!(
-                r#"<tr>
+                r"<tr>
                     <td>{}</td>
                     <td>{}</td>
                     <td>{}</td>
                     <td>{}</td>
                     <td>{}</td>
-                </tr>"#,
+                </tr>",
                 record.case_id,
                 record.case_pnr,
                 record.case_birth_date,
@@ -1123,7 +1123,7 @@ impl StructuredOutputManager {
         );
 
         fs::write(&report_path, html_content).map_err(|e| {
-            IdsError::io_error(format!("Failed to write matching HTML report: {}", e))
+            IdsError::io_error(format!("Failed to write matching HTML report: {e}"))
         })?;
 
         Ok(())
@@ -1238,7 +1238,7 @@ impl StructuredOutputManager {
         );
 
         fs::write(&report_path, html_content).map_err(|e| {
-            IdsError::io_error(format!("Failed to write data quality HTML report: {}", e))
+            IdsError::io_error(format!("Failed to write data quality HTML report: {e}"))
         })?;
 
         Ok(())

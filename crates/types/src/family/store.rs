@@ -44,7 +44,7 @@ impl FamilyStore {
         self.relations.insert(relation.pnr.clone(), relation);
     }
 
-    /// Load family relations from a set of Arrow RecordBatches
+    /// Load family relations from a set of Arrow `RecordBatches`
     pub fn load_family_relations(&mut self, batches: Vec<RecordBatch>) -> Result<(), IdsError> {
         for batch in batches {
             self.process_batch(&batch)?;
@@ -115,8 +115,7 @@ impl FamilyStore {
             // Use the new safe method
             NaiveDate::from_num_days_from_ce_opt(days_since_epoch).ok_or_else(|| {
                 IdsError::data_loading(format!(
-                    "Could not convert {} days since epoch to date",
-                    days_since_epoch
+                    "Could not convert {days_since_epoch} days since epoch to date"
                 ))
             })
         }

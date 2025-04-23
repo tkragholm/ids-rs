@@ -14,7 +14,7 @@ pub fn create_progress_style(covariate_type: CovariateType) -> ProgressStyle {
         .with_key(
             "covariate_type",
             move |_state: &indicatif::ProgressState, w: &mut dyn std::fmt::Write| {
-                write!(w, "{:?}", covariate_type).unwrap()
+                write!(w, "{covariate_type:?}").unwrap();
             },
         )
 }

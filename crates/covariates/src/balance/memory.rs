@@ -207,7 +207,7 @@ impl MemoryManager {
     pub fn get_prefetch_batch_size(&self) -> usize {
         let base_size = 10_000;
         let tier_factor = self.tier.batch_size_factor();
-        (base_size as f64 * tier_factor) as usize
+        (f64::from(base_size) * tier_factor) as usize
     }
 
     /// Get the optimal chunk size for processing based on total items and memory tier
@@ -233,18 +233,18 @@ impl MemoryManager {
         // Update total allocated memory
         self.allocated_memory.fetch_add(size, Ordering::SeqCst);
 
-        debug!("Tracked allocation: {} ({} bytes)", id, size);
+        debug!("Tracked allocation: {id} ({size} bytes)");
 
         // Return a guard that will automatically untrack on drop
         MemoryGuard {
-            manager: Arc::new(self as *const MemoryManager as usize),
+            manager: Arc::new(std::ptr::from_ref::<MemoryManager>(self) as usize),
             id: allocation_id,
             size,
             start_time: Instant::now(),
         }
     }
 
-    /// Internal method used by MemoryGuard to untrack an allocation on drop
+    /// Internal method used by `MemoryGuard` to untrack an allocation on drop
     fn untrack_allocation(&self, id: &str, size: usize) {
         // Update allocation tracking
         {
@@ -255,7 +255,7 @@ impl MemoryManager {
         // Update total allocated memory
         self.allocated_memory.fetch_sub(size, Ordering::SeqCst);
 
-        debug!("Untracked allocation: {} ({} bytes)", id, size);
+        debug!("Untracked allocation: {id} ({size} bytes)");
     }
 }
 
@@ -284,17 +284,17 @@ pub struct MemoryGuard {
 
 impl MemoryGuard {
     /// Create a new memory guard
-    pub fn new(id: &str, size: usize) -> Self {
+    #[must_use] pub fn new(id: &str, size: usize) -> Self {
         memory_manager().track_allocation(id, size)
     }
 
     /// Get the size of this allocation
-    pub fn size(&self) -> usize {
+    #[must_use] pub fn size(&self) -> usize {
         self.size
     }
 
     /// Get the elapsed time since this allocation was created
-    pub fn elapsed(&self) -> std::time::Duration {
+    #[must_use] pub fn elapsed(&self) -> std::time::Duration {
         self.start_time.elapsed()
     }
 }

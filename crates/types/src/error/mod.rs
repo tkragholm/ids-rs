@@ -545,7 +545,7 @@ impl IdsError {
     }
 }
 
-/// Type alias for Result with IdsError
+/// Type alias for Result with `IdsError`
 pub type Result<T> = std::result::Result<T, IdsError>;
 
 /// Enhanced error handling with better context support
@@ -578,7 +578,7 @@ pub type Result<T> = std::result::Result<T, IdsError>;
 /// }
 /// ```
 ///
-/// ## Converting to IdsError
+/// ## Converting to `IdsError`
 /// ```
 /// use types::error::{Result, IdsError};
 /// use anyhow::Context;
@@ -605,7 +605,7 @@ pub mod prelude {
     // Re-export macros defined at crate root
     pub use crate::{bail, ensure, try_with_context};
 
-    /// Re-export color_eyre's WrapErr trait for better error messages
+    /// Re-export `color_eyre`'s `WrapErr` trait for better error messages
     pub use color_eyre::eyre::WrapErr;
 
     /// Setup function to initialize color-eyre for pretty error reports

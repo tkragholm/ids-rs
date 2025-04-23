@@ -28,7 +28,7 @@ pub struct BalanceChecker {
 }
 
 impl BalanceChecker {
-    /// Creates a new BalanceChecker with the provided data store
+    /// Creates a new `BalanceChecker` with the provided data store
     #[must_use]
     pub fn new(store: ArrowStore) -> Self {
         Self {
@@ -39,8 +39,8 @@ impl BalanceChecker {
         }
     }
 
-    /// Returns a builder for creating a BalanceChecker with custom settings
-    pub fn builder() -> BalanceCheckerBuilder {
+    /// Returns a builder for creating a `BalanceChecker` with custom settings
+    #[must_use] pub fn builder() -> BalanceCheckerBuilder {
         BalanceCheckerBuilder::new()
     }
 
@@ -89,7 +89,7 @@ impl BalanceChecker {
         self.cache.len()
     }
 
-    /// Alias for cache_size for backward compatibility
+    /// Alias for `cache_size` for backward compatibility
     pub fn cache_len(&self) -> usize {
         self.cache.len()
     }
@@ -143,7 +143,7 @@ impl BalanceChecker {
         summaries
             .into_iter()
             .map(|(var, (sum, sum_sq, n))| {
-                let n = n as f64;
+                let n = f64::from(n);
                 let mean = sum / n;
                 let variance = (sum_sq / n) - mean.powi(2);
                 (var, (mean, variance.sqrt(), n))

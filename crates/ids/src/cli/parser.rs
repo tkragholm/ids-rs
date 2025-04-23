@@ -14,7 +14,7 @@ use crate::cli::types::Cli;
 ///
 /// # Panics
 /// * If command line parsing fails (with helpful error messages)
-pub fn parse_cli_args() -> Cli {
+#[must_use] pub fn parse_cli_args() -> Cli {
     // Check for the most common command line mistake - missing space after --family-file
     for arg in std::env::args() {
         if arg.starts_with("--family-file") && arg != "--family-file" {

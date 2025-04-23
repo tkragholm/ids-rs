@@ -12,7 +12,7 @@ pub struct CovariateSummary {
 }
 
 impl CovariateSummary {
-    pub fn new(
+    #[must_use] pub fn new(
         variable: String,
         mean_cases: f64,
         mean_controls: f64,
@@ -28,7 +28,7 @@ impl CovariateSummary {
         }
     }
 
-    pub fn is_balanced(&self, threshold: f64) -> bool {
+    #[must_use] pub fn is_balanced(&self, threshold: f64) -> bool {
         self.std_diff.abs() <= threshold
     }
 }
@@ -45,7 +45,7 @@ pub struct MatchedPairDetail {
 }
 
 impl MatchedPairDetail {
-    pub fn new(
+    #[must_use] pub fn new(
         case_pnr: String,
         control_pnrs: Vec<String>,
         treatment_date: NaiveDate,
@@ -65,7 +65,7 @@ impl MatchedPairDetail {
         }
     }
 
-    pub fn calculate_std_diff(case_value: f64, control_value: f64) -> f64 {
+    #[must_use] pub fn calculate_std_diff(case_value: f64, control_value: f64) -> f64 {
         let pooled_var = (case_value.powi(2) + control_value.powi(2)) / 2.0;
         if pooled_var == 0.0 {
             0.0

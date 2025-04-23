@@ -7,10 +7,10 @@ use crate::error::{IdsError, Result};
 /// This trait provides common operations for working with dates,
 /// with consistent error handling.
 pub trait DateHelpers {
-    /// Convert to NaiveDate
+    /// Convert to `NaiveDate`
     ///
     /// # Returns
-    /// * `Result<NaiveDate>` - The date as a NaiveDate or an error
+    /// * `Result<NaiveDate>` - The date as a `NaiveDate` or an error
     ///
     /// # Errors
     /// Returns an error if the conversion fails
@@ -22,7 +22,7 @@ pub trait DateHelpers {
     /// * `Result<i32>` - The year as an i32 or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn year(&self) -> Result<i32>;
 
     /// Calculate age at a reference date
@@ -35,7 +35,7 @@ pub trait DateHelpers {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - The conversion to NaiveDate fails
+    /// - The conversion to `NaiveDate` fails
     /// - The calculation yields an invalid age (e.g., negative)
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32>;
 
@@ -48,7 +48,7 @@ pub trait DateHelpers {
     /// * `Result<bool>` - True if the date is in the specified year, false otherwise
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn is_in_year(&self, year: i32) -> Result<bool>;
 
     /// Get month from date
@@ -57,7 +57,7 @@ pub trait DateHelpers {
     /// * `Result<u32>` - The month as a u32 (1-12) or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn month(&self) -> Result<u32>;
 
     /// Get day from date
@@ -66,7 +66,7 @@ pub trait DateHelpers {
     /// * `Result<u32>` - The day as a u32 (1-31) or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn day(&self) -> Result<u32>;
 
     /// Get the quarter (1-4) for this date
@@ -75,32 +75,32 @@ pub trait DateHelpers {
     /// * `Result<u32>` - The quarter (1-4) or an error
     ///
     /// # Errors
-    /// Returns an error if the conversion to NaiveDate fails
+    /// Returns an error if the conversion to `NaiveDate` fails
     fn quarter(&self) -> Result<u32> {
         Ok(((self.month()? - 1) / 3) + 1)
     }
 }
 
-/// Implementation of DateHelpers for i32 (days since epoch)
+/// Implementation of `DateHelpers` for i32 (days since epoch)
 ///
 /// This implementation safely converts an integer representing days since the Common Era
-/// into a NaiveDate, using the safer `from_num_days_from_ce_opt` method
+/// into a `NaiveDate`, using the safer `from_num_days_from_ce_opt` method
 /// that returns an Option rather than panicking.
 impl DateHelpers for i32 {
-    /// Convert days since epoch to NaiveDate
+    /// Convert days since epoch to `NaiveDate`
     ///
     /// # Returns
-    /// * `Result<NaiveDate>` - The date as a NaiveDate or an error
+    /// * `Result<NaiveDate>` - The date as a `NaiveDate` or an error
     ///
     /// # Errors
-    /// Returns a date_conversion error if the integer value doesn't represent a valid date
+    /// Returns a `date_conversion` error if the integer value doesn't represent a valid date
     ///
     /// # Safety
-    /// Uses the non-panicking from_num_days_from_ce_opt method rather than the deprecated
-    /// from_num_days_from_ce method for improved safety.
+    /// Uses the non-panicking `from_num_days_from_ce_opt` method rather than the deprecated
+    /// `from_num_days_from_ce` method for improved safety.
     fn to_naive_date(&self) -> Result<NaiveDate> {
         NaiveDate::from_num_days_from_ce_opt(*self)
-            .ok_or_else(|| IdsError::date_conversion(format!("Invalid days since epoch: {}", self)))
+            .ok_or_else(|| IdsError::date_conversion(format!("Invalid days since epoch: {self}")))
     }
 
     fn year(&self) -> Result<i32> {
@@ -113,8 +113,7 @@ impl DateHelpers for i32 {
 
         if birth_date > *reference_date {
             return Err(IdsError::invalid_value(format!(
-                "Birth date ({}) is after reference date ({})",
-                birth_date, reference_date
+                "Birth date ({birth_date}) is after reference date ({reference_date})"
             )));
         }
 
@@ -146,7 +145,7 @@ impl DateHelpers for i32 {
     }
 }
 
-/// Implementation of DateHelpers for NaiveDate directly
+/// Implementation of `DateHelpers` for `NaiveDate` directly
 impl DateHelpers for NaiveDate {
     fn to_naive_date(&self) -> Result<NaiveDate> {
         Ok(*self)
@@ -159,8 +158,7 @@ impl DateHelpers for NaiveDate {
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32> {
         if self > reference_date {
             return Err(IdsError::invalid_value(format!(
-                "Birth date ({}) is after reference date ({})",
-                self, reference_date
+                "Birth date ({self}) is after reference date ({reference_date})"
             )));
         }
 
@@ -190,7 +188,7 @@ impl DateHelpers for NaiveDate {
     }
 }
 
-/// Implementation of DateHelpers for Option<i32>
+/// Implementation of `DateHelpers` for Option<i32>
 impl DateHelpers for Option<i32> {
     fn to_naive_date(&self) -> Result<NaiveDate> {
         match self {
@@ -235,7 +233,7 @@ impl DateHelpers for Option<i32> {
     }
 }
 
-/// Implementation of DateHelpers for Option<NaiveDate>
+/// Implementation of `DateHelpers` for Option<NaiveDate>
 impl DateHelpers for Option<NaiveDate> {
     fn to_naive_date(&self) -> Result<NaiveDate> {
         match self {

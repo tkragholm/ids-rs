@@ -89,7 +89,7 @@ pub trait ArrowAccess {
 /// Extension trait for Arrow access with convenience methods
 ///
 /// This trait provides additional utility methods that build on top of
-/// the core ArrowAccess trait.
+/// the core `ArrowAccess` trait.
 pub trait ArrowAccessExt: ArrowAccess {
     /// Get a slice of values from a column
     ///
@@ -185,7 +185,7 @@ impl<T: ArrowAccess> ArrowAccessExt for T {
     }
 }
 
-/// Implementation of ArrowAccess for RecordBatch
+/// Implementation of `ArrowAccess` for `RecordBatch`
 impl ArrowAccess for RecordBatch {
     fn get_value<T: ArrowType>(&self, column: &str, row: usize) -> Result<T> {
         let column = self.get_column(column)?;
@@ -200,8 +200,7 @@ impl ArrowAccess for RecordBatch {
 
         T::from_array(&column, row).ok_or_else(|| {
             IdsError::type_conversion(format!(
-                "Failed to convert value at row {} to requested type",
-                row
+                "Failed to convert value at row {row} to requested type"
             ))
         })
     }
@@ -223,8 +222,7 @@ impl ArrowAccess for RecordBatch {
 
         Ok(Some(T::from_array(&column, row).ok_or_else(|| {
             IdsError::type_conversion(format!(
-                "Failed to convert value at row {} in column to requested type",
-                row
+                "Failed to convert value at row {row} in column to requested type"
             ))
         })?))
     }
@@ -253,13 +251,13 @@ impl ArrowAccess for RecordBatch {
         let idx = self
             .schema()
             .index_of(column)
-            .map_err(|_| IdsError::column_not_found(format!("Column '{}' not found", column)))?;
+            .map_err(|_| IdsError::column_not_found(format!("Column '{column}' not found")))?;
 
         Ok(Arc::clone(self.column(idx)))
     }
 }
 
-/// Implementation of ArrowAccess for RecordBatch reference
+/// Implementation of `ArrowAccess` for `RecordBatch` reference
 impl ArrowAccess for &RecordBatch {
     fn get_value<T: ArrowType>(&self, column: &str, row: usize) -> Result<T> {
         (*self).get_value(column, row)

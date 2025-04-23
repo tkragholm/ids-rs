@@ -53,7 +53,7 @@
 //! - `arrow-integration` - Integration with Apache Arrow (enabled by default)
 //! - `serde-support` - Serialization/deserialization via serde (enabled by default)
 //! - `chrono-nightly` - Enables nightly chrono features for improved date handling
-//! - `polars-integration` - Integration with the polars DataFrame library
+//! - `polars-integration` - Integration with the polars `DataFrame` library
 //! - `logging` - Logging functionality (enabled by default)
 
 // Core public modules

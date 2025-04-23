@@ -4,11 +4,11 @@
 //! for various components of the system, including:
 //!
 //! - **Store**: Core trait for data storage and retrieval
-//! - **FamilyAccess**: Trait for accessing family relations
-//! - **CovariateProcessor**: Trait for processing covariates
-//! - **DateHelpers**: Trait for date handling utilities
+//! - **`FamilyAccess`**: Trait for accessing family relations
+//! - **`CovariateProcessor`**: Trait for processing covariates
+//! - **`DateHelpers`**: Trait for date handling utilities
 //! - **Cacheable**: Trait for cacheable objects
-//! - **TimeVaryingAccess**: Trait for accessing time-varying data
+//! - **`TimeVaryingAccess`**: Trait for accessing time-varying data
 //!
 //! These traits allow for loose coupling between components and enable
 //! alternative implementations of key functionality.
@@ -115,7 +115,7 @@ pub trait Store: Send + Sync {
     ///
     /// # Returns
     ///
-    /// A Result containing a HashMap of covariates indexed by type,
+    /// A Result containing a `HashMap` of covariates indexed by type,
     /// or an error if retrieval failed.
     fn covariates(
         &mut self,
@@ -147,7 +147,7 @@ pub trait Store: Send + Sync {
     ///
     /// # Returns
     ///
-    /// A Result containing an Option of a HashMap of covariates indexed by type,
+    /// A Result containing an Option of a `HashMap` of covariates indexed by type,
     /// or an error if retrieval failed. The Option will be None if the person has
     /// no family relations or if no covariates exist for the family.
     fn family_covariates(

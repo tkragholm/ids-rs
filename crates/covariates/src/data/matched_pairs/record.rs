@@ -34,11 +34,11 @@ where
 }
 
 impl MatchedPairRecord {
-    pub fn get_case_info(&self) -> (&str, NaiveDate) {
+    #[must_use] pub fn get_case_info(&self) -> (&str, NaiveDate) {
         (&self.case_pnr, self.case_treatment_date)
     }
 
-    pub fn get_control_info(&self) -> (&str, NaiveDate) {
+    #[must_use] pub fn get_control_info(&self) -> (&str, NaiveDate) {
         (&self.control_pnr, self.case_treatment_date)
     }
 }
@@ -65,9 +65,9 @@ pub struct CaseWithControls {
 }
 
 impl CaseWithControls {
-    /// Convert a list of MatchedPairRecords into a list of CaseWithControls,
-    /// grouping by case_id
-    pub fn from_matched_pair_records(records: &[MatchedPairRecord]) -> Vec<Self> {
+    /// Convert a list of `MatchedPairRecords` into a list of `CaseWithControls`,
+    /// grouping by `case_id`
+    #[must_use] pub fn from_matched_pair_records(records: &[MatchedPairRecord]) -> Vec<Self> {
         let mut case_map: hashbrown::HashMap<String, CaseWithControls> = hashbrown::HashMap::new();
 
         for record in records {

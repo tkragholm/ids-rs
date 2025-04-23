@@ -17,7 +17,7 @@ use std::sync::Arc;
 /// Standard thread-safe wrapper for store implementations.
 ///
 /// This wrapper provides consistent thread-safe access to any store implementation
-/// using high-performance RwLock for concurrent read access and exclusive write access.
+/// using high-performance `RwLock` for concurrent read access and exclusive write access.
 #[derive(Debug, Clone)]
 pub struct ThreadSafeStore<S: Store + 'static> {
     inner: Arc<RwLock<S>>,
@@ -93,16 +93,16 @@ impl<S: Store + 'static> ThreadSafeStore<S> {
     ///
     /// # Returns
     ///
-    /// A reference to the Arc-wrapped RwLock containing the store
+    /// A reference to the Arc-wrapped `RwLock` containing the store
     #[must_use]
     pub fn inner(&self) -> &Arc<RwLock<S>> {
         &self.inner
     }
 }
 
-/// Implementation of the Store trait for ThreadSafeStore.
+/// Implementation of the Store trait for `ThreadSafeStore`.
 ///
-/// This allows ThreadSafeStore to be used anywhere a Store is expected.
+/// This allows `ThreadSafeStore` to be used anywhere a Store is expected.
 impl<S: Store + 'static> Store for ThreadSafeStore<S> {
     fn covariate(
         &mut self,
@@ -140,9 +140,9 @@ impl<S: Store + 'static> Store for ThreadSafeStore<S> {
 ///
 /// This optimized cache implementation uses efficient data sharding based on key hashing
 /// to minimize contention and maximize throughput in highly concurrent scenarios.
-/// It eliminates redundant locks by leveraging DashMap's built-in concurrency.
+/// It eliminates redundant locks by leveraging `DashMap`'s built-in concurrency.
 pub struct ShardedCache<K, V> {
-    /// Array of DashMap instances, each responsible for a shard of the keyspace
+    /// Array of `DashMap` instances, each responsible for a shard of the keyspace
     shards: Vec<dashmap::DashMap<K, V>>,
     /// Number of shards for distributing keys
     num_shards: usize,
@@ -170,7 +170,7 @@ where
         // Determine optimal shard count based on CPU cores or provided value
         let num_shards = num_shards.unwrap_or_else(|| {
             std::thread::available_parallelism()
-                .map(|p| p.get())
+                .map(std::num::NonZero::get)
                 .unwrap_or(16)
                 .max(4)
         });
@@ -239,7 +239,7 @@ where
 
     /// Clear all entries from the cache.
     pub fn clear(&self) {
-        self.shards.iter().for_each(|shard| shard.clear());
+        self.shards.iter().for_each(dashmap::DashMap::clear);
     }
 
     /// Get the approximate number of entries in the cache.
@@ -247,8 +247,8 @@ where
     /// # Returns
     ///
     /// The approximate number of entries
-    pub fn len(&self) -> usize {
-        self.shards.iter().map(|shard| shard.len()).sum()
+    #[must_use] pub fn len(&self) -> usize {
+        self.shards.iter().map(dashmap::DashMap::len).sum()
     }
 
     /// Check if the cache is empty.
@@ -256,8 +256,8 @@ where
     /// # Returns
     ///
     /// True if the cache is empty, otherwise false
-    pub fn is_empty(&self) -> bool {
-        self.shards.iter().all(|shard| shard.is_empty())
+    #[must_use] pub fn is_empty(&self) -> bool {
+        self.shards.iter().all(dashmap::DashMap::is_empty)
     }
 
     /// Perform a bulk insertion with minimal contention.
@@ -363,7 +363,7 @@ impl CovariateCache {
     ///
     /// # Returns
     ///
-    /// A new CovariateCache instance
+    /// A new `CovariateCache` instance
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -499,8 +499,7 @@ impl CovariateCache {
                 }
                 Err(e) => {
                     return Err(IdsError::invalid_operation(format!(
-                        "Failed to load covariate: {}",
-                        e
+                        "Failed to load covariate: {e}"
                     )));
                 }
             }

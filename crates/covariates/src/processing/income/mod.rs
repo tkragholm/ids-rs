@@ -12,7 +12,7 @@ pub struct IncomeProcessor {
 
 impl IncomeProcessor {
     /// Create a new income processor
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             name: "Income".to_string(),
         }

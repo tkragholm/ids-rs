@@ -12,21 +12,21 @@ impl From<log::SetLoggerError> for IdsError {
 // Convert from Chrono's ParseError to IdsError
 impl From<ChronoParseError> for IdsError {
     fn from(err: ChronoParseError) -> Self {
-        IdsError::InvalidDate(format!("Failed to parse date: {}", err))
+        IdsError::InvalidDate(format!("Failed to parse date: {err}"))
     }
 }
 
 // Convert from std::num::ParseIntError to IdsError
 impl From<std::num::ParseIntError> for IdsError {
     fn from(err: std::num::ParseIntError) -> Self {
-        IdsError::type_conversion(format!("Failed to parse integer: {}", err))
+        IdsError::type_conversion(format!("Failed to parse integer: {err}"))
     }
 }
 
 // Convert from std::num::ParseFloatError to IdsError
 impl From<std::num::ParseFloatError> for IdsError {
     fn from(err: std::num::ParseFloatError) -> Self {
-        IdsError::type_conversion(format!("Failed to parse float: {}", err))
+        IdsError::type_conversion(format!("Failed to parse float: {err}"))
     }
 }
 
@@ -40,7 +40,7 @@ impl From<std::fmt::Error> for IdsError {
 // Convert from std::string::FromUtf8Error to IdsError
 impl From<std::string::FromUtf8Error> for IdsError {
     fn from(err: std::string::FromUtf8Error) -> Self {
-        IdsError::InvalidFormat(format!("Invalid UTF-8 sequence: {}", err))
+        IdsError::InvalidFormat(format!("Invalid UTF-8 sequence: {err}"))
     }
 }
 
@@ -51,7 +51,7 @@ impl From<std::string::FromUtf8Error> for IdsError {
 // Convert from std::sync::mpsc::RecvError to IdsError for parallel processing errors
 impl From<std::sync::mpsc::RecvError> for IdsError {
     fn from(err: std::sync::mpsc::RecvError) -> Self {
-        IdsError::DataLoading(format!("Channel receive error: {}", err))
+        IdsError::DataLoading(format!("Channel receive error: {err}"))
     }
 }
 
@@ -62,7 +62,7 @@ impl From<std::sync::mpsc::RecvError> for IdsError {
 // Convert from std::path::StripPrefixError to IdsError
 impl From<std::path::StripPrefixError> for IdsError {
     fn from(err: std::path::StripPrefixError) -> Self {
-        IdsError::PathResolution(format!("Path prefix error: {}", err))
+        IdsError::PathResolution(format!("Path prefix error: {err}"))
     }
 }
 

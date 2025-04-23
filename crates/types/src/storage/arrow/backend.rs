@@ -43,13 +43,13 @@ pub struct ArrowBackend {
 }
 
 impl ArrowBackend {
-    /// Create a new ArrowBackend instance with empty data
+    /// Create a new `ArrowBackend` instance with empty data
     ///
     /// # Returns
-    /// * `std::result::Result<Self, IdsError>` - A new ArrowBackend or an error
+    /// * `std::result::Result<Self, IdsError>` - A new `ArrowBackend` or an error
     ///
     /// # Errors
-    /// Returns an error if the TranslationMaps cannot be initialized
+    /// Returns an error if the `TranslationMaps` cannot be initialized
     pub fn new() -> std::result::Result<Self, IdsError> {
         let translations =
             TranslationMaps::new().map_err(|e| IdsError::invalid_format(format!("{e}")))?;
@@ -97,7 +97,7 @@ impl ArrowBackend {
         })
     }
 
-    /// Create a new empty ArrowBackend, used for diagnostic mode when data loading fails
+    /// Create a new empty `ArrowBackend`, used for diagnostic mode when data loading fails
     ///
     /// # Panics
     ///
@@ -311,7 +311,7 @@ impl ArrowBackend {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
-                log::warn!("Invalid AKM batch for year {}: {}", year, e);
+                log::warn!("Invalid AKM batch for year {year}: {e}");
             }
         }
 
@@ -398,7 +398,7 @@ impl ArrowBackend {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
-                log::warn!("Invalid BEF batch for period {}: {}", period, e);
+                log::warn!("Invalid BEF batch for period {period}: {e}");
             }
         }
 
@@ -446,7 +446,7 @@ impl ArrowBackend {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
-                log::warn!("Invalid IND batch for year {}: {}", year, e);
+                log::warn!("Invalid IND batch for year {year}: {e}");
             }
         }
 
@@ -489,7 +489,7 @@ impl ArrowBackend {
         // Validate batches first
         for batch in &batches {
             if let Err(e) = self.validate_batch(batch) {
-                log::warn!("Invalid UDDF batch for period {}: {}", period, e);
+                log::warn!("Invalid UDDF batch for period {period}: {e}");
             }
         }
 
@@ -518,7 +518,7 @@ impl ArrowBackend {
     /// Add a period to the date cache for faster lookups
     ///
     /// This method parses a period string like "201903" and adds a mapping
-    /// to the corresponding NaiveDate.
+    /// to the corresponding `NaiveDate`.
     ///
     /// # Arguments
     /// * `period` - The period string (e.g., "201903")
@@ -589,8 +589,7 @@ impl ArrowBackend {
 
         // If we get here, resort to a default date to avoid errors
         log::warn!(
-            "Could not parse period '{}', using a default date (2020-01-01)",
-            period
+            "Could not parse period '{period}', using a default date (2020-01-01)"
         );
         let default_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
         self.period_date_cache
@@ -982,9 +981,7 @@ impl ArrowBackend {
                             let mut builder = Covariate::demographics(
                                 family_size,
                                 municipality.unwrap_or(0),
-                                family_type
-                                    .map(|ft| ft.to_string())
-                                    .unwrap_or_else(|| "0".to_string()),
+                                family_type.map_or_else(|| "0".to_string(), |ft| ft.to_string()),
                             );
 
                             // Add citizenship if available
@@ -1091,17 +1088,14 @@ impl ArrowBackend {
             } else {
                 // Add to cache and get it back
                 if let Err(e) = self.add_period_to_cache(period) {
-                    log::warn!("Failed to parse period '{}': {}", period, e);
+                    log::warn!("Failed to parse period '{period}': {e}");
                     continue; // Skip this period
                 }
 
                 // Now it should be in the cache
-                match self.period_date_cache.get(period) {
-                    Some(date) => *date,
-                    None => {
-                        log::warn!("Period '{}' not found in cache after adding", period);
-                        continue; // Skip this period
-                    }
+                if let Some(date) = self.period_date_cache.get(period) { *date } else {
+                    log::warn!("Period '{period}' not found in cache after adding");
+                    continue; // Skip this period
                 }
             };
 
@@ -1155,7 +1149,7 @@ impl ArrowBackend {
         for batch in &mut family_batches {
             // Validate batch
             if let Err(e) = self.validate_batch(batch) {
-                log::warn!("Invalid family relations batch: {}", e);
+                log::warn!("Invalid family relations batch: {e}");
             }
 
             // Optimize memory layout
@@ -1266,7 +1260,7 @@ impl ArrowBackend {
         // Use cached column index for PNR if available
         let pnr_idx = if let Some(&idx) = self
             .column_indices
-            .get(&("".to_string(), "PNR".to_string()))
+            .get(&(String::new(), "PNR".to_string()))
         {
             idx
         } else if batch.schema().fields().iter().any(|f| f.name() == "PNR") {
@@ -1317,16 +1311,15 @@ impl ArrowBackend {
 
                 // Not found in any chunk
                 return Ok(None);
-            } else {
-                // Linear scan for small arrays
-                for i in 0..string_array.len() {
-                    if !string_array.is_null(i) {
-                        // Use direct string comparison for small arrays
-                        if string_array.value(i) == pnr {
-                            // Intern the found PNR for future lookups
-                            self.string_interner.get_or_intern(pnr);
-                            return Ok(Some(i));
-                        }
+            }
+            // Linear scan for small arrays
+            for i in 0..string_array.len() {
+                if !string_array.is_null(i) {
+                    // Use direct string comparison for small arrays
+                    if string_array.value(i) == pnr {
+                        // Intern the found PNR for future lookups
+                        self.string_interner.get_or_intern(pnr);
+                        return Ok(Some(i));
                     }
                 }
             }
@@ -1354,7 +1347,10 @@ impl ArrowBackend {
             "" // Unknown register type
         };
 
-        let col_idx = if !register_type.is_empty() {
+        let col_idx = if register_type.is_empty() {
+            // Direct schema lookup for non-cached columns
+            batch.schema().index_of(column_name)?
+        } else {
             // Try to get from cache first
             if let Some(&idx) = self
                 .column_indices
@@ -1365,9 +1361,6 @@ impl ArrowBackend {
                 // Fall back to schema lookup
                 batch.schema().index_of(column_name)?
             }
-        } else {
-            // Direct schema lookup for non-cached columns
-            batch.schema().index_of(column_name)?
         };
 
         let array = batch.column(col_idx);
@@ -1376,7 +1369,7 @@ impl ArrowBackend {
             .as_any()
             .downcast_ref::<StringArray>()
             .ok_or_else(move || {
-                IdsError::data_loading(format!("Column {} is not a string array", column_name))
+                IdsError::data_loading(format!("Column {column_name} is not a string array"))
             })
     }
 

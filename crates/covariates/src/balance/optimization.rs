@@ -19,7 +19,7 @@ pub enum OptimizationStrategy {
 
 impl OptimizationStrategy {
     /// Maps memory tier to optimization strategy
-    pub fn from_memory_tier(tier: MemoryTier) -> Self {
+    #[must_use] pub fn from_memory_tier(tier: MemoryTier) -> Self {
         match tier {
             MemoryTier::VeryHigh => OptimizationStrategy::Performance,
             MemoryTier::High => OptimizationStrategy::Performance,

@@ -1,4 +1,4 @@
-use super::builders::*;
+use super::builders::{DemographicsBuilder, EducationBuilder, IncomeBuilder, OccupationBuilder};
 use super::types::{Covariate, CovariateType, CovariateValue};
 use hashbrown::HashMap;
 

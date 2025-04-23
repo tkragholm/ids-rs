@@ -23,12 +23,12 @@ pub fn create_schema(fields: Vec<(&str, DataType)>) -> ArrowSchema {
     ArrowSchema::new(fields)
 }
 
-/// Trait for converting between RecordBatch and other formats
+/// Trait for converting between `RecordBatch` and other formats
 ///
-/// This trait provides methods for converting between Arrow RecordBatch
+/// This trait provides methods for converting between Arrow `RecordBatch`
 /// and other data formats like CSV.
 pub trait RecordBatchConversion {
-    /// Convert RecordBatch to CSV string
+    /// Convert `RecordBatch` to CSV string
     ///
     /// # Returns
     /// A CSV string representation of the batch
@@ -37,14 +37,14 @@ pub trait RecordBatchConversion {
     /// Returns an error if the conversion fails
     fn to_csv(&self) -> Result<String>;
 
-    /// Create RecordBatch from CSV string
+    /// Create `RecordBatch` from CSV string
     ///
     /// # Arguments
     /// * `csv` - CSV data as string
     /// * `schema` - Arrow schema for parsing
     ///
     /// # Returns
-    /// A RecordBatch containing the parsed data
+    /// A `RecordBatch` containing the parsed data
     ///
     /// # Errors
     /// Returns an error if parsing fails

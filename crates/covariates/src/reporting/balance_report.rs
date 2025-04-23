@@ -10,7 +10,7 @@ impl BalanceReport {
         Self { results }
     }
 
-    pub fn generate_summary_statistics(&self) -> Vec<ReportRow> {
+    #[must_use] pub fn generate_summary_statistics(&self) -> Vec<ReportRow> {
         self.results
             .summaries
             .iter()

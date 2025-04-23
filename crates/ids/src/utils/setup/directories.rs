@@ -19,7 +19,7 @@ pub fn setup_directories(output_dir: &str) -> IdsResult<()> {
     // Ensure output directory exists
     let output_path = Path::new(output_dir);
     if !output_path.exists() {
-        info!("Creating output directory: {}", output_dir);
+        info!("Creating output directory: {output_dir}");
         fs::create_dir_all(output_path)?;
     }
 

@@ -41,7 +41,7 @@ pub fn configure_logging_with_dir(output_dir: &str) -> IdsResult<()> {
     {
         Ok(appender) => appender,
         Err(e) => {
-            error!("Failed to create log file: {}", e);
+            error!("Failed to create log file: {e}");
             return Err(crate::core::IdsError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to create log file: {e}"),
@@ -58,7 +58,7 @@ pub fn configure_logging_with_dir(output_dir: &str) -> IdsResult<()> {
     {
         Ok(appender) => appender,
         Err(e) => {
-            error!("Failed to create debug log file: {}", e);
+            error!("Failed to create debug log file: {e}");
             return Err(crate::core::IdsError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to create debug log file: {e}"),
@@ -80,7 +80,7 @@ pub fn configure_logging_with_dir(output_dir: &str) -> IdsResult<()> {
         ) {
         Ok(config) => config,
         Err(e) => {
-            error!("Failed to build logging config: {}", e);
+            error!("Failed to build logging config: {e}");
             return Err(crate::core::IdsError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to build logging config: {e}"),
@@ -90,14 +90,14 @@ pub fn configure_logging_with_dir(output_dir: &str) -> IdsResult<()> {
 
     // Initialize the logging system
     if let Err(e) = log4rs::init_config(config) {
-        error!("Failed to initialize logging: {}", e);
+        error!("Failed to initialize logging: {e}");
         return Err(crate::core::IdsError::Io(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to initialize logging: {e}"),
         )));
     }
 
-    info!("Logging initialized. Output directory: {}", output_dir);
+    info!("Logging initialized. Output directory: {output_dir}");
     debug!("Debug logging enabled");
 
     Ok(())

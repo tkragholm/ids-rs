@@ -3,7 +3,7 @@
 /// This macro is inspired by the `assert!` macro but returns an error instead of panicking.
 /// It has three forms:
 ///
-/// 1. With a direct IdsError instance: `ensure!(val >= 0, IdsError::validation("Invalid value"))`
+/// 1. With a direct `IdsError` instance: `ensure!(val >= 0, IdsError::validation("Invalid value"))`
 /// 2. With a simple string message: `ensure!(val >= 0, "Value must be non-negative")`
 /// 3. With a formatted message: `ensure!(val < 100, "Value {} exceeds maximum allowed (100)", val)`
 ///
@@ -87,9 +87,9 @@ macro_rules! ensure {
 /// The macro is intelligent about error handling:
 ///
 /// 1. For standard library errors (io, parse, etc.), it preserves their type info
-/// 2. For Arrow errors, it uses the specialized ArrowWithContext variant
-/// 3. For Parquet errors, it also uses ArrowWithContext for consistency
-/// 4. For other errors, it creates a DataAccess error with the original as source
+/// 2. For Arrow errors, it uses the specialized `ArrowWithContext` variant
+/// 3. For Parquet errors, it also uses `ArrowWithContext` for consistency
+/// 4. For other errors, it creates a `DataAccess` error with the original as source
 #[macro_export]
 macro_rules! try_with_context {
     ($expr:expr, $context:expr) => {
@@ -118,7 +118,7 @@ macro_rules! try_with_context {
 /// This macro returns early with an error, similar to `return Err(...);`.
 /// It can be used in three ways:
 ///
-/// 1. With a direct IdsError instance: `bail!(IdsError::validation("Invalid data"))`
+/// 1. With a direct `IdsError` instance: `bail!(IdsError::validation("Invalid data"))`
 /// 2. With a simple string message: `bail!("No data provided")` (creates a Validation error)
 /// 3. With a formatted message: `bail!("Empty data: expected at least {} characters", 1)`
 ///

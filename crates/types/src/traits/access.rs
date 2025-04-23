@@ -20,13 +20,13 @@ pub trait Store {
     /// * `field` - The field name to retrieve
     ///
     /// # Returns
-    /// * `Result<ArrowValue>` - The data wrapped in an ArrowValue or an error
+    /// * `Result<ArrowValue>` - The data wrapped in an `ArrowValue` or an error
     ///
     /// # Errors
     /// Returns an error if:
     /// - The data does not exist for the given year/field
     /// - There was a problem accessing the data
-    /// - The data could not be converted to an ArrowValue
+    /// - The data could not be converted to an `ArrowValue`
     ///
     /// # Examples
     ///

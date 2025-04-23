@@ -1,7 +1,7 @@
 use covariates::balance::BalanceChecker;
 use types::storage::arrow::backend::ArrowBackend;
 
-/// Extension trait for BalanceChecker to provide diagnostic capabilities
+/// Extension trait for `BalanceChecker` to provide diagnostic capabilities
 pub trait BalanceCheckerDiagnostic {
     /// Create a new checker with an empty store for diagnostic mode
     fn new_diagnostic() -> BalanceChecker;

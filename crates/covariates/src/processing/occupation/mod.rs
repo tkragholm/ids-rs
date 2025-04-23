@@ -12,7 +12,7 @@ pub struct OccupationProcessor {
 
 impl OccupationProcessor {
     /// Create a new occupation processor
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             name: "Occupation".to_string(),
         }
@@ -47,7 +47,7 @@ impl CovariateProcessor for OccupationProcessor {
         }
 
         // Example: use socio as numeric value
-        covariate.socio().map(|socio| socio as f64)
+        covariate.socio().map(f64::from)
     }
 
     fn process_categorical(&self, covariate: &Covariate) -> Option<String> {

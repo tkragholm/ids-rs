@@ -24,12 +24,12 @@ impl Default for ProcessorConfig {
 }
 
 impl ProcessorConfig {
-    /// Create a new ProcessorConfig with default values
+    /// Create a new `ProcessorConfig` with default values
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a new ProcessorConfig with custom configuration
+    /// Create a new `ProcessorConfig` with custom configuration
     #[allow(dead_code)]
     pub fn with_config(
         thread_count: Option<usize>,

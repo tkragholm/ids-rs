@@ -21,12 +21,12 @@ pub enum DataStore {
 }
 
 impl DataStore {
-    /// Create a new DataStore with an ArrowBackend
+    /// Create a new `DataStore` with an `ArrowBackend`
     pub fn new_arrow() -> Result<Self> {
         Ok(Self::Arrow(ThreadSafeStore::new(ArrowBackend::new()?)))
     }
 
-    /// Create a new DataStore with a TimeVaryingBackend
+    /// Create a new `DataStore` with a `TimeVaryingBackend`
     #[must_use]
     pub fn new_time_varying() -> Self {
         Self::TimeVarying(ThreadSafeStore::new(TimeVaryingBackend::new()))

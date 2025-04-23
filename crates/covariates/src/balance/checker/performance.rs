@@ -85,7 +85,7 @@ impl BalanceChecker {
                 count
             }
             Err(e) => {
-                log::warn!("Error during data prefetching: {}", e);
+                log::warn!("Error during data prefetching: {e}");
                 0
             }
         }
@@ -94,9 +94,7 @@ impl BalanceChecker {
 
 // Helper function for integer division with ceiling
 fn div_ceil(a: usize, b: usize) -> usize {
-    if b == 0 {
-        panic!("Division by zero");
-    }
+    assert!((b != 0), "Division by zero");
     let d = a / b;
     let r = a % b;
     if r > 0 && b > 0 {

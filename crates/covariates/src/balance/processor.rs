@@ -24,8 +24,8 @@ impl Default for ValueProcessor {
 }
 
 impl ValueProcessor {
-    /// Create a new ValueProcessor with default settings
-    pub fn new() -> Self {
+    /// Create a new `ValueProcessor` with default settings
+    #[must_use] pub fn new() -> Self {
         let config = ProcessorConfig::new();
         Self {
             numeric_processor: NumericProcessor::new(config.clone()),
@@ -34,9 +34,9 @@ impl ValueProcessor {
         }
     }
 
-    /// Create a new ValueProcessor with custom configuration
+    /// Create a new `ValueProcessor` with custom configuration
     #[allow(dead_code)]
-    pub fn with_config(
+    #[must_use] pub fn with_config(
         thread_count: Option<usize>,
         chunk_size_multiplier: Option<usize>,
         optimization_strategy: Option<OptimizationStrategy>,
@@ -55,7 +55,7 @@ impl ValueProcessor {
 
     /// Configure optimization strategy
     #[allow(dead_code)]
-    pub fn with_optimization_strategy(mut self, strategy: OptimizationStrategy) -> Self {
+    #[must_use] pub fn with_optimization_strategy(mut self, strategy: OptimizationStrategy) -> Self {
         self.config = self.config.with_optimization_strategy(strategy);
         self.numeric_processor = NumericProcessor::new(self.config.clone());
         self.categorical_processor = CategoricalProcessor::new(self.config.clone());
@@ -64,7 +64,7 @@ impl ValueProcessor {
 
     /// Automatically select optimization strategy based on system resources
     #[allow(dead_code)]
-    pub fn auto_configure(mut self) -> Self {
+    #[must_use] pub fn auto_configure(mut self) -> Self {
         self.config = self.config.auto_configure();
         self.numeric_processor = NumericProcessor::new(self.config.clone());
         self.categorical_processor = CategoricalProcessor::new(self.config.clone());

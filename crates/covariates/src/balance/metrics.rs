@@ -13,7 +13,7 @@ pub struct BalanceMetrics {
 
 impl BalanceMetrics {
     /// Create a new balance metrics calculator
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             processor: super::processor::ValueProcessor::new(),
         }
@@ -35,8 +35,7 @@ impl BalanceMetrics {
         }
 
         debug!(
-            "Calculating balance for numeric variable {} (type: {:?})",
-            variable_name, covariate_type
+            "Calculating balance for numeric variable {variable_name} (type: {covariate_type:?})"
         );
 
         // Extract values
@@ -91,8 +90,7 @@ impl BalanceMetrics {
         extractor: impl Fn(&Covariate) -> Option<String> + Send + Sync,
     ) -> IdsResult<(Vec<CovariateSummary>, (f64, f64))> {
         debug!(
-            "Calculating balance for categorical variable {} (type: {:?})",
-            variable_name, covariate_type
+            "Calculating balance for categorical variable {variable_name} (type: {covariate_type:?})"
         );
 
         // Extract values
@@ -127,14 +125,14 @@ impl BalanceMetrics {
         // Calculate proportions and standardized differences for each category
         let mut results = Vec::new();
         for category in all_categories {
-            let case_count = case_counts.get(&category).cloned().unwrap_or(0);
+            let case_count = case_counts.get(&category).copied().unwrap_or(0);
             let case_prop = if case_values.is_empty() {
                 0.0
             } else {
                 case_count as f64 / case_values.len() as f64
             };
 
-            let control_count = control_counts.get(&category).cloned().unwrap_or(0);
+            let control_count = control_counts.get(&category).copied().unwrap_or(0);
             let control_prop = if control_values.is_empty() {
                 0.0
             } else {
@@ -159,7 +157,7 @@ impl BalanceMetrics {
             let category_name = if variable_name.is_empty() {
                 category.clone()
             } else {
-                format!("{}: {}", variable_name, category)
+                format!("{variable_name}: {category}")
             };
 
             let summary = CovariateSummary::new(
@@ -212,8 +210,7 @@ impl BalanceMetrics {
 
             if dash_count > 0 {
                 warn!(
-                    "{} PNRs contain dashes, which might affect matching",
-                    dash_count
+                    "{dash_count} PNRs contain dashes, which might affect matching"
                 );
             }
         }
