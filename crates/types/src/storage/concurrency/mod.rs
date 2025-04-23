@@ -139,12 +139,15 @@ impl<S: Store + 'static> Store for ThreadSafeStore<S> {
 
 /// High-performance sharded cache for improved concurrency.
 ///
-/// This cache implementation uses a combination of sharding and highly optimized
-/// lock implementation to minimize contention and maximize throughput in
-/// concurrent scenarios.
+/// This optimized cache implementation uses efficient data sharding based on key hashing
+/// to minimize contention and maximize throughput in highly concurrent scenarios.
+/// It eliminates redundant locks by leveraging DashMap's built-in concurrency.
 pub struct ShardedCache<K, V> {
-    shards: Vec<RwLock<dashmap::DashMap<K, V>>>,
+    /// Array of DashMap instances, each responsible for a shard of the keyspace
+    shards: Vec<dashmap::DashMap<K, V>>,
+    /// Number of shards for distributing keys
     num_shards: usize,
+    /// Hash function state for key distribution
     hasher: RandomState,
 }
 
@@ -165,6 +168,7 @@ where
     /// A new sharded cache instance
     #[must_use]
     pub fn new(capacity: usize, num_shards: Option<usize>) -> Self {
+        // Determine optimal shard count based on CPU cores or provided value
         let num_shards = num_shards.unwrap_or_else(|| {
             std::thread::available_parallelism()
                 .map(|p| p.get())
@@ -172,12 +176,13 @@ where
                 .max(4)
         });
 
+        // Calculate per-shard capacity, ensuring even distribution
         let per_shard_capacity = (capacity / num_shards) + 1;
-        let mut shards = Vec::with_capacity(num_shards);
-
-        for _ in 0..num_shards {
-            shards.push(RwLock::new(DashMap::with_capacity(per_shard_capacity)));
-        }
+        
+        // Create shards with pre-allocated capacity
+        let shards: Vec<_> = (0..num_shards)
+            .map(|_| DashMap::with_capacity_and_hasher(per_shard_capacity, RandomState::new()))
+            .collect();
 
         Self {
             shards,
@@ -186,7 +191,9 @@ where
         }
     }
 
-    /// Get the shard index for a key.
+    /// Get the shard index for a key using consistent hashing.
+    ///
+    /// Uses a high-quality hash function to distribute keys evenly across shards.
     #[inline]
     fn shard_idx<Q: Hash>(&self, key: &Q) -> usize {
         (self.hasher.hash_one(key) % self.num_shards as u64) as usize
@@ -203,8 +210,7 @@ where
     /// The value if present, otherwise None
     pub fn get(&self, key: &K) -> Option<V> {
         let shard_idx = self.shard_idx(key);
-        let shard = self.shards[shard_idx].read();
-        shard.get(key).map(|v| v.clone())
+        self.shards[shard_idx].get(key).map(|v| v.clone())
     }
 
     /// Insert a value into the cache.
@@ -215,8 +221,7 @@ where
     /// * `value` - The value to insert
     pub fn insert(&self, key: K, value: V) {
         let shard_idx = self.shard_idx(&key);
-        let shard = self.shards[shard_idx].read();
-        shard.insert(key, value);
+        self.shards[shard_idx].insert(key, value);
     }
 
     /// Check if the cache contains a key.
@@ -230,16 +235,12 @@ where
     /// True if the key is present, otherwise false
     pub fn contains_key(&self, key: &K) -> bool {
         let shard_idx = self.shard_idx(key);
-        let shard = self.shards[shard_idx].read();
-        shard.contains_key(key)
+        self.shards[shard_idx].contains_key(key)
     }
 
     /// Clear all entries from the cache.
     pub fn clear(&self) {
-        for shard in &self.shards {
-            let shard_guard = shard.read();
-            shard_guard.clear();
-        }
+        self.shards.iter().for_each(|shard| shard.clear());
     }
 
     /// Get the approximate number of entries in the cache.
@@ -248,10 +249,7 @@ where
     ///
     /// The approximate number of entries
     pub fn len(&self) -> usize {
-        self.shards
-            .iter()
-            .map(|shard| shard.read().len())
-            .sum()
+        self.shards.iter().map(|shard| shard.len()).sum()
     }
 
     /// Check if the cache is empty.
@@ -260,31 +258,50 @@ where
     ///
     /// True if the cache is empty, otherwise false
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.shards.iter().all(|shard| shard.is_empty())
     }
 
-    /// Perform a bulk insertion with minimal locking.
+    /// Perform a bulk insertion with minimal contention.
     ///
-    /// This method sorts entries by shard to minimize the number of lock acquisitions.
+    /// This method pre-sorts entries by shard to minimize cross-shard operations and
+    /// maximize insertion throughput in concurrent scenarios.
     ///
     /// # Arguments
     ///
     /// * `entries` - The entries to insert
     pub fn insert_batch(&self, entries: Vec<(K, V)>) {
-        // Group entries by shard
+        // Group entries by shard for efficient insertion
         let mut sharded_entries: Vec<Vec<(K, V)>> = vec![Vec::new(); self.num_shards];
 
+        // Distribute entries to their target shards
         for (key, value) in entries {
             let idx = self.shard_idx(&key);
             sharded_entries[idx].push((key, value));
         }
 
-        // Insert entries into each shard
-        for (idx, entries) in sharded_entries.into_iter().enumerate() {
-            if !entries.is_empty() {
-                let shard = self.shards[idx].read();
-                for (key, value) in entries {
-                    shard.insert(key, value);
+        // Process each shard in parallel using rayon if available
+        #[cfg(feature = "parallel")]
+        {
+            use rayon::prelude::*;
+            sharded_entries.into_par_iter().enumerate().for_each(|(idx, entries)| {
+                if !entries.is_empty() {
+                    let shard = &self.shards[idx];
+                    entries.into_iter().for_each(|(key, value)| {
+                        shard.insert(key, value);
+                    });
+                }
+            });
+        }
+        
+        // Sequential fallback when parallel feature is not enabled
+        #[cfg(not(feature = "parallel"))]
+        {
+            for (idx, entries) in sharded_entries.into_iter().enumerate() {
+                if !entries.is_empty() {
+                    let shard = &self.shards[idx];
+                    for (key, value) in entries {
+                        shard.insert(key, value);
+                    }
                 }
             }
         }
@@ -301,8 +318,31 @@ where
     /// The removed value if it was present
     pub fn remove(&self, key: &K) -> Option<V> {
         let shard_idx = self.shard_idx(key);
-        let shard = self.shards[shard_idx].read();
-        shard.remove(key).map(|(_, v)| v)
+        self.shards[shard_idx].remove(key).map(|(_, v)| v)
+    }
+    
+    /// Get or compute a value in the cache.
+    ///
+    /// If the key exists in the cache, returns the existing value.
+    /// Otherwise, computes a new value using the provided function and inserts it.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to look up
+    /// * `f` - Function to compute a new value if key is not present
+    ///
+    /// # Returns
+    ///
+    /// The existing or newly computed value
+    pub fn get_or_insert_with<F>(&self, key: K, f: F) -> V 
+    where
+        F: FnOnce() -> V
+    {
+        let shard_idx = self.shard_idx(&key);
+        self.shards[shard_idx]
+            .entry(key)
+            .or_insert_with(f)
+            .clone()
     }
 }
 

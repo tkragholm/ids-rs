@@ -23,19 +23,78 @@ use crate::models::CovariateType;
 
 /// Common cache key for covariate lookups
 /// Used across various caching implementations
+///
+/// Optimized implementation that uses a string interner pool to minimize
+/// memory usage when many PNRs are used in cache keys.
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct CacheKey {
-    pub pnr: String,
+    /// PNR identifier string, using an Arc-string for memory-efficient cloning
+    pub pnr: std::sync::Arc<str>,
+    /// Type of covariate for this cache entry
     pub covariate_type: CovariateType,
+    /// Reference date for this covariate
     pub date: NaiveDate,
 }
 
 impl CacheKey {
-    /// Create a new cache key
+    /// Create a new cache key with efficient memory usage
+    ///
+    /// Uses a thread-local cache of PNR strings to minimize memory allocations
+    /// when creating many cache keys with the same PNRs.
+    ///
+    /// # Arguments
+    /// * `pnr` - The PNR identifier
+    /// * `covariate_type` - The type of covariate
+    /// * `date` - The reference date
+    ///
+    /// # Returns
+    /// A new cache key with optimized memory usage
     #[must_use]
     pub fn new(pnr: &str, covariate_type: CovariateType, date: NaiveDate) -> Self {
+        use std::sync::Arc;
+        
+        // Use a thread-local cache for PNRs to avoid duplicate allocations
+        thread_local! {
+            static PNR_CACHE: std::cell::RefCell<dashmap::DashMap<String, Arc<str>>> = 
+                std::cell::RefCell::new(dashmap::DashMap::with_capacity(1000));
+        }
+        
+        // Try to get the PNR from the cache first
+        let pnr_arc = PNR_CACHE.with(|cache| {
+            let cache = cache.borrow();
+            if let Some(cached) = cache.get(pnr) {
+                cached.clone()
+            } else {
+                // Not in cache, create new Arc and add to cache
+                let pnr_arc = Arc::from(pnr);
+                cache.insert(pnr.to_string(), pnr_arc.clone());
+                pnr_arc
+            }
+        });
+        
         Self {
-            pnr: pnr.to_string(),
+            pnr: pnr_arc,
+            covariate_type,
+            date,
+        }
+    }
+    
+    /// Create a new cache key with a pre-allocated Arc<str>
+    ///
+    /// This is useful when you already have an Arc<str> from another source,
+    /// avoiding the need to go through the cache lookup.
+    ///
+    /// # Arguments
+    /// * `pnr` - The PNR identifier as an Arc<str>
+    /// * `covariate_type` - The type of covariate
+    /// * `date` - The reference date
+    ///
+    /// # Returns
+    /// A new cache key using the provided Arc<str>
+    #[must_use]
+    pub fn from_arc(pnr: std::sync::Arc<str>, covariate_type: CovariateType, date: NaiveDate) -> Self {
+        Self {
+            pnr,
             covariate_type,
             date,
         }
