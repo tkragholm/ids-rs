@@ -93,7 +93,7 @@ pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
 /// Validates an optional date.
 ///
 /// # Arguments
-/// * `date` - Optional NaiveDate to validate
+/// * `date` - Optional `NaiveDate` to validate
 ///
 /// # Errors
 /// Returns `SamplingError::InvalidDate` if the date is present but invalid
@@ -237,7 +237,7 @@ pub mod date_format {
     use chrono::NaiveDate;
     use serde::{self, Deserialize, Deserializer};
 
-    /// Deserializes a date string into a NaiveDate.
+    /// Deserializes a date string into a `NaiveDate`.
     ///
     /// # Errors
     /// Returns a deserialization error if the date string cannot be parsed

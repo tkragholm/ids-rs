@@ -41,7 +41,7 @@ pub struct IncidenceDensitySampler {
 impl IncidenceDensitySampler {
     const BATCH_SIZE: usize = 1024;
 
-    /// Creates a new IncidenceDensitySampler.
+    /// Creates a new `IncidenceDensitySampler`.
     ///
     /// # Panics
     /// Panics if the epoch date (1970-01-01) cannot be created.
@@ -496,7 +496,7 @@ impl IncidenceDensitySampler {
         use rayon::prelude::*;
         use std::sync::Mutex;
 
-        log::info!("Saving matches to {}", filename);
+        log::info!("Saving matches to {filename}");
 
         // Prepare all records in parallel before writing to file
         // This is faster than doing file I/O inside the parallel loop
@@ -602,17 +602,17 @@ impl IncidenceDensitySampler {
         }
 
         wtr.flush()?;
-        log::info!("Successfully wrote matches to {}", filename);
+        log::info!("Successfully wrote matches to {filename}");
 
         let total_pairs: usize = case_control_pairs
             .iter()
             .map(|(_, controls)| controls.len())
             .sum();
-        log::info!("Total case-control pairs written: {}", total_pairs);
+        log::info!("Total case-control pairs written: {total_pairs}");
 
         #[allow(clippy::cast_precision_loss)]
         let avg_controls = total_pairs as f64 / case_control_pairs.len() as f64;
-        log::info!("Average controls per case: {:.2}", avg_controls);
+        log::info!("Average controls per case: {avg_controls:.2}");
 
         Ok(())
     }
