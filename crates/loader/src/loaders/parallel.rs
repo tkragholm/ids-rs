@@ -250,7 +250,7 @@ impl StoreLoader for ParallelLoader {
 
         // UDDF data
         if load_uddf_parallel {
-            let base_path_clone = base_path.clone();
+            let base_path_clone = base_path;
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
                 match registry::load_uddf(&base_path_clone, None) {
@@ -400,7 +400,7 @@ impl StoreLoader for ParallelLoader {
 
         // AKM data
         if load_akm_parallel {
-            let akm_path = akm_path.clone();
+            let akm_path = akm_path;
             let akm_path_str = akm_path.to_str().unwrap_or_default().to_string();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
@@ -428,7 +428,7 @@ impl StoreLoader for ParallelLoader {
 
         // BEF data
         if load_bef_parallel {
-            let bef_path = bef_path.clone();
+            let bef_path = bef_path;
             let bef_path_str = bef_path.to_str().unwrap_or_default().to_string();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
@@ -455,7 +455,7 @@ impl StoreLoader for ParallelLoader {
 
         // IND data
         if load_ind_parallel {
-            let ind_path = ind_path.clone();
+            let ind_path = ind_path;
             let ind_path_str = ind_path.to_str().unwrap_or_default().to_string();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {
@@ -483,7 +483,7 @@ impl StoreLoader for ParallelLoader {
 
         // UDDF data
         if load_uddf_parallel {
-            let uddf_path = uddf_path.clone();
+            let uddf_path = uddf_path;
             let uddf_path_str = uddf_path.to_str().unwrap_or_default().to_string();
             let sender_clone = sender.clone();
             handles.push(thread::spawn(move || {

@@ -15,6 +15,6 @@ impl BalanceCheckerDiagnostic for BalanceChecker {
 
         // Create a checker with an empty store
         // This will have limited functionality, but allows the UI to continue
-        BalanceChecker::new(empty_store)
+        Self::new(empty_store)
     }
 }

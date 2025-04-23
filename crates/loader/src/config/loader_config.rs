@@ -223,7 +223,7 @@ impl LoaderConfig {
     /// # Arguments
     /// * `enabled` - Whether to enable family-based filtering
     #[must_use]
-    pub fn with_family_filtering(mut self, enabled: bool) -> Self {
+    pub const fn with_family_filtering(mut self, enabled: bool) -> Self {
         self.use_family_filtering = enabled;
         self
     }
@@ -233,7 +233,7 @@ impl LoaderConfig {
     /// # Arguments
     /// * `batch_size` - Batch size for loading data
     #[must_use]
-    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
+    pub const fn with_batch_size(mut self, batch_size: usize) -> Self {
         self.batch_size = batch_size;
         self
     }
@@ -243,7 +243,7 @@ impl LoaderConfig {
     /// # Arguments
     /// * `max_threads` - Maximum number of threads to use
     #[must_use]
-    pub fn with_max_threads(mut self, max_threads: usize) -> Self {
+    pub const fn with_max_threads(mut self, max_threads: usize) -> Self {
         self.max_threads = max_threads;
         self
     }

@@ -44,7 +44,7 @@ pub enum BoxStyle {
 
 impl BoxChars {
     /// Get a set of box drawing characters based on a style
-    #[must_use] pub fn from_style(style: BoxStyle) -> Self {
+    #[must_use] pub const fn from_style(style: BoxStyle) -> Self {
         match style {
             BoxStyle::Single => Self {
                 top_left: "┌",
@@ -131,12 +131,12 @@ impl RichConsole {
     }
 
     /// Get the current terminal width
-    #[must_use] pub fn width(&self) -> u16 {
+    #[must_use] pub const fn width(&self) -> u16 {
         self.width
     }
 
     /// Force set a different terminal width (useful for testing or constrained output)
-    pub fn set_width(&mut self, width: u16) {
+    pub const fn set_width(&mut self, width: u16) {
         self.width = width;
     }
 

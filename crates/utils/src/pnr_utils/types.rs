@@ -33,10 +33,10 @@ impl Gender {
     ///
     /// # Returns
     /// The gender (Male for odd, Female for even)
-    #[must_use] pub fn from_pnr_digit(last_digit: u8) -> Self {
+    #[must_use] pub const fn from_pnr_digit(last_digit: u8) -> Self {
         match last_digit % 2 {
-            0 => Gender::Female,
-            _ => Gender::Male,
+            0 => Self::Female,
+            _ => Self::Male,
         }
     }
 
@@ -44,11 +44,11 @@ impl Gender {
     ///
     /// # Returns
     /// "M" for Male, "F" for Female, "U" for Unknown
-    #[must_use] pub fn to_string(&self) -> &'static str {
+    #[must_use] pub const fn to_string(&self) -> &'static str {
         match self {
-            Gender::Male => "M",
-            Gender::Female => "F",
-            Gender::Unknown => "U",
+            Self::Male => "M",
+            Self::Female => "F",
+            Self::Unknown => "U",
         }
     }
 }
@@ -56,9 +56,9 @@ impl Gender {
 impl From<&str> for Gender {
     fn from(s: &str) -> Self {
         match s.trim().to_uppercase().as_str() {
-            "M" | "MALE" => Gender::Male,
-            "F" | "FEMALE" => Gender::Female,
-            _ => Gender::Unknown,
+            "M" | "MALE" => Self::Male,
+            "F" | "FEMALE" => Self::Female,
+            _ => Self::Unknown,
         }
     }
 }

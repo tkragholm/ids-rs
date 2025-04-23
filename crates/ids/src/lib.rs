@@ -184,7 +184,7 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
 
     // Try to initialize the log wrapper (may fail if logger is already initialized)
     // This is okay because we already set up log4rs above
-    if let Err(e) = LogWrapper::new(multi.clone(), env_logger).try_init() {
+    if let Err(e) = LogWrapper::new(multi, env_logger).try_init() {
         // If we can't initialize the wrapper, ensure we have the right log level
         eprintln!("Note: Progress bar integration may be limited: {e}");
         log::set_max_level(log_level);
