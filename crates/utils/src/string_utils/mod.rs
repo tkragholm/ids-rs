@@ -7,13 +7,13 @@
 //! into a single, comprehensive implementation that can be used throughout the
 //! codebase.
 
-mod case_conversion;
-mod parsing;
-mod formatting;
+pub mod case_conversion;
+pub mod formatting;
+pub mod parsing;
 
 pub use case_conversion::*;
-pub use parsing::*;
 pub use formatting::*;
+pub use parsing::*;
 
 // Re-export core types and traits for convenience
 pub use crate::error::Result;

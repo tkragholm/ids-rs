@@ -9,50 +9,47 @@ impl ConsoleOutput {
         println!("\n{}", title.green().bold());
         println!("{}", "═".repeat(title.len()).green());
     }
-    
+
     /// Print a subsection header
     pub fn subsection(title: &str) {
         println!("\n{}", title.blue().bold());
         println!("{}", "─".repeat(title.len()).blue());
     }
-    
+
     /// Print a key-value pair with optional formatting
     pub fn key_value(key: &str, value: &str) {
         println!("{}: {}", key.bold(), value);
     }
-    
+
     /// Print a key-value pair with colored value
     pub fn key_value_colored(key: &str, value: &str, success: bool) {
-        let colored_value = if success {
-            value.green()
-        } else {
-            value.red()
-        };
+        let colored_value = if success { value.green() } else { value.red() };
         println!("{}: {}", key.bold(), colored_value);
     }
-    
+
     /// Print a success message
     pub fn success(message: &str) {
         println!("{} {}", "✓".green().bold(), message);
     }
-    
+
     /// Print an error message
     pub fn error(message: &str) {
         eprintln!("{} {}", "✗".red().bold(), message);
     }
-    
+
     /// Print a warning message
     pub fn warning(message: &str) {
         println!("{} {}", "!".yellow().bold(), message);
     }
-    
+
     /// Print an info message
     pub fn info(message: &str) {
         println!("{} {}", "ℹ".blue().bold(), message);
     }
-    
+
     /// Format a percentage with appropriate color based on value
-    #[must_use] pub fn format_percentage(value: f64) -> ColoredString {
+    #[must_use]
+    pub fn format_percentage(value: f64) -> ColoredString {
         let percentage = format!("{:.2}%", value * 100.0);
         if value >= 0.9 {
             percentage.green()
@@ -62,9 +59,10 @@ impl ConsoleOutput {
             percentage.red()
         }
     }
-    
+
     /// Format a number with appropriate units (K, M, B)
-    #[must_use] pub fn format_number(num: usize) -> String {
+    #[must_use]
+    pub fn format_number(num: usize) -> String {
         if num < 1_000 {
             num.to_string()
         } else if num < 1_000_000 {
@@ -75,18 +73,18 @@ impl ConsoleOutput {
             format!("{:.2}B", num as f64 / 1_000_000_000.0)
         }
     }
-    
+
     /// Print a progress status
     pub fn status(step: usize, total: usize, description: &str) {
         let progress = format!("[{step}/{total}]").blue();
         println!("{progress} {description}");
     }
-    
+
     /// Print a table with headers and rows
     pub fn table(headers: &[&str], rows: &[Vec<String>]) {
         // Determine column widths
         let mut widths = headers.iter().map(|h| h.len()).collect::<Vec<_>>();
-        
+
         for row in rows {
             for (i, cell) in row.iter().enumerate() {
                 if i < widths.len() {
@@ -94,7 +92,7 @@ impl ConsoleOutput {
                 }
             }
         }
-        
+
         // Print headers
         print!("│ ");
         for (i, header) in headers.iter().enumerate() {
@@ -102,7 +100,7 @@ impl ConsoleOutput {
             print!("{}{} │ ", header.bold(), padding);
         }
         println!();
-        
+
         // Print separator
         print!("├─");
         #[allow(clippy::needless_range_loop)]
@@ -110,7 +108,7 @@ impl ConsoleOutput {
             print!("{}┼─", "─".repeat(widths[i] + 1));
         }
         println!();
-        
+
         // Print rows
         for row in rows {
             print!("│ ");
@@ -126,10 +124,11 @@ impl ConsoleOutput {
 }
 
 /// Timer formatting utilities
-#[must_use] pub fn format_duration_short(duration: std::time::Duration) -> String {
+#[must_use]
+pub fn format_duration_short(duration: std::time::Duration) -> String {
     let total_secs = duration.as_secs();
     let millis = duration.subsec_millis();
-    
+
     if total_secs == 0 {
         format!("{millis}ms")
     } else if total_secs < 60 {

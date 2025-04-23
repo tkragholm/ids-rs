@@ -37,7 +37,10 @@ static INIT: Once = Once::new();
 /// Returns an error if:
 /// * The log file cannot be created or written to
 /// * The logging configuration is invalid
-pub fn configure_logging_with_level(log_file: Option<&str>, level: LevelFilter) -> Result<(), Box<dyn Error>> {
+pub fn configure_logging_with_level(
+    log_file: Option<&str>,
+    level: LevelFilter,
+) -> Result<(), Box<dyn Error>> {
     INIT.call_once(|| {
         // Helper function to create a console appender
         let create_console_appender = || {
@@ -69,21 +72,13 @@ pub fn configure_logging_with_level(log_file: Option<&str>, level: LevelFilter) 
             root = root.appender("file");
         }
 
-        let config = config_builder
-            .build(root.build(level))
-            .unwrap_or_else(|_| {
-                // Create a new console appender for the fallback configuration
-                Config::builder()
-                    .appender(
-                        Appender::builder().build("console", Box::new(create_console_appender())),
-                    )
-                    .build(
-                        Root::builder()
-                            .appender("console")
-                            .build(level),
-                    )
-                    .unwrap()
-            });
+        let config = config_builder.build(root.build(level)).unwrap_or_else(|_| {
+            // Create a new console appender for the fallback configuration
+            Config::builder()
+                .appender(Appender::builder().build("console", Box::new(create_console_appender())))
+                .build(Root::builder().appender("console").build(level))
+                .unwrap()
+        });
 
         let _ = log4rs::init_config(config);
     });
@@ -132,23 +127,31 @@ pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<d
                 // Validate dates with detailed error messages
                 if let Err(e) = validate_date(&record.bday.to_string()) {
                     log::error!("Invalid birth date at record {}: {}", idx + 1, e);
-                    return Err(Box::new(SamplingError::invalid_date("Invalid birth date".to_string())));
+                    return Err(Box::new(SamplingError::invalid_date(
+                        "Invalid birth date".to_string(),
+                    )));
                 }
 
                 if let Err(e) = validate_optional_date(&record.mother_bday) {
                     log::error!("Invalid mother birth date at record {}: {}", idx + 1, e);
-                    return Err(Box::new(SamplingError::invalid_date("Invalid mother birth date".to_string())));
+                    return Err(Box::new(SamplingError::invalid_date(
+                        "Invalid mother birth date".to_string(),
+                    )));
                 }
 
                 if let Err(e) = validate_optional_date(&record.father_bday) {
                     log::error!("Invalid father birth date at record {}: {}", idx + 1, e);
-                    return Err(Box::new(SamplingError::invalid_date("Invalid father birth date".to_string())));
+                    return Err(Box::new(SamplingError::invalid_date(
+                        "Invalid father birth date".to_string(),
+                    )));
                 }
 
                 if let Some(treatment_date) = record.treatment_date {
                     if let Err(e) = validate_date(&treatment_date.to_string()) {
                         log::error!("Invalid treatment date at record {}: {}", idx + 1, e);
-                        return Err(Box::new(SamplingError::invalid_date("Invalid treatment date".to_string())));
+                        return Err(Box::new(SamplingError::invalid_date(
+                            "Invalid treatment date".to_string(),
+                        )));
                     }
                 }
 
@@ -282,7 +285,9 @@ impl MatchingCriteria {
     /// Returns `SamplingError::invalid_criteria` if either window value is not positive
     pub fn validate(&self) -> Result<(), crate::errors::SamplingError> {
         if self.birth_date_window <= 0 || self.parent_date_window <= 0 {
-            return Err(crate::errors::SamplingError::invalid_criteria("Birth or parent date window must be positive"));
+            return Err(crate::errors::SamplingError::invalid_criteria(
+                "Birth or parent date window must be positive",
+            ));
         }
         Ok(())
     }

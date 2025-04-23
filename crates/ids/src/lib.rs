@@ -59,20 +59,20 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 /// # Errors
 /// * Returns an error if logging initialization fails
 fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use chrono::Local;
     use indicatif::MultiProgress;
     use indicatif_log_bridge::LogWrapper;
     use log::LevelFilter;
-    use std::path::Path;
+    use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+    use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+    use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
     use log4rs::{
         append::{console::ConsoleAppender, file::FileAppender, rolling_file::RollingFileAppender},
+        config::{Appender, Config, Logger, Root},
         encode::pattern::PatternEncoder,
-        config::{Appender, Config, Root, Logger},
         filter::threshold::ThresholdFilter,
     };
-    use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
-    use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
-    use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
-    use chrono::Local;
+    use std::path::Path;
 
     // Get the log level from environment or use a default
     let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
@@ -96,7 +96,7 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
 
     // Create timestamp for this session
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    
+
     // Prepare log file paths
     let main_log_path = logs_dir.join("ids.log");
     let session_log_path = logs_dir.join(format!("ids_session_{}.log", timestamp));
@@ -105,34 +105,37 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
     // Create console appender with colored output
     let stdout = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{h({d(%Y-%m-%d %H:%M:%S)} - {h({l})} [{T}] {t} - {m}{n})}"
+            "{h({d(%Y-%m-%d %H:%M:%S)} - {h({l})} [{T}] {t} - {m}{n})}",
         )))
         .build();
 
     // Create file appender for main log (append mode)
     let main_log_file = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S)} - {l} [{T}] {t} - {m}{n}"
+            "{d(%Y-%m-%d %H:%M:%S)} - {l} [{T}] {t} - {m}{n}",
         )))
         .build(main_log_path.clone())?;
 
     // Create file appender for session-specific log
     let session_log_file = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S.%3f)} - {l} [{T}] {t} - {m}{n}"
+            "{d(%Y-%m-%d %H:%M:%S.%3f)} - {l} [{T}] {t} - {m}{n}",
         )))
         .build(session_log_path.clone())?;
 
     // Create rolling file appender for debug logs with size trigger (10MB)
     let size_trigger = SizeTrigger::new(10 * 1024 * 1024); // 10MB size trigger
     let window_roller = FixedWindowRoller::builder()
-        .build(&format!("{}/debug_{}.{{}}.log", logs_dir.display(), timestamp), 5)
+        .build(
+            &format!("{}/debug_{}.{{}}.log", logs_dir.display(), timestamp),
+            5,
+        )
         .unwrap();
     let compound_policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(window_roller));
-    
+
     let debug_log_file = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S.%3f)} [{T}] {l} {M}:{L} - {m}{n}"
+            "{d(%Y-%m-%d %H:%M:%S.%3f)} [{T}] {l} {M}:{L} - {m}{n}",
         )))
         .build(debug_log_path.clone(), Box::new(compound_policy))?;
 
@@ -144,17 +147,21 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
         .appender(
             Appender::builder()
                 .filter(Box::new(ThresholdFilter::new(LevelFilter::Debug)))
-                .build("debug_log", Box::new(debug_log_file))
+                .build("debug_log", Box::new(debug_log_file)),
         )
         // Set up loggers for specific modules to capture more detailed logs
-        .logger(Logger::builder()
-            .appender("debug_log")
-            .additive(false)
-            .build("types", LevelFilter::Debug))
-        .logger(Logger::builder()
-            .appender("debug_log")
-            .additive(false)
-            .build("loader", LevelFilter::Debug))
+        .logger(
+            Logger::builder()
+                .appender("debug_log")
+                .additive(false)
+                .build("types", LevelFilter::Debug),
+        )
+        .logger(
+            Logger::builder()
+                .appender("debug_log")
+                .additive(false)
+                .build("loader", LevelFilter::Debug),
+        )
         // Root logger configuration
         .build(
             Root::builder()
@@ -164,7 +171,7 @@ fn initialize_logging_with_files(output_dir: &str) -> Result<(), Box<dyn std::er
                 .appender("debug_log")
                 .build(log_level),
         )?;
-    
+
     // Initialize log4rs with the config
     log4rs::init_config(config)?;
 

@@ -1,6 +1,6 @@
+use arrow::record_batch::RecordBatch;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use arrow::record_batch::RecordBatch;
 use types::error::IdsError;
 
 use crate::formats::load_parquet_files_parallel;
@@ -29,14 +29,14 @@ pub fn load_ind(
     pnr_filter: Option<&HashSet<String>>,
 ) -> Result<Vec<RecordBatch>, IdsError> {
     log::info!("Loading IND data from {}", base_path);
-    
+
     // Create a progress tracker
     let progress = LoaderProgress::new();
     progress.set_main_message("Loading IND data");
-    
+
     // Normalize path handling for both directory and file scenarios
     let path = Path::new(base_path);
-    
+
     // Determine the actual path to search
     let ind_path = if path.is_dir() {
         // Check for an "ind" subdirectory
@@ -59,10 +59,10 @@ pub fn load_ind(
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."))
     };
-    
+
     // Get the schema for IND data
     let schema = ind_schema();
-    
+
     // Load the Parquet files
     let batches = if ind_path.is_dir() {
         load_parquet_files_parallel(&ind_path, Some(&schema), pnr_filter, Some(&progress))?
@@ -73,7 +73,7 @@ pub fn load_ind(
         log::warn!("No IND data found at {}", base_path);
         Vec::new()
     };
-    
+
     log::info!("Loaded {} record batches of IND data", batches.len());
     Ok(batches)
 }

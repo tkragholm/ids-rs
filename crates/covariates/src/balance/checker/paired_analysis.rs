@@ -23,45 +23,50 @@ impl BalanceChecker {
         for (case_pnr, case_date) in cases {
             cases_by_date.entry(*case_date).or_default().push(case_pnr);
         }
-        
+
         // Do the same for controls
         let mut controls_by_date: HashMap<NaiveDate, Vec<&str>> = HashMap::new();
         for (control_pnr, control_date) in controls {
-            controls_by_date.entry(*control_date).or_default().push(control_pnr);
+            controls_by_date
+                .entry(*control_date)
+                .or_default()
+                .push(control_pnr);
         }
-        
+
         // Determine optimal chunk size based on number of pairs
-        let total_pairs: usize = cases_by_date.iter()
+        let total_pairs: usize = cases_by_date
+            .iter()
             .map(|(date, case_pnrs)| {
                 let control_count = controls_by_date.get(date).map_or(0, |c| c.len());
                 case_pnrs.len() * control_count
             })
             .sum();
-            
+
         let num_threads = rayon::current_num_threads();
         let chunk_size = (total_pairs / num_threads).clamp(100, 5000);
-        
+
         debug!(
-            "Processing {} matched pairs for {} cases and {} controls using chunk size {}", 
-            total_pairs, cases.len(), controls.len(), chunk_size
+            "Processing {} matched pairs for {} cases and {} controls using chunk size {}",
+            total_pairs,
+            cases.len(),
+            controls.len(),
+            chunk_size
         );
-        
+
         // Use a thread-safe container for collecting results
         let pair_details = Arc::new(Mutex::new(Vec::with_capacity(total_pairs * 4)));
-        
+
         // Define the variables we'll use for prefetching - include Occupation
         let covariate_types = [
             CovariateType::Demographics,
-            CovariateType::Income, 
+            CovariateType::Income,
             CovariateType::Education,
             CovariateType::Occupation,
         ];
-        
+
         // Convert HashMaps to Vecs for parallel processing
-        let date_groups: Vec<(NaiveDate, Vec<&str>)> = cases_by_date
-            .into_iter()
-            .collect();
-        
+        let date_groups: Vec<(NaiveDate, Vec<&str>)> = cases_by_date.into_iter().collect();
+
         // Process each date group in parallel using rayon
         date_groups.par_iter().for_each(|(date, case_pnrs)| {
             // Get matching controls for this date
@@ -69,27 +74,27 @@ impl BalanceChecker {
                 Some(pnrs) => pnrs,
                 None => return, // No controls for this date
             };
-            
+
             // For large enough groups, prefetch all the data we'll need
             if case_pnrs.len() * control_pnrs.len() > 100 {
                 // Collect all PNRs for prefetching (both cases and controls)
                 let mut all_pnrs = Vec::with_capacity(case_pnrs.len() + control_pnrs.len());
                 all_pnrs.extend(case_pnrs.iter().map(|p| p.to_string()));
                 all_pnrs.extend(control_pnrs.iter().map(|p| p.to_string()));
-                
+
                 // Prefetch all data for this date group
                 self.prefetch_data(&all_pnrs, &covariate_types, &[*date]);
             }
-            
+
             // Process each case-control pair
             for &case_pnr in case_pnrs {
                 for &control_pnr in control_pnrs {
                     let mut batch_details = Vec::new();
-                    
+
                     // --- DEMOGRAPHICS ---
-                    
+
                     // Original variables
-                    
+
                     // Family Size
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -113,9 +118,9 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // New demographics variables
-                    
+
                     // Age
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -127,7 +132,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // Children Count
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -139,9 +144,9 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // --- INCOME ---
-                    
+
                     // Original income variable
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -153,9 +158,9 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // New income variables
-                    
+
                     // Wage Income
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -167,7 +172,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // Employment Status
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -181,8 +186,8 @@ impl BalanceChecker {
                     }
 
                     // --- EDUCATION ---
-                    
-                    // Education Level - treated as a numeric value 
+
+                    // Education Level - treated as a numeric value
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
                         control_pnr,
@@ -196,7 +201,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // ISCED Level - convert from string code to numeric value for comparison
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -205,20 +210,19 @@ impl BalanceChecker {
                         CovariateType::Education,
                         "ISCED Level",
                         |cov| {
-                            cov.isced_code()
-                                .and_then(|code| {
-                                    // Extract the first character which should be the ISCED level
-                                    if !code.is_empty() {
-                                        code[0..1].parse::<f64>().ok()
-                                    } else {
-                                        None
-                                    }
-                                })
+                            cov.isced_code().and_then(|code| {
+                                // Extract the first character which should be the ISCED level
+                                if !code.is_empty() {
+                                    code[0..1].parse::<f64>().ok()
+                                } else {
+                                    None
+                                }
+                            })
                         },
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // Education Years - already a numeric value
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -230,12 +234,12 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // --- OCCUPATION ---
-                    
+
                     // Original occupation variables
-                    
-                    // SOCIO13 Occupation Code - convert directly to numeric 
+
+                    // SOCIO13 Occupation Code - convert directly to numeric
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
                         control_pnr,
@@ -249,7 +253,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // Classification System - treat as categorical but convert to numeric
                     // This is retained for compatibility with any non-SOCIO13 classification systems
                     if let Ok(Some(detail)) = self.process_matched_pair(
@@ -271,9 +275,9 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // New occupation variables
-                    
+
                     // SOCIO
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -285,7 +289,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // SOCIO02
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -297,7 +301,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // PRE_SOCIO
                     if let Ok(Some(detail)) = self.process_matched_pair(
                         case_pnr,
@@ -309,7 +313,7 @@ impl BalanceChecker {
                     ) {
                         batch_details.push(detail);
                     }
-                    
+
                     // Add all details at once to minimize lock contention
                     if !batch_details.is_empty() {
                         let mut details = pair_details.lock();
@@ -318,7 +322,7 @@ impl BalanceChecker {
                 }
             }
         });
-        
+
         // Add all collected pair details to the results
         let collected_details = match Arc::try_unwrap(pair_details) {
             Ok(mutex) => mutex.into_inner(),
@@ -327,9 +331,9 @@ impl BalanceChecker {
                 guard.clone()
             }
         };
-            
+
         log::debug!("Collected {} matched pair details", collected_details.len());
-        
+
         for detail in collected_details {
             results.add_pair_detail(detail);
         }

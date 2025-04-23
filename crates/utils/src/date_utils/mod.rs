@@ -8,10 +8,10 @@
 //! into a single, comprehensive implementation that can be used throughout the
 //! codebase.
 
-mod core;
-mod formatting;
-mod parsing;
-mod periods;
+pub mod core;
+pub mod formatting;
+pub mod parsing;
+pub mod periods;
 
 pub use core::*;
 pub use formatting::*;

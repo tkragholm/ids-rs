@@ -1,9 +1,9 @@
-use types::error::{IdsError, Result};
-use types::models::{Covariate, CovariateType};
-use types::traits::CovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;
+use types::error::{IdsError, Result};
+use types::models::{Covariate, CovariateType};
+use types::traits::CovariateProcessor;
 
 /// Processor for education covariates
 pub struct EducationProcessor {
@@ -24,21 +24,19 @@ impl CovariateProcessor for EducationProcessor {
         // Default implementation - would be overridden by concrete implementation
         Err(IdsError::invalid_operation("Not implemented".to_string()))
     }
-    
+
     fn covariate_type(&self) -> CovariateType {
         CovariateType::Education
     }
-    
+
     fn required_fields(&self) -> Vec<String> {
-        vec![
-            "HFAUDD".to_string(),
-        ]
+        vec!["HFAUDD".to_string()]
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn is_categorical(&self) -> bool {
         // Default to false
         false
@@ -66,12 +64,12 @@ impl CovariateProcessor for EducationProcessor {
 impl ConfigurableProcessor for EducationProcessor {
     fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error> {
         if config.covariate_type != CovariateType::Education {
-            return Err(Error::config(
-                format!("Invalid covariate type: expected Education, got {:?}", 
-                config.covariate_type)
-            ));
+            return Err(Error::config(format!(
+                "Invalid covariate type: expected Education, got {:?}",
+                config.covariate_type
+            )));
         }
-        
+
         Ok(Self {
             name: config.name.clone(),
         })

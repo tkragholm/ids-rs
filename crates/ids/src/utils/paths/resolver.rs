@@ -1,5 +1,5 @@
-use std::path::Path;
 use log;
+use std::path::Path;
 
 /// Resolve a path - absolute or relative to base
 ///
@@ -15,7 +15,7 @@ use log;
 #[must_use]
 pub fn resolve_path(base_path: &str, path: &str) -> String {
     let path_obj = Path::new(path);
-    
+
     if path_obj.is_absolute() {
         path.to_string()
     } else {

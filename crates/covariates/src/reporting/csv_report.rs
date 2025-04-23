@@ -18,22 +18,22 @@ pub fn categorize_variable(variable: &str) -> (&'static str, &'static str, &'sta
         v if v.contains("Citizenship") => ("Demographics", "BEF", "STATSB"),
         v if v.contains("Age") => ("Demographics", "BEF", "ALDER"),
         v if v.contains("Children Count") => ("Demographics", "BEF", "ANTBOERNF/ANTBOERNH"),
-        
+
         // Income variables (IND)
         "Income" => ("Income", "IND", "PERINDKIALT_13"),
         v if v.contains("Wage Income") => ("Income", "IND", "LOENMV_13"),
         v if v.contains("Employment Status") => ("Income", "IND", "BESKST13"),
-        
+
         // Occupation variables (AKM)
         v if v.contains("SOCIO13") => ("Occupation", "AKM", "SOCIO13"),
         v if v == "SOCIO" || v.contains("SOCIO Category") => ("Occupation", "AKM", "SOCIO"),
         v if v.contains("SOCIO02") => ("Occupation", "AKM", "SOCIO02"),
         v if v.contains("Previous Socioeconomic") => ("Occupation", "IND", "PRE_SOCIO"),
         v if v.contains("Classification System") => ("Occupation", "AKM", "Classification"),
-        
+
         // Education variables
         v if v.contains("Education") || v.contains("ISCED") => ("Education", "UDDA", "Education"),
-        
+
         // Default case
         _ => ("Other", "", ""),
     }
@@ -47,7 +47,7 @@ impl CsvReport for BalanceReport {
         wtr.write_record([
             "Variable",
             "Category",
-            "Register", 
+            "Register",
             "Register Variable",
             "Mean (Cases)",
             "Mean (Controls)",
@@ -60,7 +60,7 @@ impl CsvReport for BalanceReport {
         for row in self.generate_summary_statistics() {
             // Categorize the variable
             let (category, register, register_var) = categorize_variable(&row.variable);
-            
+
             wtr.write_record([
                 &row.variable,
                 category,

@@ -41,7 +41,7 @@ impl BalanceChecker {
         self.log_balance_statistics(&results);
         Ok(results)
     }
-    
+
     /// Calculate balance metrics for all covariate types
     fn add_all_balances(
         &self,
@@ -53,7 +53,7 @@ impl BalanceChecker {
         // Update progress bar to account for occupation processing
         let total_steps = 4; // demographics, income, education, occupation
         overall_pb.set_length(total_steps);
-        
+
         overall_pb.set_message("Processing demographics...");
         self.calculate_demographic_balance(results, cases, controls)?;
         overall_pb.inc(1);
@@ -65,7 +65,7 @@ impl BalanceChecker {
         overall_pb.set_message("Processing education...");
         self.calculate_education_balance(results, cases, controls)?;
         overall_pb.inc(1);
-        
+
         overall_pb.set_message("Processing occupation...");
         self.calculate_occupation_balance(results, cases, controls)?;
         overall_pb.inc(1);
@@ -117,7 +117,7 @@ impl BalanceChecker {
         results.add_missing_rate("Family Type".to_string(), missing_rates.0, missing_rates.1);
 
         // New variables from TROUBLE.md (BEF register)
-        
+
         // Civil status (CIVST) - Categorical
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -132,7 +132,7 @@ impl BalanceChecker {
             results.add_summary(summary);
         }
         results.add_missing_rate("Civil Status".to_string(), missing_rates.0, missing_rates.1);
-        
+
         // Gender (KOEN) - Categorical
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -147,7 +147,7 @@ impl BalanceChecker {
             results.add_summary(summary);
         }
         results.add_missing_rate("Gender".to_string(), missing_rates.0, missing_rates.1);
-        
+
         // Citizenship (STATSB) - Categorical
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -162,7 +162,7 @@ impl BalanceChecker {
             results.add_summary(summary);
         }
         results.add_missing_rate("Citizenship".to_string(), missing_rates.0, missing_rates.1);
-        
+
         // Age (ALDER) - Numeric
         let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -174,7 +174,7 @@ impl BalanceChecker {
         )?;
         results.add_summary(summary);
         results.add_missing_rate("Age".to_string(), missing_rates.0, missing_rates.1);
-        
+
         // Children count (ANTBOERNF/ANTBOERNH) - Numeric
         let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -185,7 +185,11 @@ impl BalanceChecker {
             |covariate| covariate.children_count().map(|val| val as f64),
         )?;
         results.add_summary(summary);
-        results.add_missing_rate("Children Count".to_string(), missing_rates.0, missing_rates.1);
+        results.add_missing_rate(
+            "Children Count".to_string(),
+            missing_rates.0,
+            missing_rates.1,
+        );
 
         Ok(())
     }
@@ -210,7 +214,7 @@ impl BalanceChecker {
         results.add_missing_rate("Income".to_string(), missing_rates.0, missing_rates.1);
 
         // New variables from TROUBLE.md (IND register)
-        
+
         // Wage income (LOENMV_13) - Numeric
         let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -223,7 +227,7 @@ impl BalanceChecker {
 
         results.add_summary(summary);
         results.add_missing_rate("Wage Income".to_string(), missing_rates.0, missing_rates.1);
-        
+
         // Employment status (BESKST13) - Numeric categorical
         let (summary, missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -235,8 +239,12 @@ impl BalanceChecker {
         )?;
 
         results.add_summary(summary);
-        results.add_missing_rate("Employment Status".to_string(), missing_rates.0, missing_rates.1);
-        
+        results.add_missing_rate(
+            "Employment Status".to_string(),
+            missing_rates.0,
+            missing_rates.1,
+        );
+
         // Also add as categorical for better representation
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -250,7 +258,11 @@ impl BalanceChecker {
         for summary in summaries {
             results.add_summary(summary);
         }
-        results.add_missing_rate("Employment Status Category".to_string(), missing_rates.0, missing_rates.1);
+        results.add_missing_rate(
+            "Employment Status Category".to_string(),
+            missing_rates.0,
+            missing_rates.1,
+        );
 
         Ok(())
     }
@@ -279,7 +291,7 @@ impl BalanceChecker {
             missing_rates.0,
             missing_rates.1,
         );
-        
+
         // 2. Process ISCED codes as a separate categorical variable
         // Only if ISCED codes are available in the data
         let (isced_summaries, isced_missing_rates) = self.metrics.calculate_categorical_balance(
@@ -299,7 +311,7 @@ impl BalanceChecker {
             isced_missing_rates.0,
             isced_missing_rates.1,
         );
-        
+
         // 3. Process education years as a numeric variable (if available)
         let (years_summary, years_missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -309,7 +321,7 @@ impl BalanceChecker {
             "Education Years",
             |covariate| covariate.education_years().map(|y| y as f64),
         )?;
-        
+
         results.add_summary(years_summary);
         results.add_missing_rate(
             "Education Years".to_string(),
@@ -319,7 +331,7 @@ impl BalanceChecker {
 
         Ok(())
     }
-    
+
     fn calculate_occupation_balance(
         &self,
         results: &mut BalanceResults,
@@ -344,7 +356,7 @@ impl BalanceChecker {
             code_missing_rates.0,
             code_missing_rates.1,
         );
-        
+
         // 2. Process SOCIO13 codes as a numeric variable for standardized difference calculation
         let (socio_summary, socio_missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -353,18 +365,20 @@ impl BalanceChecker {
             CovariateType::Occupation,
             "SOCIO13 Value",
             |covariate| {
-                covariate.occupation_code().clone()
+                covariate
+                    .occupation_code()
+                    .clone()
                     .and_then(|code| code.parse::<f64>().ok())
             },
         )?;
-        
+
         results.add_summary(socio_summary);
         results.add_missing_rate(
             "SOCIO13 Value".to_string(),
             socio_missing_rates.0,
             socio_missing_rates.1,
         );
-        
+
         // 3. Process occupation classification system as a separate categorical variable
         // This might be used for different versions or systems (DISCO, ISCO, etc.)
         let (class_summaries, class_missing_rates) = self.metrics.calculate_categorical_balance(
@@ -384,9 +398,9 @@ impl BalanceChecker {
             class_missing_rates.0,
             class_missing_rates.1,
         );
-        
+
         // New variables from TROUBLE.md (AKM register)
-        
+
         // SOCIO - older socioeconomic classification
         let (socio_summary, socio_missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -396,14 +410,14 @@ impl BalanceChecker {
             "SOCIO",
             |covariate| covariate.socio().map(|val| val as f64),
         )?;
-        
+
         results.add_summary(socio_summary);
         results.add_missing_rate(
             "SOCIO".to_string(),
             socio_missing_rates.0,
             socio_missing_rates.1,
         );
-        
+
         // Also as categorical
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -422,7 +436,7 @@ impl BalanceChecker {
             missing_rates.0,
             missing_rates.1,
         );
-        
+
         // SOCIO02 - another socioeconomic classification
         let (socio02_summary, socio02_missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -432,14 +446,14 @@ impl BalanceChecker {
             "SOCIO02",
             |covariate| covariate.socio02().map(|val| val as f64),
         )?;
-        
+
         results.add_summary(socio02_summary);
         results.add_missing_rate(
             "SOCIO02".to_string(),
             socio02_missing_rates.0,
             socio02_missing_rates.1,
         );
-        
+
         // Also as categorical
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -458,7 +472,7 @@ impl BalanceChecker {
             missing_rates.0,
             missing_rates.1,
         );
-        
+
         // PRE_SOCIO - previous socioeconomic status
         let (pre_socio_summary, pre_socio_missing_rates) = self.metrics.calculate_numeric_balance(
             self,
@@ -468,14 +482,14 @@ impl BalanceChecker {
             "Previous Socioeconomic Status",
             |covariate| covariate.pre_socio().map(|val| val as f64),
         )?;
-        
+
         results.add_summary(pre_socio_summary);
         results.add_missing_rate(
             "Previous Socioeconomic Status".to_string(),
             pre_socio_missing_rates.0,
             pre_socio_missing_rates.1,
         );
-        
+
         // Also as categorical
         let (summaries, missing_rates) = self.metrics.calculate_categorical_balance(
             self,
@@ -497,7 +511,7 @@ impl BalanceChecker {
 
         Ok(())
     }
-    
+
     /// Log statistics about the balance calculation results
     fn log_balance_statistics(&self, results: &BalanceResults) {
         debug!("Balance calculation completed:");

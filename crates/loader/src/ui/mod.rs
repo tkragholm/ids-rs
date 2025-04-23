@@ -1,4 +1,4 @@
-mod progress;
 pub mod console;
+mod progress;
 
 pub use progress::LoaderProgress;

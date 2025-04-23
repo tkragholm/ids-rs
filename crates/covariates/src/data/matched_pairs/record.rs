@@ -69,10 +69,10 @@ impl CaseWithControls {
     /// grouping by case_id
     pub fn from_matched_pair_records(records: &[MatchedPairRecord]) -> Vec<Self> {
         let mut case_map: hashbrown::HashMap<String, CaseWithControls> = hashbrown::HashMap::new();
-        
+
         for record in records {
             let case_id = record.case_id.clone();
-            
+
             // Convert the control part of the MatchedPairRecord to a Control
             let control = Control {
                 id: record.control_id.clone(),
@@ -82,7 +82,7 @@ impl CaseWithControls {
                 mother_age_diff: Some(record.mother_age_diff_days),
                 father_age_diff: Some(record.father_age_diff_days),
             };
-            
+
             // If we've seen this case before, add this control to its list
             if let Some(case_entry) = case_map.get_mut(&case_id) {
                 case_entry.controls.push(control);
@@ -98,7 +98,7 @@ impl CaseWithControls {
                 case_map.insert(case_id, case_entry);
             }
         }
-        
+
         case_map.into_values().collect()
     }
 }

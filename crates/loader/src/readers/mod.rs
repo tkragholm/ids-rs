@@ -41,10 +41,10 @@ pub trait DataReader {
     /// # Errors
     /// Returns an error if reading fails
     fn read_batches_with_filter(
-        &self, 
-        path: &Path, 
+        &self,
+        path: &Path,
         schema: &Schema,
-        pnr_filter: &HashSet<String>
+        pnr_filter: &HashSet<String>,
     ) -> Result<Vec<RecordBatch>, IdsError>;
 
     /// Read Annual Register (AKM) data for a specific year

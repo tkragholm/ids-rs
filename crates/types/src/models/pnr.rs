@@ -1,7 +1,7 @@
-use chrono::{Duration, NaiveDate};
-use rand::Rng;
-use hashbrown::HashMap;
 use crate::error::{IdsError, Result};
+use chrono::{Duration, NaiveDate};
+use hashbrown::HashMap;
+use rand::Rng;
 
 pub type PersonInfo = (NaiveDate, String);
 pub type ParentPair = (PersonInfo, PersonInfo);

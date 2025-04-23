@@ -1,7 +1,6 @@
 use crate::error::{IdsError, Result};
 use arrow::array::{
-    Array, ArrayData, BooleanArray, Date32Array, Float64Array, Int32Array, StringArray,
-    make_array,
+    make_array, Array, ArrayData, BooleanArray, Date32Array, Float64Array, Int32Array, StringArray,
 };
 use arrow::buffer::Buffer;
 use arrow::compute::filter_record_batch;
@@ -39,15 +38,15 @@ impl ArrowUtils {
                     if matches!(batch.schema().field(idx).data_type(), DataType::Utf8) {
                         return Ok(Some(idx));
                     }
-                },
+                }
                 Err(_) => continue, // Column name not found, try the next one
             }
         }
-        
+
         // No PNR column found
         Ok(None)
     }
-    
+
     /// Filter a batch by a boolean mask
     ///
     /// # Arguments
@@ -62,23 +61,26 @@ impl ArrowUtils {
     pub fn filter_batch_by_mask(batch: &RecordBatch, mask: &[bool]) -> Result<Option<RecordBatch>> {
         // Create a BooleanArray from the mask
         let mask_array = BooleanArray::from(mask.to_vec());
-        
+
         // Apply the filter
         match filter_record_batch(batch, &mask_array) {
             Ok(filtered) if filtered.num_rows() > 0 => Ok(Some(filtered)),
             Ok(_) => Ok(None), // Empty result
-            Err(e) => Err(IdsError::invalid_operation(format!("Failed to filter batch: {}", e))),
+            Err(e) => Err(IdsError::invalid_operation(format!(
+                "Failed to filter batch: {}",
+                e
+            ))),
         }
     }
-    
+
     /// Create a new empty batch with the given schema
-    /// 
+    ///
     /// # Arguments
     /// * `schema` - The schema for the empty batch
-    /// 
+    ///
     /// # Returns
     /// A new empty RecordBatch with the provided schema
-    /// 
+    ///
     /// # Errors
     /// Returns an error if the empty batch cannot be created
     pub fn create_empty_batch(schema: ArrowSchema) -> Result<RecordBatch> {
@@ -102,12 +104,12 @@ impl ArrowUtils {
             .collect();
 
         let fields_len = fields.len();
-        RecordBatch::try_new(schema_arc, columns)
-            .map_err(|err| {
-                IdsError::invalid_operation(
-                    format!("Failed to create empty batch with {} fields: {}", fields_len, err)
-                )
-            })
+        RecordBatch::try_new(schema_arc, columns).map_err(|err| {
+            IdsError::invalid_operation(format!(
+                "Failed to create empty batch with {} fields: {}",
+                fields_len, err
+            ))
+        })
     }
 
     /// Get Unix epoch (1970-01-01) date safely
@@ -136,12 +138,12 @@ impl ArrowUtils {
     pub fn date_to_days_since_epoch(date: NaiveDate) -> Result<i32> {
         let epoch = Self::get_unix_epoch()?;
         let days = date.signed_duration_since(epoch).num_days();
-        
+
         // Safely convert to i32, checking for overflow
         i32::try_from(days).map_err(|_| {
-            IdsError::invalid_date(
-                format!("Date conversion overflow: days since epoch ({days}) exceeds i32 range")
-            )
+            IdsError::invalid_date(format!(
+                "Date conversion overflow: days since epoch ({days}) exceeds i32 range"
+            ))
         })
     }
 
@@ -264,13 +266,13 @@ impl ArrowUtils {
     }
 
     /// Align a batch's buffers for better memory performance
-    /// 
+    ///
     /// # Arguments
     /// * `batch` - The record batch to align
-    /// 
+    ///
     /// # Returns
     /// A new record batch with aligned buffers
-    /// 
+    ///
     /// # Errors
     /// Returns an error if the aligned batch cannot be created
     pub fn align_batch_buffers(batch: &RecordBatch) -> Result<RecordBatch> {
@@ -284,10 +286,9 @@ impl ArrowUtils {
             })
             .collect();
 
-        RecordBatch::try_new(batch.schema(), columns)
-            .map_err(|err| {
-                IdsError::invalid_operation(format!("Failed to create aligned batch: {err}"))
-            })
+        RecordBatch::try_new(batch.schema(), columns).map_err(|err| {
+            IdsError::invalid_operation(format!("Failed to create aligned batch: {err}"))
+        })
     }
 
     /// Create a sliced array for zero-copy operations
@@ -314,8 +315,8 @@ impl ArrowUtils {
     pub fn arrays_equal_by_ptr(array1: &dyn Array, array2: &dyn Array) -> bool {
         // Since we can't use ptr_eq directly on ArrayData, we compare memory addresses
         std::ptr::eq(
-            array1.to_data().buffers()[0].as_ptr(), 
-            array2.to_data().buffers()[0].as_ptr()
+            array1.to_data().buffers()[0].as_ptr(),
+            array2.to_data().buffers()[0].as_ptr(),
         )
     }
 }

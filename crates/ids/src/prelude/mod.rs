@@ -2,7 +2,7 @@
 // to make it more convenient to import them
 
 // Re-export error types
-pub use crate::core::error::{IdsError, IdsResult, ErrorContext};
+pub use crate::core::error::{ErrorContext, IdsError, IdsResult};
 
 // Re-export CLI types
 pub use crate::cli::types::{Cli, Commands, ConfigCommands};

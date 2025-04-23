@@ -10,62 +10,34 @@ mod ui;
 
 // Re-export configuration related types
 pub use config::{
-    LoaderConfig, 
-    RegisterPathConfig,
-    env::{get_batch_size, get_max_threads, should_use_family_filtering, use_parallel_loading}
+    env::{get_batch_size, get_max_threads, should_use_family_filtering, use_parallel_loading},
+    LoaderConfig, RegisterPathConfig,
 };
 
 // Re-export core loader implementations
-pub use loaders::{
-    StoreLoader,
-    ParallelLoader,
-    SequentialLoader,
-};
+pub use loaders::{ParallelLoader, SequentialLoader, StoreLoader};
 
 // Re-export reader related types
-pub use readers::{
-    DataReader,
-    FileReader,
-    CustomPathReader,
-};
+pub use readers::{CustomPathReader, DataReader, FileReader};
 
 // Re-export UI related types
 pub use ui::{
-    LoaderProgress,
     console::{print_section, print_success, print_warning},
+    LoaderProgress,
 };
 
 // Re-export format utilities
-pub use formats::{
-    read_parquet,
-    read_parquet_with_filter,
-    load_parquet_files_parallel,
-};
+pub use formats::{load_parquet_files_parallel, read_parquet, read_parquet_with_filter};
 
 // Re-export registry loading functions
-pub use registry::{
-    load_akm,
-    load_bef,
-    load_family,
-    load_ind,
-    load_uddf,
-};
+pub use registry::{load_akm, load_bef, load_family, load_ind, load_uddf};
 
 // Re-export schema functions
-pub use schema::{
-    akm_schema,
-    bef_schema,
-    ind_schema,
-    uddf_schema,
-    family_schema,
-};
+pub use schema::{akm_schema, bef_schema, family_schema, ind_schema, uddf_schema};
 
 // Re-export core types from types crate
 pub use types::{
-    error::IdsError,
-    family::FamilyRelations,
-    models::*,
-    storage::arrow::backend::ArrowBackend as ArrowStore,
-    store::DataStore as UnifiedStore,
+    error::IdsError, family::FamilyRelations, models::*,
+    storage::arrow::backend::ArrowBackend as ArrowStore, store::DataStore as UnifiedStore,
     traits::Store,
 };

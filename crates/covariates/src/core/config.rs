@@ -11,22 +11,22 @@ use types::traits::VariableType;
 pub struct CovariateVariableConfig {
     /// Variable name (e.g., "Age", "Family Size")
     pub name: String,
-    
+
     /// Variable type (Numeric, Categorical, Binary)
     pub variable_type: VariableType,
-    
+
     /// Field accessor method in the Covariate struct (e.g., "get_age", "get_family_size")
     pub accessor: String,
-    
+
     /// Translation map to use for categorical variables (e.g., "family_type", "civst")
     pub translation: Option<String>,
-    
+
     /// Description of the variable
     pub description: Option<String>,
-    
+
     /// Default value when variable is missing
     pub default_value: Option<String>,
-    
+
     /// Additional configuration options as key-value pairs
     pub options: HashMap<String, String>,
 }
@@ -36,13 +36,13 @@ pub struct CovariateVariableConfig {
 pub struct CovariateTypeConfig {
     /// Name of the covariate type (e.g., "Demographics", "Income")
     pub name: String,
-    
+
     /// Covariate type enum
     pub covariate_type: CovariateType,
-    
+
     /// List of variables in this covariate type
     pub variables: Vec<CovariateVariableConfig>,
-    
+
     /// Description of the covariate type
     pub description: Option<String>,
 }
@@ -52,7 +52,7 @@ pub struct CovariateTypeConfig {
 pub struct CovariatesConfig {
     /// List of covariate types
     pub covariate_types: Vec<CovariateTypeConfig>,
-    
+
     /// Global settings
     pub settings: HashMap<String, String>,
 }
@@ -65,14 +65,17 @@ impl CovariatesConfig {
         let config: CovariatesConfig = serde_json::from_reader(reader)?;
         Ok(config)
     }
-    
+
     /// Get a covariate type configuration by type
-    pub fn get_covariate_type(&self, covariate_type: CovariateType) -> Option<&CovariateTypeConfig> {
+    pub fn get_covariate_type(
+        &self,
+        covariate_type: CovariateType,
+    ) -> Option<&CovariateTypeConfig> {
         self.covariate_types
             .iter()
             .find(|ct| ct.covariate_type == covariate_type)
     }
-    
+
     /// Get a default configuration with all standard covariate types and variables
     pub fn default_config() -> Self {
         // Demographics variables
@@ -198,7 +201,9 @@ impl CovariatesConfig {
                 variable_type: VariableType::Categorical,
                 accessor: "isced_code".to_string(),
                 translation: None,
-                description: Some("International Standard Classification of Education code".to_string()),
+                description: Some(
+                    "International Standard Classification of Education code".to_string(),
+                ),
                 default_value: None,
                 options: HashMap::new(),
             },
@@ -269,7 +274,9 @@ impl CovariatesConfig {
                     name: "Demographics".to_string(),
                     covariate_type: CovariateType::Demographics,
                     variables: demographics_variables,
-                    description: Some("Demographic variables like age, gender, and family status".to_string()),
+                    description: Some(
+                        "Demographic variables like age, gender, and family status".to_string(),
+                    ),
                 },
                 CovariateTypeConfig {
                     name: "Income".to_string(),
@@ -293,7 +300,7 @@ impl CovariatesConfig {
             settings: HashMap::new(),
         }
     }
-    
+
     /// Save the configuration to a file
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
         let json = serde_json::to_string_pretty(self)?;
@@ -313,74 +320,82 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
-    
+
     #[test]
     fn test_config_serialization() {
         let config = CovariatesConfig::default_config();
         let serialized = serde_json::to_string_pretty(&config).unwrap();
         let deserialized: CovariatesConfig = serde_json::from_str(&serialized).unwrap();
-        
-        assert_eq!(config.covariate_types.len(), deserialized.covariate_types.len());
-        
+
+        assert_eq!(
+            config.covariate_types.len(),
+            deserialized.covariate_types.len()
+        );
+
         // Check that all covariate types are present
         for ct in &config.covariate_types {
-            let found = deserialized.covariate_types
+            let found = deserialized
+                .covariate_types
                 .iter()
                 .find(|c| c.covariate_type == ct.covariate_type)
                 .unwrap();
-                
+
             assert_eq!(ct.name, found.name);
             assert_eq!(ct.variables.len(), found.variables.len());
         }
     }
-    
+
     #[test]
     fn test_save_and_load_config() -> Result<(), Box<dyn std::error::Error>> {
         let config = CovariatesConfig::default_config();
-        
+
         // Create a temporary file
         let mut temp_file = NamedTempFile::new()?;
         let path = temp_file.path().to_path_buf();
-        
+
         // Write the config to the file
         let json = serde_json::to_string_pretty(&config)?;
         temp_file.write_all(json.as_bytes())?;
         temp_file.flush()?;
-        
+
         // Load the config from the file
         let loaded_config = CovariatesConfig::from_file(&path)?;
-        
+
         // Check that the loaded config matches the original
-        assert_eq!(config.covariate_types.len(), loaded_config.covariate_types.len());
-        
+        assert_eq!(
+            config.covariate_types.len(),
+            loaded_config.covariate_types.len()
+        );
+
         Ok(())
     }
-    
+
     #[test]
     fn test_generate_default_config() -> Result<(), Box<dyn std::error::Error>> {
         // Create a temporary file
         let temp_file = NamedTempFile::new()?;
         let path = temp_file.path().to_path_buf();
-        
+
         // Generate the default config
         generate_default_config(&path)?;
-        
+
         // Load the config from the file
         let config = CovariatesConfig::from_file(&path)?;
-        
+
         // Check that the config has the expected types
         assert_eq!(config.covariate_types.len(), 4);
-        
-        let types: Vec<CovariateType> = config.covariate_types
+
+        let types: Vec<CovariateType> = config
+            .covariate_types
             .iter()
             .map(|ct| ct.covariate_type)
             .collect();
-            
+
         assert!(types.contains(&CovariateType::Demographics));
         assert!(types.contains(&CovariateType::Income));
         assert!(types.contains(&CovariateType::Education));
         assert!(types.contains(&CovariateType::Occupation));
-        
+
         Ok(())
     }
 }

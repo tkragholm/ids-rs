@@ -9,7 +9,7 @@ use super::env::{get_batch_size, get_max_threads, should_use_family_filtering};
 pub struct RegisterPathConfig {
     /// Base directory for register files
     pub base_path: String,
-    
+
     /// Custom paths for specific register types
     pub custom_paths: HashMap<String, String>,
 }
@@ -116,7 +116,7 @@ impl RegisterPathConfig {
                 "No base path or custom paths specified".to_string(),
             ));
         }
-        
+
         let resolved = self.resolve_paths()?;
         let mut invalid_paths = Vec::new();
 
@@ -142,16 +142,16 @@ impl RegisterPathConfig {
 pub struct LoaderConfig {
     /// Path configuration for register files
     pub path_config: RegisterPathConfig,
-    
+
     /// Batch size for loading data
     pub batch_size: usize,
-    
+
     /// Maximum number of threads to use
     pub max_threads: usize,
-    
+
     /// Optional set of PNRs to filter by
     pub filter_by_pnr: Option<HashSet<String>>,
-    
+
     /// Whether to use family-based filtering
     pub use_family_filtering: bool,
 }

@@ -15,7 +15,7 @@ pub trait DateHelpers {
     /// # Errors
     /// Returns an error if the conversion fails
     fn to_naive_date(&self) -> Result<NaiveDate>;
-    
+
     /// Get year from date
     ///
     /// # Returns
@@ -24,7 +24,7 @@ pub trait DateHelpers {
     /// # Errors
     /// Returns an error if the conversion to NaiveDate fails
     fn year(&self) -> Result<i32>;
-    
+
     /// Calculate age at a reference date
     ///
     /// # Arguments
@@ -38,7 +38,7 @@ pub trait DateHelpers {
     /// - The conversion to NaiveDate fails
     /// - The calculation yields an invalid age (e.g., negative)
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32>;
-    
+
     /// Check if date is in a specific year
     ///
     /// # Arguments
@@ -50,7 +50,7 @@ pub trait DateHelpers {
     /// # Errors
     /// Returns an error if the conversion to NaiveDate fails
     fn is_in_year(&self, year: i32) -> Result<bool>;
-    
+
     /// Get month from date
     ///
     /// # Returns
@@ -59,7 +59,7 @@ pub trait DateHelpers {
     /// # Errors
     /// Returns an error if the conversion to NaiveDate fails
     fn month(&self) -> Result<u32>;
-    
+
     /// Get day from date
     ///
     /// # Returns
@@ -68,7 +68,7 @@ pub trait DateHelpers {
     /// # Errors
     /// Returns an error if the conversion to NaiveDate fails
     fn day(&self) -> Result<u32>;
-    
+
     /// Get the quarter (1-4) for this date
     ///
     /// # Returns
@@ -94,7 +94,7 @@ impl DateHelpers for i32 {
     ///
     /// # Errors
     /// Returns a date_conversion error if the integer value doesn't represent a valid date
-    /// 
+    ///
     /// # Safety
     /// Uses the non-panicking from_num_days_from_ce_opt method rather than the deprecated
     /// from_num_days_from_ce method for improved safety.
@@ -102,43 +102,44 @@ impl DateHelpers for i32 {
         NaiveDate::from_num_days_from_ce_opt(*self)
             .ok_or_else(|| IdsError::date_conversion(format!("Invalid days since epoch: {}", self)))
     }
-    
+
     fn year(&self) -> Result<i32> {
         let date = self.to_naive_date()?;
         Ok(Datelike::year(&date))
     }
-    
+
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32> {
         let birth_date = self.to_naive_date()?;
-        
+
         if birth_date > *reference_date {
             return Err(IdsError::invalid_value(format!(
                 "Birth date ({}) is after reference date ({})",
                 birth_date, reference_date
             )));
         }
-        
+
         let mut age = Datelike::year(reference_date) - Datelike::year(&birth_date);
-        
+
         // Adjust if birthday hasn't occurred yet in the reference year
-        if Datelike::month(reference_date) < Datelike::month(&birth_date) ||
-           (Datelike::month(reference_date) == Datelike::month(&birth_date) && 
-            Datelike::day(reference_date) < Datelike::day(&birth_date)) {
+        if Datelike::month(reference_date) < Datelike::month(&birth_date)
+            || (Datelike::month(reference_date) == Datelike::month(&birth_date)
+                && Datelike::day(reference_date) < Datelike::day(&birth_date))
+        {
             age -= 1;
         }
-        
+
         Ok(age as u32)
     }
-    
+
     fn is_in_year(&self, year: i32) -> Result<bool> {
         Ok(self.year()? == year)
     }
-    
+
     fn month(&self) -> Result<u32> {
         let date = self.to_naive_date()?;
         Ok(Datelike::month(&date))
     }
-    
+
     fn day(&self) -> Result<u32> {
         let date = self.to_naive_date()?;
         Ok(Datelike::day(&date))
@@ -150,11 +151,11 @@ impl DateHelpers for NaiveDate {
     fn to_naive_date(&self) -> Result<NaiveDate> {
         Ok(*self)
     }
-    
+
     fn year(&self) -> Result<i32> {
         Ok(Datelike::year(self))
     }
-    
+
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32> {
         if self > reference_date {
             return Err(IdsError::invalid_value(format!(
@@ -162,27 +163,28 @@ impl DateHelpers for NaiveDate {
                 self, reference_date
             )));
         }
-        
+
         let mut age = Datelike::year(reference_date) - Datelike::year(self);
-        
+
         // Adjust if birthday hasn't occurred yet in the reference year
-        if Datelike::month(reference_date) < Datelike::month(self) ||
-           (Datelike::month(reference_date) == Datelike::month(self) && 
-            Datelike::day(reference_date) < Datelike::day(self)) {
+        if Datelike::month(reference_date) < Datelike::month(self)
+            || (Datelike::month(reference_date) == Datelike::month(self)
+                && Datelike::day(reference_date) < Datelike::day(self))
+        {
             age -= 1;
         }
-        
+
         Ok(age as u32)
     }
-    
+
     fn is_in_year(&self, year: i32) -> Result<bool> {
         Ok(Datelike::year(self) == year)
     }
-    
+
     fn month(&self) -> Result<u32> {
         Ok(Datelike::month(self))
     }
-    
+
     fn day(&self) -> Result<u32> {
         Ok(Datelike::day(self))
     }
@@ -196,35 +198,35 @@ impl DateHelpers for Option<i32> {
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn year(&self) -> Result<i32> {
         match self {
             Some(days) => days.year(),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32> {
         match self {
             Some(days) => days.age_at(reference_date),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn is_in_year(&self, year: i32) -> Result<bool> {
         match self {
             Some(days) => days.is_in_year(year),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn month(&self) -> Result<u32> {
         match self {
             Some(days) => days.month(),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn day(&self) -> Result<u32> {
         match self {
             Some(days) => days.day(),
@@ -241,35 +243,35 @@ impl DateHelpers for Option<NaiveDate> {
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn year(&self) -> Result<i32> {
         match self {
             Some(date) => Ok(Datelike::year(date)),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn age_at(&self, reference_date: &NaiveDate) -> Result<u32> {
         match self {
             Some(date) => DateHelpers::age_at(date, reference_date),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn is_in_year(&self, year: i32) -> Result<bool> {
         match self {
             Some(date) => Ok(Datelike::year(date) == year),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn month(&self) -> Result<u32> {
         match self {
             Some(date) => Ok(Datelike::month(date)),
             None => Err(IdsError::missing_value("Date is null".to_string())),
         }
     }
-    
+
     fn day(&self) -> Result<u32> {
         match self {
             Some(date) => Ok(Datelike::day(date)),

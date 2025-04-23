@@ -27,7 +27,7 @@ impl ArrowValue {
             batch: Arc::new(batch),
         }
     }
-    
+
     /// Create a new ArrowValue from an Arc-wrapped RecordBatch
     ///
     /// # Arguments
@@ -38,7 +38,7 @@ impl ArrowValue {
     pub fn from_arc(batch: Arc<RecordBatch>) -> Self {
         Self { batch }
     }
-    
+
     /// Get the underlying RecordBatch
     ///
     /// # Returns
@@ -46,7 +46,7 @@ impl ArrowValue {
     pub fn batch(&self) -> &RecordBatch {
         &self.batch
     }
-    
+
     /// Get the number of rows in the batch
     ///
     /// # Returns
@@ -54,7 +54,7 @@ impl ArrowValue {
     pub fn row_count(&self) -> usize {
         self.batch.num_rows()
     }
-    
+
     /// Check if the batch is empty
     ///
     /// # Returns
@@ -62,7 +62,7 @@ impl ArrowValue {
     pub fn is_empty(&self) -> bool {
         self.batch.num_rows() == 0
     }
-    
+
     /// Create an empty ArrowValue with the same schema
     ///
     /// # Returns
@@ -75,11 +75,9 @@ impl ArrowValue {
         let empty_arrays = schema
             .fields()
             .iter()
-            .map(|field| {
-                arrow::array::new_empty_array(field.data_type())
-            })
+            .map(|field| arrow::array::new_empty_array(field.data_type()))
             .collect::<Vec<_>>();
-            
+
         let empty_batch = RecordBatch::try_new(schema.clone(), empty_arrays)?;
         Ok(Self::new(empty_batch))
     }

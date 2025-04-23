@@ -7,17 +7,17 @@ use crossbeam_deque::{Injector, Steal, Worker};
 use parking_lot::Mutex;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 // use rayon::prelude::*;
+use arrow::array::{Array, StringArray};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 use std::thread;
-use arrow::array::{Array, StringArray};
 use types::error::IdsError;
 
 /// Read a Parquet file and return its contents as a vector of `RecordBatches`.
 ///
-/// Uses a parallel processing pipeline with crossbeam channels and worker threads 
+/// Uses a parallel processing pipeline with crossbeam channels and worker threads
 /// for better performance.
 ///
 /// # Arguments
@@ -45,19 +45,21 @@ pub fn read_parquet(
     // Check if the file exists
     if !path.exists() {
         log::error!("File not found: {}", path.display());
-        return Err(IdsError::io_error(format!("File not found: {}", path.display())));
+        return Err(IdsError::io_error(format!(
+            "File not found: {}",
+            path.display()
+        )));
     }
 
     // Create a progress bar if provided
     let progress_bar = if let Some(progress) = progress {
-        let file_size = std::fs::metadata(path)
-            .map(|m| m.len())
-            .unwrap_or(1000);
-            
-        let filename = path.file_name()
+        let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(1000);
+
+        let filename = path
+            .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or("unknown");
-            
+
         Some(progress.create_file_progress(file_size, filename))
     } else {
         None
@@ -71,7 +73,11 @@ pub fn read_parquet(
 
     // Create a reader builder
     let mut builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(|e| {
-        log::error!("Failed to create parquet reader for {}: {}", path.display(), e);
+        log::error!(
+            "Failed to create parquet reader for {}: {}",
+            path.display(),
+            e
+        );
         IdsError::invalid_operation(format!(
             "Failed to create parquet reader for {}: {}",
             path.display(),
@@ -98,7 +104,11 @@ pub fn read_parquet(
 
     // Create the reader
     let reader = builder.build().map_err(|e| {
-        log::error!("Failed to build parquet reader for {}: {}", path.display(), e);
+        log::error!(
+            "Failed to build parquet reader for {}: {}",
+            path.display(),
+            e
+        );
         IdsError::invalid_operation(format!(
             "Failed to build parquet reader for {}: {}",
             path.display(),
@@ -141,27 +151,27 @@ pub fn read_parquet(
                         None => {
                             log::warn!("Could not cast PNR column to StringArray");
                             // Create a string array once and reuse it
-                            static EMPTY_ARRAY: once_cell::sync::Lazy<StringArray> = 
+                            static EMPTY_ARRAY: once_cell::sync::Lazy<StringArray> =
                                 once_cell::sync::Lazy::new(|| StringArray::from(vec![""]));
                             &EMPTY_ARRAY
                         }
                     };
-                    
+
                     let _pnr_vec: Vec<bool> = (0..pnr_strings.len())
                         .map(|i| {
                             let pnr = pnr_strings.value(i);
                             pnr_filter.contains(pnr)
                         })
                         .collect();
-                    
+
                     // Create a filtered batch - this would require additional work
                     // For now, just return the original batch
                     // In a real implementation, you would use the boolean mask to filter rows
                     batch.clone() // Return original for now
-                },
+                }
                 None => batch.clone(), // If no PNR column, return the original batch
             };
-            
+
             // RecordBatch doesn't have is_empty() method
             // Instead we can check if it has any rows
             if filtered_batch.num_rows() > 0 {
@@ -238,7 +248,10 @@ pub fn load_parquet_files_parallel(
     pnr_filter: Option<&HashSet<String>>,
     progress: Option<&LoaderProgress>,
 ) -> Result<Vec<RecordBatch>, IdsError> {
-    log::info!("Loading Parquet files from directory: {}", dir_path.display());
+    log::info!(
+        "Loading Parquet files from directory: {}",
+        dir_path.display()
+    );
 
     // Check if the directory exists
     if !dir_path.exists() || !dir_path.is_dir() {
@@ -257,12 +270,8 @@ pub fn load_parquet_files_parallel(
             e
         ))
     })? {
-        let entry = entry.map_err(|e| {
-            IdsError::io_error(format!(
-                "Failed to read directory entry: {}",
-                e
-            ))
-        })?;
+        let entry = entry
+            .map_err(|e| IdsError::io_error(format!("Failed to read directory entry: {}", e)))?;
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
             parquet_files.push(path);
@@ -270,7 +279,10 @@ pub fn load_parquet_files_parallel(
     }
 
     if parquet_files.is_empty() {
-        log::warn!("No Parquet files found in directory: {}", dir_path.display());
+        log::warn!(
+            "No Parquet files found in directory: {}",
+            dir_path.display()
+        );
         return Ok(Vec::new());
     }
 
@@ -354,11 +366,7 @@ pub fn load_parquet_files_parallel(
                         }
                     };
 
-                    log::debug!(
-                        "Thread {} processing file: {}",
-                        thread_id,
-                        path.display()
-                    );
+                    log::debug!("Thread {} processing file: {}", thread_id, path.display());
 
                     // Process the file
                     let result = read_parquet(

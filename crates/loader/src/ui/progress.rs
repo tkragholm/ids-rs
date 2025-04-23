@@ -60,15 +60,14 @@ impl LoaderProgress {
 
     /// Start a sub-progress tracker for a specific file
     pub fn start_file_progress(&mut self, path: &Path) -> ProgressBar {
-        let filename = path.file_name()
+        let filename = path
+            .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or("unknown");
-            
+
         // Try to get file size for accurate progress
-        let file_size = std::fs::metadata(path)
-            .map(|m| m.len())
-            .unwrap_or(1000);
-            
+        let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(1000);
+
         self.create_file_progress(file_size, filename)
     }
 
@@ -83,43 +82,43 @@ impl LoaderProgress {
         sub_pb.set_prefix(prefix.to_string());
         self.sub_pb = Some(sub_pb);
     }
-    
+
     /// Increment the main progress
     pub fn inc_main(&self) {
         self.main_pb.inc(1);
     }
-    
+
     /// Increment the sub progress
     pub fn inc_sub(&self) {
         if let Some(pb) = &self.sub_pb {
             pb.inc(1);
         }
     }
-    
+
     /// Set a message on the main progress
     pub fn set_main_message(&self, msg: &str) {
         self.main_pb.set_message(msg.to_string());
     }
-    
+
     /// Set a message on the sub progress
     pub fn set_sub_message(&self, msg: &str) {
         if let Some(pb) = &self.sub_pb {
             pb.set_message(msg.to_string());
         }
     }
-    
+
     /// Finish the main progress
     pub fn finish_main(&self) {
         self.main_pb.finish_with_message("Complete");
     }
-    
+
     /// Finish the sub progress
     pub fn finish_sub(&self) {
         if let Some(pb) = &self.sub_pb {
             pb.finish();
         }
     }
-    
+
     /// Finish all progress bars
     pub fn finish(&self) {
         self.finish_sub();

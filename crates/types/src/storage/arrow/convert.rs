@@ -82,7 +82,9 @@ impl ArrowType for String {
                 Some(array.value(index).to_string())
             }
             DataType::LargeUtf8 => {
-                let array = array.as_any().downcast_ref::<arrow::array::LargeStringArray>()?;
+                let array = array
+                    .as_any()
+                    .downcast_ref::<arrow::array::LargeStringArray>()?;
                 Some(array.value(index).to_string())
             }
             _ => None,
@@ -134,7 +136,9 @@ impl ArrowType for f64 {
 
         match array.data_type() {
             DataType::Float64 => {
-                let array = array.as_any().downcast_ref::<arrow::array::Float64Array>()?;
+                let array = array
+                    .as_any()
+                    .downcast_ref::<arrow::array::Float64Array>()?;
                 Some(array.value(index))
             }
             _ => None,
@@ -150,7 +154,9 @@ impl ArrowType for bool {
 
         match array.data_type() {
             DataType::Boolean => {
-                let array = array.as_any().downcast_ref::<arrow::array::BooleanArray>()?;
+                let array = array
+                    .as_any()
+                    .downcast_ref::<arrow::array::BooleanArray>()?;
                 Some(array.value(index))
             }
             _ => None,

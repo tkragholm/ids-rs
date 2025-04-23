@@ -1,5 +1,5 @@
 // Re-export IdsError from the types crate
-pub use types::error::{LegacyErrorContext as Context, IdsError, Result};
+pub use types::error::{IdsError, LegacyErrorContext as Context, Result};
 
 // Helper functions for specific error types
 pub fn date_parse_error<T: std::fmt::Display>(msg: T) -> IdsError {
@@ -30,7 +30,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_with_context_for_io_error() {
         let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
@@ -38,7 +38,7 @@ mod tests {
         let ids_result = result.with_context(|| "Failed to read file");
         assert!(matches!(ids_result, Err(IdsError::Io(_))));
     }
-    
+
     #[test]
     fn test_with_context_for_generic_error() {
         let result: std::result::Result<(), &str> = Err("custom error");
@@ -49,15 +49,15 @@ mod tests {
             assert!(msg.contains("custom error"));
         }
     }
-    
+
     #[test]
     fn test_helper_functions() {
         let error = validation_error("Invalid input");
         assert!(matches!(error, IdsError::Validation(_)));
-        
+
         let error = config_error("Missing configuration");
         assert!(matches!(error, IdsError::Config(_)));
-        
+
         let error = date_parse_error("Invalid date format");
         assert!(matches!(error, IdsError::InvalidDate(_)));
     }

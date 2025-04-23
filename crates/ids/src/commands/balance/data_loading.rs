@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use core::utils::console::{format_duration_short, ConsoleOutput};
 use covariates::data::matched_pairs::load_matched_pairs;
 use hashbrown::HashMap;
-use loader::{ParallelLoader, StoreLoader, RegisterPathConfig};
+use loader::{ParallelLoader, RegisterPathConfig, StoreLoader};
 use log::{error, info};
 use std::collections::HashSet;
 use std::path::Path;
@@ -16,13 +16,13 @@ use super::config::BalanceCheckConfig;
 pub type MatchedPairData = (Vec<(String, NaiveDate, Vec<String>)>, HashSet<String>);
 
 /// Load matched pair data from the specified file
-/// 
+///
 /// # Arguments
 /// * `matches_path` - Path to the matches file
-/// 
+///
 /// # Returns
 /// * `IdsResult<MatchedPairData>` - Matched pairs and unique PNRs
-/// 
+///
 /// # Errors
 /// * Returns an error if the file is not found or cannot be loaded
 pub fn load_matched_pair_data(matches_path: &Path) -> IdsResult<MatchedPairData> {
@@ -33,7 +33,7 @@ pub fn load_matched_pair_data(matches_path: &Path) -> IdsResult<MatchedPairData>
     }
 
     let loading_start = Instant::now();
-    
+
     // Load the matched pairs data
     let matched_pairs = match load_matched_pairs(matches_path) {
         Ok(pairs) => pairs,
@@ -43,7 +43,7 @@ pub fn load_matched_pair_data(matches_path: &Path) -> IdsResult<MatchedPairData>
             return Err(crate::core::IdsError::data_loading(error_msg));
         }
     };
-    
+
     // Extract all unique PNRs for diagnostic mode (will be used if register data loading fails)
     let mut all_unique_pnrs = std::collections::HashSet::new();
     for (case_pnr, _, control_pnrs) in &matched_pairs {
@@ -54,26 +54,28 @@ pub fn load_matched_pair_data(matches_path: &Path) -> IdsResult<MatchedPairData>
     }
 
     let loading_time = loading_start.elapsed();
-    
+
     // Log loading statistics
     ConsoleOutput::key_value("Matched pairs loaded", &matched_pairs.len().to_string());
     ConsoleOutput::key_value("Unique PNRs found", &all_unique_pnrs.len().to_string());
     ConsoleOutput::key_value("Loading time", &format_duration_short(loading_time));
-    
+
     Ok((matched_pairs, all_unique_pnrs))
 }
 
 /// Set up data paths for registers based on configuration
-/// 
+///
 /// # Arguments
 /// * `config` - Balance check configuration
-/// 
+///
 /// # Returns
 /// * `IdsResult<(String, HashMap<String, String>)>` - Base path and custom paths
-/// 
+///
 /// # Errors
 /// * Returns an error if no paths are specified
-pub fn setup_data_paths(config: &BalanceCheckConfig) -> IdsResult<(String, HashMap<String, String>)> {
+pub fn setup_data_paths(
+    config: &BalanceCheckConfig,
+) -> IdsResult<(String, HashMap<String, String>)> {
     let mut custom_paths = HashMap::new();
     let mut has_custom_paths = false;
 
@@ -118,7 +120,7 @@ pub fn setup_data_paths(config: &BalanceCheckConfig) -> IdsResult<(String, HashM
     } else {
         ConsoleOutput::error("No covariate directory or custom paths specified");
         return Err(crate::core::IdsError::config(
-            "No covariate directory or custom paths specified"
+            "No covariate directory or custom paths specified",
         ));
     };
 
@@ -126,19 +128,22 @@ pub fn setup_data_paths(config: &BalanceCheckConfig) -> IdsResult<(String, HashM
 }
 
 /// Load register data using specified paths
-/// 
+///
 /// # Arguments
 /// * `base_path` - Base path for register data
 /// * `custom_paths` - Map of custom paths for specific registers
-/// 
+///
 /// # Returns
 /// * `IdsResult<types::storage::ArrowBackend>` - Loaded arrow store
-/// 
+///
 /// # Errors
 /// * Returns an error if data loading fails
-pub fn load_register_data(base_path: &str, custom_paths: &HashMap<String, String>) -> IdsResult<types::storage::ArrowBackend> {
+pub fn load_register_data(
+    base_path: &str,
+    custom_paths: &HashMap<String, String>,
+) -> IdsResult<types::storage::ArrowBackend> {
     ConsoleOutput::subsection("Loading Register Data");
-    
+
     let loader = ParallelLoader::new();
     let load_start = Instant::now();
     let has_custom_paths = !custom_paths.is_empty();
@@ -168,12 +173,14 @@ pub fn load_register_data(base_path: &str, custom_paths: &HashMap<String, String
             ConsoleOutput::error(&format!("Failed to load register data: {e}"));
             ConsoleOutput::warning("Will continue in diagnostic mode with limited functionality");
             error!("Failed to load register data: {}", e);
-            
+
             // Create a diagnostic mode store with no data
-            use covariates::balance::BalanceChecker;
             use crate::diagnostic::BalanceCheckerDiagnostic;
+            use covariates::balance::BalanceChecker;
             let _diagnostic_checker = BalanceChecker::new_diagnostic();
-            ConsoleOutput::warning("Using diagnostic mode with limited functionality - results will be incomplete");
+            ConsoleOutput::warning(
+                "Using diagnostic mode with limited functionality - results will be incomplete",
+            );
             return Err(crate::core::IdsError::data_loading(format!(
                 "Failed to load register data: {e}"
             )));
@@ -186,6 +193,6 @@ pub fn load_register_data(base_path: &str, custom_paths: &HashMap<String, String
         format_duration_short(load_time)
     ));
     info!("Register data loaded in {:?}", load_time);
-    
+
     Ok(store)
 }

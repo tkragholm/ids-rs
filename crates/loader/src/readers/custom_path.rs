@@ -1,8 +1,8 @@
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
 use std::collections::HashSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use arrow::record_batch::RecordBatch;
-use arrow_schema::Schema;
 use types::error::IdsError;
 
 use crate::readers::DataReader;
@@ -33,20 +33,23 @@ impl CustomPathReader {
     /// # Returns
     /// A new CustomPathReader instance
     pub fn new(base_path: &Path, paths: std::collections::HashMap<String, PathBuf>) -> Self {
-        log::debug!("Creating CustomPathReader with base path: {}", base_path.display());
-        
+        log::debug!(
+            "Creating CustomPathReader with base path: {}",
+            base_path.display()
+        );
+
         let akm_path = paths.get("akm").map(|p| base_path.join(p));
         let bef_path = paths.get("bef").map(|p| base_path.join(p));
         let ind_path = paths.get("ind").map(|p| base_path.join(p));
         let uddf_path = paths.get("uddf").map(|p| base_path.join(p));
         let family_path = paths.get("family").map(|p| base_path.join(p));
-        
+
         log::debug!("AKM path: {:?}", akm_path);
         log::debug!("BEF path: {:?}", bef_path);
         log::debug!("IND path: {:?}", ind_path);
         log::debug!("UDDF path: {:?}", uddf_path);
         log::debug!("Family path: {:?}", family_path);
-        
+
         Self {
             base_path: base_path.to_path_buf(),
             akm_path,
@@ -56,7 +59,7 @@ impl CustomPathReader {
             family_path,
         }
     }
-    
+
     /// Check if file exists and is accessible
     fn check_file(&self, path: &Path) -> Result<(), IdsError> {
         if !path.exists() {
@@ -65,14 +68,14 @@ impl CustomPathReader {
                 format!("File not found: {}", path.display()),
             )));
         }
-        
+
         if !path.is_file() {
             return Err(IdsError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!("Path is not a file: {}", path.display()),
             )));
         }
-        
+
         // Check if file can be opened
         match File::open(path) {
             Ok(_) => Ok(()),
@@ -87,7 +90,7 @@ impl CustomPathReader {
 impl DataReader for CustomPathReader {
     fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError> {
         log::info!("CustomPathReader attempting to read {}", path.display());
-        
+
         if !path.exists() {
             // Be more explicit about missing files
             log::warn!("File does not exist: {}", path.display());
@@ -138,15 +141,18 @@ impl DataReader for CustomPathReader {
             }
         }
     }
-    
+
     fn read_batches_with_filter(
-        &self, 
-        path: &Path, 
+        &self,
+        path: &Path,
         schema: &Schema,
-        pnr_filter: &HashSet<String>
+        pnr_filter: &HashSet<String>,
     ) -> Result<Vec<RecordBatch>, IdsError> {
-        log::info!("CustomPathReader attempting to read {} with PNR filter", path.display());
-        
+        log::info!(
+            "CustomPathReader attempting to read {} with PNR filter",
+            path.display()
+        );
+
         if !path.exists() {
             log::warn!("File does not exist: {}", path.display());
             return Err(IdsError::Io(std::io::Error::new(
@@ -174,12 +180,14 @@ impl DataReader for CustomPathReader {
             }
         }
 
-        log::info!(
-            "Loading parquet with PNR filter from {}",
-            path.display()
-        );
+        log::info!("Loading parquet with PNR filter from {}", path.display());
 
-        match crate::formats::parquet::read_parquet_with_filter(path, Some(schema), pnr_filter, None) {
+        match crate::formats::parquet::read_parquet_with_filter(
+            path,
+            Some(schema),
+            pnr_filter,
+            None,
+        ) {
             Ok(batches) => {
                 log::info!(
                     "Successfully read {} batches from {} with PNR filter",
@@ -189,7 +197,11 @@ impl DataReader for CustomPathReader {
                 Ok(batches)
             }
             Err(e) => {
-                log::error!("Error reading parquet file with filter {}: {}", path.display(), e);
+                log::error!(
+                    "Error reading parquet file with filter {}: {}",
+                    path.display(),
+                    e
+                );
                 Err(e)
             }
         }
@@ -197,7 +209,7 @@ impl DataReader for CustomPathReader {
 
     fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
         log::info!("Reading AKM data for year {}", year);
-        
+
         let path = match &self.akm_path {
             Some(p) => p.clone(),
             None => {
@@ -214,7 +226,7 @@ impl DataReader for CustomPathReader {
             Some(q) => log::info!("Reading BEF data for year {}, quarter {}", year, q),
             None => log::info!("Reading BEF data for year {}", year),
         }
-        
+
         let path = match &self.bef_path {
             Some(p) => p.clone(),
             None => {
@@ -228,7 +240,7 @@ impl DataReader for CustomPathReader {
 
     fn read_ind(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
         log::info!("Reading IND data for year {}", year);
-        
+
         let path = match &self.ind_path {
             Some(p) => p.clone(),
             None => {
@@ -242,7 +254,7 @@ impl DataReader for CustomPathReader {
 
     fn read_uddf(&self, period: &str) -> Result<Vec<RecordBatch>, IdsError> {
         log::info!("Reading UDDF data for period {}", period);
-        
+
         let path = match &self.uddf_path {
             Some(p) => p.clone(),
             None => {
@@ -256,11 +268,13 @@ impl DataReader for CustomPathReader {
 
     fn read_family(&self) -> Result<Vec<RecordBatch>, IdsError> {
         log::info!("Reading family relation data");
-        
+
         let path = match &self.family_path {
             Some(p) => p.clone(),
             None => {
-                return Err(IdsError::config("Family path not configured for this reader"));
+                return Err(IdsError::config(
+                    "Family path not configured for this reader",
+                ));
             }
         };
 

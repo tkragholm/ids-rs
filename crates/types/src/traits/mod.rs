@@ -22,8 +22,8 @@ pub mod utils;
 // Imports
 use crate::{
     error::Result,
-    models::{Covariate, CovariateType, TimeVaryingValue},
     family::relations::FamilyRelations,
+    models::{Covariate, CovariateType, TimeVaryingValue},
 };
 use chrono::NaiveDate;
 
@@ -307,4 +307,3 @@ impl<T: Store> FamilyAccess for T {
         self.family_relations(pnr).map(|rel| rel.birth_date)
     }
 }
-

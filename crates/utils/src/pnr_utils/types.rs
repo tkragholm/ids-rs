@@ -39,7 +39,7 @@ impl Gender {
             _ => Gender::Male,
         }
     }
-    
+
     /// Get a string representation of the gender
     ///
     /// # Returns
@@ -66,7 +66,7 @@ impl From<&str> for Gender {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_gender_from_pnr_digit() {
         assert_eq!(Gender::from_pnr_digit(1), Gender::Male);
@@ -74,14 +74,14 @@ mod tests {
         assert_eq!(Gender::from_pnr_digit(3), Gender::Male);
         assert_eq!(Gender::from_pnr_digit(4), Gender::Female);
     }
-    
+
     #[test]
     fn test_gender_to_string() {
         assert_eq!(Gender::Male.to_string(), "M");
         assert_eq!(Gender::Female.to_string(), "F");
         assert_eq!(Gender::Unknown.to_string(), "U");
     }
-    
+
     #[test]
     fn test_gender_from_string() {
         assert_eq!(Gender::from("M"), Gender::Male);

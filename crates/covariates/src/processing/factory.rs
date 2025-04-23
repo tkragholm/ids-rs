@@ -34,29 +34,35 @@ impl ConfigurableProcessorImpl {
 }
 
 impl CovariateProcessor for ConfigurableProcessorImpl {
-    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> types::error::Result<Covariate> {
+    fn process(
+        &self,
+        _store: &dyn types::traits::access::Store,
+        _year: i32,
+    ) -> types::error::Result<Covariate> {
         // Default implementation, will be overridden by concrete processors
-        Err(types::error::IdsError::invalid_operation("Not implemented".to_string()))
+        Err(types::error::IdsError::invalid_operation(
+            "Not implemented".to_string(),
+        ))
     }
-    
+
     fn covariate_type(&self) -> CovariateType {
         self.covariate_type
     }
-    
+
     fn required_fields(&self) -> Vec<String> {
         // Default to empty list - concrete implementations will provide actual fields
         Vec::new()
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn is_categorical(&self) -> bool {
         // Default to false - specialized implementations will determine this
         false
     }
-    
+
     fn process_numeric(&self, _covariate: &Covariate) -> Option<f64> {
         // Default to None - specialized implementations will be needed
         None
@@ -130,9 +136,9 @@ impl ConfigurableVariableProcessorImpl {
             // Demographics accessors - support both old and new method names
             "get_family_size" | "family_size" => covariate.family_size().map(|v| v as f64),
             "get_municipality" | "municipality" => covariate.municipality().map(|v| v as f64),
-            "get_family_type" | "family_type" => covariate
-                .family_type()
-                .and_then(|v| v.parse::<f64>().ok()),
+            "get_family_type" | "family_type" => {
+                covariate.family_type().and_then(|v| v.parse::<f64>().ok())
+            }
             "get_civil_status" | "civil_status" => covariate
                 .civil_status()
                 .map(|v| v.bytes().next().unwrap_or(0) as f64), // unwrap_or(0) is safe - default to 0 if empty string
@@ -152,7 +158,9 @@ impl ConfigurableVariableProcessorImpl {
             // Income accessors
             "get_income_amount" | "income_amount" => covariate.income_amount(),
             "get_wage_income" | "wage_income" => covariate.wage_income(),
-            "get_employment_status" | "employment_status" => covariate.employment_status().map(|v| v as f64),
+            "get_employment_status" | "employment_status" => {
+                covariate.employment_status().map(|v| v as f64)
+            }
 
             // Education accessors
             "get_education_level" | "education_level" => covariate
@@ -161,7 +169,9 @@ impl ConfigurableVariableProcessorImpl {
             "get_isced_code" | "isced_code" => covariate
                 .isced_code()
                 .map(|v| self.categorical_to_numeric(&v)),
-            "get_education_years" | "education_years" => covariate.education_years().map(|v| v as f64),
+            "get_education_years" | "education_years" => {
+                covariate.education_years().map(|v| v as f64)
+            }
 
             // Occupation accessors
             "get_occupation_code" | "occupation_code" => covariate
@@ -190,18 +200,28 @@ impl ConfigurableVariableProcessorImpl {
 
         let raw_value = match self.accessor.as_str() {
             // Demographics accessors - support both old and new method names
-            "get_family_size" | "family_size" => return covariate.family_size().map(|v| v.to_string()),
-            "get_municipality" | "municipality" => return covariate.municipality().map(|v| v.to_string()),
+            "get_family_size" | "family_size" => {
+                return covariate.family_size().map(|v| v.to_string())
+            }
+            "get_municipality" | "municipality" => {
+                return covariate.municipality().map(|v| v.to_string())
+            }
             "get_family_type" | "family_type" => covariate.family_type(),
             "get_civil_status" | "civil_status" => covariate.civil_status(),
             "get_gender" | "gender" => covariate.gender(),
             "get_citizenship" | "citizenship" => covariate.citizenship(),
             "get_age" | "age" => return covariate.age().map(|v| v.to_string()),
-            "get_children_count" | "children_count" => return covariate.children_count().map(|v| v.to_string()),
+            "get_children_count" | "children_count" => {
+                return covariate.children_count().map(|v| v.to_string())
+            }
 
             // Income accessors
-            "get_income_amount" | "income_amount" => return covariate.income_amount().map(|v| v.to_string()),
-            "get_wage_income" | "wage_income" => return covariate.wage_income().map(|v| v.to_string()),
+            "get_income_amount" | "income_amount" => {
+                return covariate.income_amount().map(|v| v.to_string())
+            }
+            "get_wage_income" | "wage_income" => {
+                return covariate.wage_income().map(|v| v.to_string())
+            }
             "get_employment_status" | "employment_status" => {
                 return covariate.employment_status().map(|v| v.to_string())
             }
@@ -209,7 +229,9 @@ impl ConfigurableVariableProcessorImpl {
             // Education accessors
             "get_education_level" | "education_level" => covariate.education_level(),
             "get_isced_code" | "isced_code" => covariate.isced_code(),
-            "get_education_years" | "education_years" => return covariate.education_years().map(|v| v.to_string()),
+            "get_education_years" | "education_years" => {
+                return covariate.education_years().map(|v| v.to_string())
+            }
 
             // Occupation accessors
             "get_occupation_code" | "occupation_code" => covariate.occupation_code(),
@@ -259,24 +281,30 @@ impl ConfigurableVariableProcessorImpl {
 }
 
 impl CovariateProcessor for ConfigurableVariableProcessorImpl {
-    fn process(&self, _store: &dyn types::traits::access::Store, _year: i32) -> types::error::Result<Covariate> {
+    fn process(
+        &self,
+        _store: &dyn types::traits::access::Store,
+        _year: i32,
+    ) -> types::error::Result<Covariate> {
         // Default implementation, will be overridden by concrete processors
-        Err(types::error::IdsError::invalid_operation("Not implemented".to_string()))
+        Err(types::error::IdsError::invalid_operation(
+            "Not implemented".to_string(),
+        ))
     }
-    
+
     fn covariate_type(&self) -> CovariateType {
         self.covariate_type
     }
-    
+
     fn required_fields(&self) -> Vec<String> {
         // Default to empty list - concrete implementations will provide actual fields
         Vec::new()
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
         self.process_value(covariate)
     }
@@ -288,7 +316,7 @@ impl CovariateProcessor for ConfigurableVariableProcessorImpl {
     fn is_categorical(&self) -> bool {
         matches!(self.variable_type, VariableType::Categorical)
     }
-    
+
     fn variable_type(&self) -> VariableType {
         self.variable_type
     }
@@ -496,7 +524,8 @@ mod tests {
         let factory = ProcessorFactory::new(config);
 
         // Create a processor for a specific variable
-        let processor = match factory.create_variable_processor(CovariateType::Demographics, "Age") {
+        let processor = match factory.create_variable_processor(CovariateType::Demographics, "Age")
+        {
             Some(p) => p,
             None => panic!("Age variable processor should be available in default config"),
         };

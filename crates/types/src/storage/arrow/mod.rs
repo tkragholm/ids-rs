@@ -8,11 +8,11 @@
 #[cfg(feature = "arrow-integration")]
 pub mod access;
 #[cfg(feature = "arrow-integration")]
+pub mod backend;
+#[cfg(feature = "arrow-integration")]
 pub mod convert;
 #[cfg(feature = "arrow-integration")]
 pub mod utils;
-#[cfg(feature = "arrow-integration")]
-pub mod backend;
 #[cfg(feature = "arrow-integration")]
 pub mod values;
 
@@ -20,13 +20,13 @@ pub mod values;
 #[cfg(feature = "arrow-integration")]
 pub use access::ArrowAccess;
 #[cfg(feature = "arrow-integration")]
-pub use values::ArrowValue;
+pub use backend::ArrowBackend;
 #[cfg(feature = "arrow-integration")]
 pub use convert::{create_schema, RecordBatchConversion};
 #[cfg(feature = "arrow-integration")]
 pub use utils::ArrowUtils;
 #[cfg(feature = "arrow-integration")]
-pub use backend::ArrowBackend;
+pub use values::ArrowValue;
 
 #[cfg(not(feature = "arrow-integration"))]
 compile_error!("The Arrow functionality requires the 'arrow-integration' feature to be enabled");

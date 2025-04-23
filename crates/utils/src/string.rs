@@ -1,22 +1,22 @@
-use crate::error::{Result, validation_error};
+use crate::error::{validation_error, Result};
 
 /// Utility trait for string operations
 pub trait StringUtils {
     /// Convert a string to title case
     fn to_title_case(s: &str) -> String;
-    
+
     /// Convert a string to snake case
     fn to_snake_case(s: &str) -> String;
-    
+
     /// Convert a string to camel case
     fn to_camel_case(s: &str) -> String;
-    
+
     /// Parse a string as an i32, with a custom error message
     fn parse_i32(s: &str, error_msg: &str) -> Result<i32>;
-    
+
     /// Parse a string as an f64, with a custom error message
     fn parse_f64(s: &str, error_msg: &str) -> Result<f64>;
-    
+
     /// Truncate a string to a maximum length with ellipsis
     fn truncate(s: &str, max_length: usize) -> String;
 }
@@ -32,21 +32,20 @@ impl StringUtils for StringUtilsImpl {
                     word.to_string()
                 } else {
                     let mut chars = word.chars();
-                    chars.next().map_or_else(
-                        String::new,
-                        |first| first.to_uppercase().collect::<String>() + chars.as_str()
-                    )
+                    chars.next().map_or_else(String::new, |first| {
+                        first.to_uppercase().collect::<String>() + chars.as_str()
+                    })
                 }
             })
             .collect::<Vec<String>>()
             .join(" ")
     }
-    
+
     fn to_snake_case(s: &str) -> String {
         // First separate by spaces
         let mut result = String::new();
         let mut prev_is_uppercase = false;
-        
+
         for c in s.chars() {
             if c.is_uppercase() {
                 if !prev_is_uppercase && !result.is_empty() && !result.ends_with('_') {
@@ -62,14 +61,14 @@ impl StringUtils for StringUtilsImpl {
                 prev_is_uppercase = false;
             }
         }
-        
+
         result
     }
-    
+
     fn to_camel_case(s: &str) -> String {
         let mut result = String::new();
         let mut capitalize_next = false;
-        
+
         for c in s.chars() {
             if c == ' ' || c == '_' || c == '-' {
                 capitalize_next = true;
@@ -82,34 +81,36 @@ impl StringUtils for StringUtilsImpl {
                 result.push(c);
             }
         }
-        
+
         result
     }
-    
+
     fn parse_i32(s: &str, error_msg: &str) -> Result<i32> {
-        s.trim().parse::<i32>()
+        s.trim()
+            .parse::<i32>()
             .map_err(|_| validation_error(format!("{error_msg}: '{s}'")))
     }
-    
+
     fn parse_f64(s: &str, error_msg: &str) -> Result<f64> {
-        s.trim().parse::<f64>()
+        s.trim()
+            .parse::<f64>()
             .map_err(|_| validation_error(format!("{error_msg}: '{s}'")))
     }
-    
+
     fn truncate(s: &str, max_length: usize) -> String {
         if s.len() <= max_length {
             return s.to_string();
         }
-        
+
         // Try to truncate at a word boundary
         let truncated = &s[0..max_length.saturating_sub(3)];
         let mut result = String::from(truncated);
-        
+
         // Find the last space to truncate at a word boundary
         if let Some(last_space) = result.rfind(' ') {
             result.truncate(last_space);
         }
-        
+
         result.push_str("...");
         result
     }
@@ -118,40 +119,46 @@ impl StringUtils for StringUtilsImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_to_title_case() {
         assert_eq!(StringUtilsImpl::to_title_case("hello world"), "Hello World");
         assert_eq!(StringUtilsImpl::to_title_case("HELLO WORLD"), "HELLO WORLD");
         assert_eq!(StringUtilsImpl::to_title_case("hello_world"), "Hello_world");
     }
-    
+
     #[test]
     fn test_to_snake_case() {
         assert_eq!(StringUtilsImpl::to_snake_case("HelloWorld"), "hello_world");
         assert_eq!(StringUtilsImpl::to_snake_case("hello world"), "hello_world");
         assert_eq!(StringUtilsImpl::to_snake_case("Hello-World"), "hello_world");
     }
-    
+
     #[test]
     fn test_to_camel_case() {
         assert_eq!(StringUtilsImpl::to_camel_case("hello_world"), "helloWorld");
         assert_eq!(StringUtilsImpl::to_camel_case("hello world"), "helloWorld");
         assert_eq!(StringUtilsImpl::to_camel_case("hello-world"), "helloWorld");
     }
-    
+
     #[test]
     fn test_parse_i32() {
-        assert_eq!(StringUtilsImpl::parse_i32("123", "Invalid number").unwrap(), 123);
+        assert_eq!(
+            StringUtilsImpl::parse_i32("123", "Invalid number").unwrap(),
+            123
+        );
         assert!(StringUtilsImpl::parse_i32("abc", "Invalid number").is_err());
     }
-    
+
     #[test]
     fn test_parse_f64() {
-        assert_eq!(StringUtilsImpl::parse_f64("123.45", "Invalid number").unwrap(), 123.45);
+        assert_eq!(
+            StringUtilsImpl::parse_f64("123.45", "Invalid number").unwrap(),
+            123.45
+        );
         assert!(StringUtilsImpl::parse_f64("abc", "Invalid number").is_err());
     }
-    
+
     #[test]
     fn test_truncate() {
         assert_eq!(StringUtilsImpl::truncate("Hello world", 20), "Hello world");

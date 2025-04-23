@@ -49,13 +49,15 @@ impl DataStore {
             _ => None,
         }
     }
-    
+
     /// Check if this data store contains a specific backend type
     #[must_use]
     pub fn has_backend_type<T: Store + 'static>(&self) -> bool {
         match self {
             Self::Arrow(_) => std::any::TypeId::of::<ArrowBackend>() == std::any::TypeId::of::<T>(),
-            Self::TimeVarying(_) => std::any::TypeId::of::<TimeVaryingBackend>() == std::any::TypeId::of::<T>(),
+            Self::TimeVarying(_) => {
+                std::any::TypeId::of::<TimeVaryingBackend>() == std::any::TypeId::of::<T>()
+            }
         }
     }
 
@@ -86,11 +88,7 @@ impl DataStore {
     }
 
     /// Add BEF (population) data
-    pub fn add_bef_data(
-        &mut self,
-        period: String,
-        batches: Vec<RecordBatch>,
-    ) -> Result<()> {
+    pub fn add_bef_data(&mut self, period: String, batches: Vec<RecordBatch>) -> Result<()> {
         match self {
             Self::Arrow(store) => {
                 let mut backend = store.write();
@@ -116,11 +114,7 @@ impl DataStore {
     }
 
     /// Add UDDF (education) data
-    pub fn add_uddf_data(
-        &mut self,
-        period: String,
-        batches: Vec<RecordBatch>,
-    ) -> Result<()> {
+    pub fn add_uddf_data(&mut self, period: String, batches: Vec<RecordBatch>) -> Result<()> {
         match self {
             Self::Arrow(store) => {
                 let mut backend = store.write();

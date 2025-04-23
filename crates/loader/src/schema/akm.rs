@@ -5,7 +5,7 @@ use arrow_schema::{DataType, Field, Schema};
 /// # Fields
 /// - `PNR`: Unique personal identifier (non-nullable)
 /// - Various employment and occupation fields (nullable)
-/// 
+///
 /// This schema matches the format in the actual parquet files
 /// Converted from the Polars datatypes in schemas.py to Arrow datatypes
 #[must_use]

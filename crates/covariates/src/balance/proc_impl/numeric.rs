@@ -1,9 +1,9 @@
-use super::super::BalanceChecker;
 use super::super::memory::MemoryGuard;
-use super::OptimizationStrategy;
+use super::super::BalanceChecker;
+use super::config::ProcessorConfig;
 use super::date_grouping::DateGroupingParams;
 use super::progress::create_progress_style;
-use super::config::ProcessorConfig;
+use super::OptimizationStrategy;
 use chrono::NaiveDate;
 use hashbrown::HashMap;
 use indicatif::ParallelProgressIterator;
@@ -98,7 +98,8 @@ impl NumericProcessor {
             "combined_numeric_{}_{}",
             covariate_type as u8, total_capacity
         );
-        let _memory_guard = MemoryGuard::new(&guard_id, total_capacity * std::mem::size_of::<f64>());
+        let _memory_guard =
+            MemoryGuard::new(&guard_id, total_capacity * std::mem::size_of::<f64>());
 
         // Allocate the result vector
         let mut all_values = Vec::with_capacity(total_capacity);
@@ -157,18 +158,16 @@ impl NumericProcessor {
                 // In balanced mode, only use date grouping for very small chunks
                 if chunk.len() < 500 {
                     // For small chunks, try the date grouping optimization
-                    self.process_with_date_grouping_numeric(
-                        DateGroupingParams {
-                            chunk,
-                            covariate_type,
-                            checker,
-                            extractor,
-                            values: &mut values,
-                            missing: &mut missing,
-                            cache_hits: &mut cache_hits,
-                            cache_misses: &mut cache_misses,
-                        }
-                    );
+                    self.process_with_date_grouping_numeric(DateGroupingParams {
+                        chunk,
+                        covariate_type,
+                        checker,
+                        extractor,
+                        values: &mut values,
+                        missing: &mut missing,
+                        cache_hits: &mut cache_hits,
+                        cache_misses: &mut cache_misses,
+                    });
                 } else {
                     // For larger chunks, process linearly to avoid memory issues
                     for (pnr, date) in chunk {
@@ -190,18 +189,16 @@ impl NumericProcessor {
             }
             OptimizationStrategy::Performance => {
                 // Performance mode: use date grouping optimization for all chunk sizes
-                self.process_with_date_grouping_numeric(
-                    DateGroupingParams {
-                        chunk,
-                        covariate_type,
-                        checker,
-                        extractor,
-                        values: &mut values,
-                        missing: &mut missing,
-                        cache_hits: &mut cache_hits,
-                        cache_misses: &mut cache_misses,
-                    }
-                );
+                self.process_with_date_grouping_numeric(DateGroupingParams {
+                    chunk,
+                    covariate_type,
+                    checker,
+                    extractor,
+                    values: &mut values,
+                    missing: &mut missing,
+                    cache_hits: &mut cache_hits,
+                    cache_misses: &mut cache_misses,
+                });
             }
         }
 
@@ -268,10 +265,8 @@ impl NumericProcessor {
 
     /// Process a chunk of subjects with date grouping optimization for numeric values
     #[inline]
-    fn process_with_date_grouping_numeric<F>(
-        &self,
-        params: DateGroupingParams<'_, F, f64>,
-    ) where
+    fn process_with_date_grouping_numeric<F>(&self, params: DateGroupingParams<'_, F, f64>)
+    where
         F: Fn(&Covariate) -> Option<f64> + Send + Sync,
     {
         // Create a memory reservation for the temporary date grouping
@@ -280,8 +275,8 @@ impl NumericProcessor {
             params.covariate_type as u8,
             params.chunk.len()
         );
-        let estimated_size =
-            params.chunk.len() * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
+        let estimated_size = params.chunk.len()
+            * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
         let _memory_guard = MemoryGuard::new(&guard_id, estimated_size);
 
         // Use date grouping for better cache locality

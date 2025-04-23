@@ -1,10 +1,10 @@
+use crate::error::{logging_error, Context, Result};
 use colored::Colorize;
-use log::{LevelFilter, Record, Level};
+use log::{Level, LevelFilter, Record};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::time::{Duration, Instant};
-use crate::error::{Context, Result, logging_error};
 
 /// Simple logger that writes to both console and a file
 pub struct SimpleLogger {
@@ -26,7 +26,7 @@ impl SimpleLogger {
                 std::fs::create_dir_all(parent)
                     .with_context(|| format!("Failed to create log directory: {:?}", parent))?;
             }
-            
+
             Some(
                 OpenOptions::new()
                     .create(true)
@@ -37,14 +37,14 @@ impl SimpleLogger {
         } else {
             None
         };
-        
+
         Ok(Self {
             log_file,
             console_level,
             file_level,
         })
     }
-    
+
     /// Write to the log file if configured
     fn write_to_file(&mut self, record: &Record) {
         if let Some(ref mut file) = self.log_file {
@@ -58,13 +58,13 @@ impl SimpleLogger {
                     record.line().unwrap_or(0),
                     record.args()
                 );
-                
+
                 let _ = file.write_all(message.as_bytes());
                 let _ = file.flush();
             }
         }
     }
-    
+
     /// Write to the console if the level matches
     fn write_to_console(&self, record: &Record) {
         if record.level() <= self.console_level {
@@ -83,7 +83,7 @@ impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         metadata.level() <= self.console_level || metadata.level() <= self.file_level
     }
-    
+
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             let mut logger = Self {
@@ -91,18 +91,18 @@ impl log::Log for SimpleLogger {
                 console_level: self.console_level,
                 file_level: self.file_level,
             };
-            
+
             if let Some(ref file) = self.log_file {
                 if let Ok(fd) = file.try_clone() {
                     logger.log_file = Some(fd);
                 }
             }
-            
+
             logger.write_to_file(record);
             self.write_to_console(record);
         }
     }
-    
+
     fn flush(&self) {
         if let Some(ref file) = self.log_file {
             let _ = file.sync_all();
@@ -117,16 +117,22 @@ pub fn setup_logger(
     file_level: LevelFilter,
 ) -> Result<()> {
     let logger = SimpleLogger::new(log_file, console_level, file_level)?;
-    
+
     // Initialize the global logger
     match log::set_boxed_logger(Box::new(logger)) {
         Ok(_) => {
             // Set the maximum log level based on both console and file levels
             log::set_max_level(std::cmp::max(console_level, file_level));
-            log::info!("Logger initialized with console level: {:?}, file level: {:?}", console_level, file_level);
+            log::info!(
+                "Logger initialized with console level: {:?}, file level: {:?}",
+                console_level,
+                file_level
+            );
             Ok(())
         }
-        Err(_) => Err(logging_error("Failed to initialize logger: logger already set")),
+        Err(_) => Err(logging_error(
+            "Failed to initialize logger: logger already set",
+        )),
     }
 }
 
@@ -148,7 +154,7 @@ impl PerformanceTimer {
             silent: false,
         }
     }
-    
+
     /// Create a new performance timer that doesn't log its results
     pub fn silent(operation_name: &str) -> Self {
         Self {
@@ -158,64 +164,66 @@ impl PerformanceTimer {
             silent: true,
         }
     }
-    
+
     /// Record a checkpoint in the timer
     pub fn checkpoint(&mut self, checkpoint_name: &str) {
-        self.checkpoints.push((checkpoint_name.to_string(), self.start.elapsed()));
+        self.checkpoints
+            .push((checkpoint_name.to_string(), self.start.elapsed()));
     }
-    
+
     /// Complete the timer and log the performance data
     pub fn finish(&mut self) -> Duration {
         let total_duration = self.start.elapsed();
-        
+
         if !self.silent {
             // Log the total time
             log::debug!(
-                "{} {} {} {}", 
+                "{} {} {} {}",
                 "PERF:".bright_magenta().bold(),
-                self.name.yellow(), 
+                self.name.yellow(),
                 "completed in".dimmed(),
                 format!("{:.2?}", total_duration).green()
             );
-            
+
             // Log checkpoints if any
             if !self.checkpoints.is_empty() {
                 let mut checkpoint_logs = Vec::new();
                 let mut last_time = Duration::from_secs(0);
-                
+
                 for (name, time) in &self.checkpoints {
                     let segment_duration = *time - last_time;
                     checkpoint_logs.push(format!("{}: {:.2?}", name.blue(), segment_duration));
                     last_time = *time;
                 }
-                
+
                 // Add the final segment if there's a gap
                 if last_time < total_duration {
                     let final_segment = total_duration - last_time;
                     checkpoint_logs.push(format!("{}: {:.2?}", "final".blue(), final_segment));
                 }
-                
-                log::debug!("{} {} {}", 
+
+                log::debug!(
+                    "{} {} {}",
                     "PERF:".bright_magenta().bold(),
                     self.name.yellow(),
                     format!("checkpoints: {}", checkpoint_logs.join(", ")).dimmed()
                 );
             }
         }
-        
+
         total_duration
     }
-    
+
     /// Get the elapsed time without finishing the timer
     pub fn elapsed(&self) -> Duration {
         self.start.elapsed()
     }
-    
+
     /// Format a time duration in a human-readable format
     pub fn format_duration(duration: Duration) -> String {
         let secs = duration.as_secs();
         let millis = duration.subsec_millis();
-        
+
         if secs == 0 {
             format!("{} ms", millis)
         } else if secs < 60 {
@@ -229,14 +237,14 @@ impl PerformanceTimer {
 }
 
 /// Shorthand function to time a closure and log its execution time
-pub fn time_operation<F, T>(operation_name: &str, f: F) -> T 
+pub fn time_operation<F, T>(operation_name: &str, f: F) -> T
 where
     F: FnOnce() -> T,
 {
     let timer = Instant::now();
     let result = f();
     let duration = timer.elapsed();
-    
+
     log::debug!(
         "{} {} {} {}",
         "PERF:".bright_magenta().bold(),
@@ -244,7 +252,7 @@ where
         "completed in".dimmed(),
         format!("{:.2?}", duration).green()
     );
-    
+
     result
 }
 
@@ -254,19 +262,19 @@ where
     F: FnOnce() -> T,
 {
     // In a real implementation, we would measure memory before
-    
+
     let result = f();
-    
+
     // And measure memory after, then log the difference
     // This is platform dependent and would require additional dependencies
-    
+
     log::debug!(
         "{} {} {}",
         "MEM:".bright_cyan().bold(),
         operation_name.yellow(),
         "(Memory measurement not implemented)".dimmed()
     );
-    
+
     result
 }
 
@@ -279,43 +287,39 @@ impl ConsoleOutput {
         println!("\n{}", title.green().bold());
         println!("{}", "═".repeat(title.len()).green());
     }
-    
+
     /// Print a subsection header
     pub fn subsection(title: &str) {
         println!("\n{}", title.blue().bold());
         println!("{}", "─".repeat(title.len()).blue());
     }
-    
+
     /// Print a key-value pair with optional formatting
     pub fn key_value(key: &str, value: &str) {
         println!("{}: {}", key.bold(), value);
     }
-    
+
     /// Print a key-value pair with colored value
     pub fn key_value_colored(key: &str, value: &str, success: bool) {
-        let colored_value = if success {
-            value.green()
-        } else {
-            value.red()
-        };
+        let colored_value = if success { value.green() } else { value.red() };
         println!("{}: {}", key.bold(), colored_value);
     }
-    
+
     /// Print a success message
     pub fn success(message: &str) {
         println!("{} {}", "✓".green().bold(), message);
     }
-    
+
     /// Print an error message
     pub fn error(message: &str) {
         eprintln!("{} {}", "✗".red().bold(), message);
     }
-    
+
     /// Print a warning message
     pub fn warning(message: &str) {
         println!("{} {}", "!".yellow().bold(), message);
     }
-    
+
     /// Format a percentage with appropriate color based on value
     pub fn format_percentage(value: f64) -> colored::ColoredString {
         let percentage = format!("{:.2}%", value * 100.0);
@@ -327,7 +331,7 @@ impl ConsoleOutput {
             percentage.red()
         }
     }
-    
+
     /// Format a number with appropriate units (K, M, B)
     pub fn format_number(num: usize) -> String {
         if num < 1_000 {
@@ -340,18 +344,18 @@ impl ConsoleOutput {
             format!("{:.2}B", num as f64 / 1_000_000_000.0)
         }
     }
-    
+
     /// Print a progress status
     pub fn status(step: usize, total: usize, description: &str) {
         let progress = format!("[{}/{}]", step, total).blue();
         println!("{} {}", progress, description);
     }
-    
+
     /// Print a table with headers and rows
     pub fn table(headers: &[&str], rows: &[Vec<String>]) {
         // Determine column widths
         let mut widths = headers.iter().map(|h| h.len()).collect::<Vec<_>>();
-        
+
         for row in rows {
             for (i, cell) in row.iter().enumerate() {
                 if i < widths.len() {
@@ -359,7 +363,7 @@ impl ConsoleOutput {
                 }
             }
         }
-        
+
         // Print headers
         print!("│ ");
         for (i, header) in headers.iter().enumerate() {
@@ -367,14 +371,14 @@ impl ConsoleOutput {
             print!("{}{} │ ", header.bold(), padding);
         }
         println!();
-        
+
         // Print separator
         print!("├─");
         for (_, width) in widths.iter().enumerate().take(headers.len()) {
             print!("{}┼─", "─".repeat(width + 1));
         }
         println!();
-        
+
         // Print rows
         for row in rows {
             print!("│ ");
@@ -393,49 +397,49 @@ impl ConsoleOutput {
 mod tests {
     use super::*;
     use log::{debug, error, info, trace, warn};
-    use tempfile::NamedTempFile;
     use std::io::Read;
     use std::thread::sleep;
-    
+    use tempfile::NamedTempFile;
+
     #[test]
     fn test_logger_levels() {
         let temp_file = NamedTempFile::new().unwrap();
-        
+
         // Initialize logger with different levels for console and file
         let result = setup_logger(
             Some(temp_file.path()),
             LevelFilter::Info,  // Console: only info and higher
             LevelFilter::Debug, // File: debug and higher
         );
-        
+
         assert!(result.is_ok());
-        
+
         // Log messages at different levels
         error!("This is an error");
         warn!("This is a warning");
         info!("This is an info message");
         debug!("This is a debug message");
         trace!("This is a trace message");
-        
+
         // Verify log contents
         let mut file_content = String::new();
         let mut file = OpenOptions::new()
             .read(true)
             .open(temp_file.path())
             .unwrap();
-        
+
         file.read_to_string(&mut file_content).unwrap();
-        
+
         // Check that error, warn, info, and debug messages are in the file
         assert!(file_content.contains("ERROR"));
         assert!(file_content.contains("WARN"));
         assert!(file_content.contains("INFO"));
         assert!(file_content.contains("DEBUG"));
-        
+
         // Check that trace messages are NOT in the file
         assert!(!file_content.contains("TRACE"));
     }
-    
+
     #[test]
     fn test_performance_timer() {
         // Setup logging to see the output
@@ -445,29 +449,32 @@ mod tests {
             LevelFilter::Debug,
             LevelFilter::Debug,
         );
-        
+
         let mut timer = PerformanceTimer::new("test_operation");
-        
+
         // Simulate some work
         sleep(Duration::from_millis(10));
         timer.checkpoint("step1");
-        
+
         sleep(Duration::from_millis(20));
         timer.checkpoint("step2");
-        
+
         sleep(Duration::from_millis(15));
         let duration = timer.finish();
-        
-        assert!(duration.as_millis() >= 45, "Timer should record at least 45ms");
-        
+
+        assert!(
+            duration.as_millis() >= 45,
+            "Timer should record at least 45ms"
+        );
+
         // Test the time_operation helper
         let result = time_operation("simple_add", || {
             sleep(Duration::from_millis(10));
             2 + 2
         });
-        
+
         assert_eq!(result, 4);
-        
+
         // Test memory measurement stub
         let result = measure_memory_usage("memory_test", || {
             let mut v = Vec::new();
@@ -476,7 +483,7 @@ mod tests {
             }
             v.len()
         });
-        
+
         assert_eq!(result, 1000);
     }
 }

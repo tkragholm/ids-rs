@@ -45,7 +45,12 @@ pub fn init_logger_with_level(level: &str) -> Result<()> {
         "info" => log::LevelFilter::Info,
         "warn" => log::LevelFilter::Warn,
         "error" => log::LevelFilter::Error,
-        _ => return Err(IdsError::validation(format!("Invalid log level: {}", level))),
+        _ => {
+            return Err(IdsError::validation(format!(
+                "Invalid log level: {}",
+                level
+            )))
+        }
     };
 
     log::set_max_level(log_level);

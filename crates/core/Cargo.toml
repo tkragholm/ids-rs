@@ -3,6 +3,10 @@ name = "core"
 version.workspace = true
 edition.workspace = true
 
+# Features
+[features]
+default = []
+
 [dependencies]
 chrono.workspace = true
 log.workspace = true
@@ -20,7 +24,6 @@ hashbrown.workspace = true
 humantime.workspace = true
 indicatif.workspace = true
 parking_lot.workspace = true
-plotters.workspace = true
 rand.workspace = true
 rustc-hash.workspace = true
 smallvec.workspace = true

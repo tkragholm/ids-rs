@@ -21,8 +21,8 @@ pub mod logging;
 
 /// Date-related utilities for formatting and parsing.
 pub mod date {
-    use chrono::NaiveDate;
     use crate::error::{IdsError, Result};
+    use chrono::NaiveDate;
 
     /// Formats a date as a string in the specified format.
     ///
@@ -61,10 +61,9 @@ pub mod date {
     /// A Result containing the parsed date, or an error if parsing failed.
     pub fn parse_date(date_str: &str) -> Result<NaiveDate> {
         // Try to parse date in format 'YYYY-MM-DD'
-        NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-            .map_err(|e| IdsError::invalid_date(
-                format!("Failed to parse date '{}': {}", date_str, e)
-            ))
+        NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|e| {
+            IdsError::invalid_date(format!("Failed to parse date '{}': {}", date_str, e))
+        })
     }
 
     /// Parses a year string into an i32.
@@ -77,10 +76,9 @@ pub mod date {
     ///
     /// A Result containing the parsed year, or an error if parsing failed.
     pub fn parse_year(year_str: &str) -> Result<i32> {
-        year_str.parse::<i32>()
-            .map_err(|e| IdsError::invalid_format(
-                format!("Failed to parse year '{}': {}", year_str, e)
-            ))
+        year_str.parse::<i32>().map_err(|e| {
+            IdsError::invalid_format(format!("Failed to parse year '{}': {}", year_str, e))
+        })
     }
 }
 
@@ -96,8 +94,15 @@ pub mod string {
     ///
     /// A sanitized string that can be used as an identifier.
     pub fn sanitize_identifier(input: &str) -> String {
-        input.chars()
-            .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        input
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect()
     }
 

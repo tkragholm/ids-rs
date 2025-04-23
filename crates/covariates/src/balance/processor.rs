@@ -6,9 +6,9 @@ use types::models::{Covariate, CovariateType};
 pub use super::optimization::OptimizationStrategy;
 
 // Import components from the proc_impl module
+use super::proc_impl::categorical::CategoricalProcessor;
 use super::proc_impl::config::ProcessorConfig;
 use super::proc_impl::numeric::NumericProcessor;
-use super::proc_impl::categorical::CategoricalProcessor;
 
 /// Main processor for covariate values
 pub struct ValueProcessor {
@@ -83,7 +83,8 @@ impl ValueProcessor {
     where
         F: Fn(&Covariate) -> Option<f64> + Send + Sync,
     {
-        self.numeric_processor.collect_numeric_values(subjects, covariate_type, checker, extractor)
+        self.numeric_processor
+            .collect_numeric_values(subjects, covariate_type, checker, extractor)
     }
 
     /// Collect categorical values for a list of subjects
@@ -98,6 +99,11 @@ impl ValueProcessor {
     where
         F: Fn(&Covariate) -> Option<String> + Send + Sync,
     {
-        self.categorical_processor.collect_categorical_values(subjects, covariate_type, checker, extractor)
+        self.categorical_processor.collect_categorical_values(
+            subjects,
+            covariate_type,
+            checker,
+            extractor,
+        )
     }
 }

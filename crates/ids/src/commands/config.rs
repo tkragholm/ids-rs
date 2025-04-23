@@ -6,13 +6,13 @@ use std::fs;
 use std::path::Path;
 
 /// Handle config related commands
-/// 
+///
 /// # Arguments
 /// * `cmd` - The specific config command to execute
-/// 
+///
 /// # Returns
 /// * `IdsResult<()>` - Success or error
-/// 
+///
 /// # Errors
 /// Returns an error if configuration file generation fails due to:
 /// - File system issues (e.g., permission denied, disk full)
@@ -27,16 +27,16 @@ pub fn handle_config_command(cmd: &ConfigCommands) -> IdsResult<()> {
 }
 
 /// Generate a default covariates configuration file
-/// 
+///
 /// # Arguments
 /// * `output_path` - Path where the configuration file should be saved
 /// * `force` - Whether to overwrite an existing file
-/// 
+///
 /// # Returns
 /// * `IdsResult<()>` - Success or error
 fn generate_covariates_config(output_path: &str, force: bool) -> IdsResult<()> {
     ConsoleOutput::section("Generating Covariates Configuration");
-    
+
     // Check if file already exists
     let output_file = Path::new(output_path);
     if output_file.exists() && !force {
@@ -47,7 +47,7 @@ fn generate_covariates_config(output_path: &str, force: bool) -> IdsResult<()> {
             "Output file {output_path} already exists. Use --force to overwrite."
         )));
     }
-    
+
     // Create parent directories if needed
     if let Some(parent) = output_file.parent() {
         if !parent.exists() {
@@ -55,14 +55,14 @@ fn generate_covariates_config(output_path: &str, force: bool) -> IdsResult<()> {
             fs::create_dir_all(parent)?;
         }
     }
-    
+
     // Generate default configuration
     let config = CovariatesConfig::default_config();
     let json = serde_json::to_string_pretty(&config)?;
-    
+
     // Write to file
     fs::write(output_path, json)?;
     ConsoleOutput::success(&format!("Configuration written to {output_path}"));
-    
+
     Ok(())
 }

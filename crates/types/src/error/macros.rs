@@ -59,7 +59,7 @@ macro_rules! ensure {
 /// Try to run an operation, with context if it fails
 ///
 /// This macro wraps an operation that returns a Result, adding context
-/// if the operation fails. It uses the `with_context` implementation to 
+/// if the operation fails. It uses the `with_context` implementation to
 /// preserve error types where possible.
 ///
 /// # Examples
@@ -75,8 +75,8 @@ macro_rules! ensure {
 ///
 ///     // Using formatted message version
 ///     let value = try_with_context!(
-///         content.parse::<i32>(), 
-///         "Failed to parse '{}' as integer from config", 
+///         content.parse::<i32>(),
+///         "Failed to parse '{}' as integer from config",
 ///         content.trim()
 ///     );
 ///
@@ -105,7 +105,7 @@ macro_rules! try_with_context {
             Ok(val) => val,
             Err(err) => {
                 return $crate::error::with_context(
-                    std::result::Result::Err(err), 
+                    std::result::Result::Err(err),
                     || format!($fmt, $($arg)*)
                 );
             }

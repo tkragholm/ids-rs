@@ -8,6 +8,8 @@ chrono.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+hashbrown.workspace = true
+rand.workspace = true
 log = { workspace = true, features = ["std"] }
 csv.workspace = true
 colored.workspace = true
@@ -15,3 +17,4 @@ anyhow.workspace = true
 tempfile.workspace = true
 console = "0.15.11"
 types = { path = "../types" }
+regex = "1.11.1"

@@ -15,23 +15,24 @@ use types::error::IdsError;
 #[allow(dead_code)]
 pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf>, IdsError> {
     if !base_path.exists() {
-        return Err(IdsError::io_error(
-            format!("Base directory not found: {}", base_path.display())
-        ));
+        return Err(IdsError::io_error(format!(
+            "Base directory not found: {}",
+            base_path.display()
+        )));
     }
-    
+
     let mut paths = HashMap::new();
-    
+
     // Check for direct vs nested structure (with /registers subdirectory)
     let registers_path = base_path.join("registers");
     let _has_registers_subdir = registers_path.exists() && registers_path.is_dir();
-    
+
     // Check for family.parquet
     let family_paths = [
         base_path.join("family.parquet"),
         registers_path.join("family.parquet"),
     ];
-    
+
     for path in &family_paths {
         if path.exists() && path.is_file() {
             log::info!("Found family relations file at: {}", path.display());
@@ -39,15 +40,12 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
             break;
         }
     }
-    
+
     // Check for register subdirectories
     let register_dirs = ["akm", "bef", "ind", "uddf"];
     for dir in &register_dirs {
-        let paths_to_check = [
-            base_path.join(dir),
-            registers_path.join(dir),
-        ];
-        
+        let paths_to_check = [base_path.join(dir), registers_path.join(dir)];
+
         for path in &paths_to_check {
             if path.exists() && path.is_dir() {
                 // Check if it has parquet files
@@ -56,10 +54,13 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
                         .filter_map(Result::ok)
                         .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
                         .collect();
-                        
+
                     if !parquet_files.is_empty() {
-                        log::info!("Found directory {} with {} parquet files", 
-                                  path.display(), parquet_files.len());
+                        log::info!(
+                            "Found directory {} with {} parquet files",
+                            path.display(),
+                            parquet_files.len()
+                        );
                         paths.insert(dir.to_string(), path.clone());
                         break;
                     }
@@ -67,7 +68,7 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
             }
         }
     }
-    
+
     Ok(paths)
 }
 
@@ -84,8 +85,8 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
 /// Returns an error if the base path doesn't exist
 #[allow(dead_code)]
 pub fn resolve_paths(
-    base_path: &str, 
-    paths: &HashMap<String, String>
+    base_path: &str,
+    paths: &HashMap<String, String>,
 ) -> Result<HashMap<String, PathBuf>, IdsError> {
     let mut resolved = HashMap::new();
     let base_path_obj = Path::new(base_path);

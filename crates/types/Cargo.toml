@@ -13,6 +13,7 @@ chrono-nightly = [] # Temporarily disabled due to workspace dependency conflicts
 polars-integration = ["polars"]
 logging = ["log"]
 parallel-processing = ["num_cpus"]
+parallel = ["parallel-processing"] # Alias for parallel-processing
 
 [dependencies]
 # Core dependencies (always included)

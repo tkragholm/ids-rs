@@ -1,6 +1,6 @@
-use std::convert::From;
-use chrono::format::ParseError as ChronoParseError;
 use super::IdsError;
+use chrono::format::ParseError as ChronoParseError;
+use std::convert::From;
 
 // Convert from log::SetLoggerError to IdsError
 impl From<log::SetLoggerError> for IdsError {
@@ -45,7 +45,7 @@ impl From<std::string::FromUtf8Error> for IdsError {
 }
 
 // Convert from serde_yaml::Error to IdsError (if used in the project)
-// We don't need to implement From<ArrowError> or From<ParquetError> for IdsError 
+// We don't need to implement From<ArrowError> or From<ParquetError> for IdsError
 // since they're already implemented with #[from] in the IdsError enum.
 
 // Convert from std::sync::mpsc::RecvError to IdsError for parallel processing errors
@@ -56,7 +56,7 @@ impl From<std::sync::mpsc::RecvError> for IdsError {
 }
 
 // Implementation for additional error types can be added as needed.
-// If additional crate dependencies are added in the future, 
+// If additional crate dependencies are added in the future,
 // add their error conversions here with appropriate feature flags.
 
 // Convert from std::path::StripPrefixError to IdsError

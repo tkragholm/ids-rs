@@ -12,7 +12,7 @@ impl BalanceCheckerDiagnostic for BalanceChecker {
     fn new_diagnostic() -> Self {
         // Create an empty store for diagnostic/fallback mode
         let empty_store = ArrowBackend::new_empty();
-        
+
         // Create a checker with an empty store
         // This will have limited functionality, but allows the UI to continue
         BalanceChecker::new(empty_store)

@@ -1,5 +1,5 @@
 pub mod env;
-pub mod path;
 mod loader_config;
+pub mod path;
 
 pub use loader_config::{LoaderConfig, RegisterPathConfig};

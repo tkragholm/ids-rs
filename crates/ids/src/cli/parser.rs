@@ -4,14 +4,14 @@ use std::process;
 use crate::cli::types::Cli;
 
 /// Parse command line arguments and handle common errors
-/// 
+///
 /// This function handles parsing CLI arguments with special
 /// error handling for common mistakes like missing spaces between
 /// options and values.
-/// 
+///
 /// # Returns
 /// * `Cli` - The parsed command line arguments
-/// 
+///
 /// # Panics
 /// * If command line parsing fails (with helpful error messages)
 pub fn parse_cli_args() -> Cli {

@@ -1,8 +1,8 @@
-use types::translation::TranslationMaps;
 use chrono::NaiveDate;
-use types::models::{CovariateType, CovariateValue};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use types::models::{CovariateType, CovariateValue};
+use types::translation::TranslationMaps;
 
 /// Data structure for storing covariate information
 #[derive(Serialize, Deserialize)]
@@ -46,10 +46,10 @@ impl CovariateStorage {
         covariate.translated_value = match &covariate.value {
             CovariateValue::Demographics { citizenship, .. } => citizenship
                 .as_ref()
-                .and_then(|code| self.translations.translate(
-                    types::translation::TranslationType::Statsb, 
-                    code
-                ))
+                .and_then(|code| {
+                    self.translations
+                        .translate(types::translation::TranslationType::Statsb, code)
+                })
                 .map(String::from),
             // Add more translations as needed
             _ => None,

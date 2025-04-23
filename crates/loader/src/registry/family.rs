@@ -1,6 +1,6 @@
+use arrow::record_batch::RecordBatch;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use arrow::record_batch::RecordBatch;
 use types::error::IdsError;
 
 use crate::formats::read_parquet;
@@ -29,14 +29,14 @@ pub fn load_family(
     pnr_filter: Option<&HashSet<String>>,
 ) -> Result<Vec<RecordBatch>, IdsError> {
     log::info!("Loading family relation data from {}", base_path);
-    
+
     // Create a progress tracker
     let progress = LoaderProgress::new();
     progress.set_main_message("Loading family relation data");
-    
+
     // Normalize path handling
     let path = Path::new(base_path);
-    
+
     // Try to find the family file in different possible locations
     let family_file = if path.is_dir() {
         // Check for a family.parquet directly in the base path
@@ -64,18 +64,22 @@ pub fn load_family(
     } else {
         PathBuf::from(base_path)
     };
-    
+
     // Get the schema for family data
     let schema = family_schema();
-    
+
     // Load the Parquet file
-    let batches = if family_file.exists() && family_file.extension().is_some_and(|ext| ext == "parquet") {
-        read_parquet(&family_file, Some(&schema), Some(&progress), pnr_filter)?
-    } else {
-        log::warn!("No family relation data found at {}", base_path);
-        Vec::new()
-    };
-    
-    log::info!("Loaded {} record batches of family relation data", batches.len());
+    let batches =
+        if family_file.exists() && family_file.extension().is_some_and(|ext| ext == "parquet") {
+            read_parquet(&family_file, Some(&schema), Some(&progress), pnr_filter)?
+        } else {
+            log::warn!("No family relation data found at {}", base_path);
+            Vec::new()
+        };
+
+    log::info!(
+        "Loaded {} record batches of family relation data",
+        batches.len()
+    );
     Ok(batches)
 }

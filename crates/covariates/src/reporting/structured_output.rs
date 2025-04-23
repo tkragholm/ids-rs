@@ -29,13 +29,13 @@ impl StructuredOutputManager {
     pub fn new<P: AsRef<Path>>(base_dir: P) -> Result<Self, IdsError> {
         let base_dir = base_dir.as_ref().to_path_buf();
         let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
-        
+
         // Create the main directory structure
         let report_dir = base_dir.join("report");
         let data_dir = base_dir.join("data");
         let plots_dir = base_dir.join("plots");
         let logs_dir = base_dir.join("logs");
-        
+
         // Create additional subdirectories
         let dirs = [
             &report_dir,
@@ -49,18 +49,18 @@ impl StructuredOutputManager {
             &plots_dir.join("data_quality"),
             &logs_dir,
         ];
-        
+
         for dir in &dirs {
             fs::create_dir_all(dir).map_err(|e| {
                 IdsError::io_error(format!("Failed to create directory {:?}: {}", dir, e))
             })?;
         }
-        
+
         // Initialize runtime information
         let mut runtime_info = HashMap::new();
         runtime_info.insert("generated_at".to_string(), timestamp);
         runtime_info.insert("version".to_string(), env!("CARGO_PKG_VERSION").to_string());
-        
+
         Ok(Self {
             base_dir,
             report_dir,
@@ -71,19 +71,19 @@ impl StructuredOutputManager {
             runtime_info,
         })
     }
-    
+
     /// Enable debug mode with more detailed output
     pub fn with_debug_mode(mut self, debug: bool) -> Self {
         self.debug_mode = debug;
         self
     }
-    
+
     /// Add custom runtime information to be included in reports
     pub fn with_runtime_info<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
         self.runtime_info.insert(key.into(), value.into());
         self
     }
-    
+
     /// Get the path to the specified output directory
     pub fn get_dir_path(&self, dir_type: OutputDirType) -> PathBuf {
         match dir_type {
@@ -100,67 +100,73 @@ impl StructuredOutputManager {
             OutputDirType::DataQualityPlots => self.plots_dir.join("data_quality"),
         }
     }
-    
+
     /// Output balance results in structured format
     pub fn output_balance_results(
-        &self, 
+        &self,
         results: &BalanceResults,
         filename_prefix: Option<&str>,
     ) -> Result<(), IdsError> {
         // Get the base balance data directory
         let balance_dir = self.get_dir_path(OutputDirType::BalanceData);
         let prefix = filename_prefix.unwrap_or("balance");
-        
+
         // Output covariate balance
         let covariate_path = balance_dir.join(format!("{}_covariate_balance.csv", prefix));
-        self.write_csv_data(&covariate_path, "Variable,Mean (Cases),Mean (Controls),Standardized Difference,Variance Ratio", 
-            &results.summaries.iter().map(|s| {
-                format!("{},{},{},{},{}",
-                    s.variable,
-                    s.mean_cases,
-                    s.mean_controls,
-                    s.std_diff,
-                    s.variance_ratio
-                )
-            }).collect::<Vec<_>>()
+        self.write_csv_data(
+            &covariate_path,
+            "Variable,Mean (Cases),Mean (Controls),Standardized Difference,Variance Ratio",
+            &results
+                .summaries
+                .iter()
+                .map(|s| {
+                    format!(
+                        "{},{},{},{},{}",
+                        s.variable, s.mean_cases, s.mean_controls, s.std_diff, s.variance_ratio
+                    )
+                })
+                .collect::<Vec<_>>(),
         )?;
-        
+
         // Output missing data rates
         let missing_path = balance_dir.join(format!("{}_missing_data_rates.csv", prefix));
         let missing_header = "Variable,Case Missing Rate,Control Missing Rate";
-        let missing_rates: Vec<String> = results.missing_data_rates.iter()
-            .map(|(var, (case_rate, ctrl_rate))| {
-                format!("{},{},{}", var, case_rate, ctrl_rate)
-            })
+        let missing_rates: Vec<String> = results
+            .missing_data_rates
+            .iter()
+            .map(|(var, (case_rate, ctrl_rate))| format!("{},{},{}", var, case_rate, ctrl_rate))
             .collect();
         self.write_csv_data(&missing_path, missing_header, &missing_rates)?;
-        
+
         // Generate standardized difference statistics
         let std_diff_path = balance_dir.join(format!("{}_std_differences.csv", prefix));
         let std_diff_header = "Variable,Min,Max,Mean,StdDev,AbsMean";
         let mut var_stats: HashMap<String, Vec<f64>> = HashMap::new();
-        
+
         // Collect by variable
         for detail in &results.matched_pair_details {
-            var_stats.entry(detail.variable.clone())
+            var_stats
+                .entry(detail.variable.clone())
                 .or_default()
                 .push(detail.std_diff);
         }
-        
+
         // Calculate statistics for each variable
-        let std_diff_data: Vec<String> = var_stats.iter()
+        let std_diff_data: Vec<String> = var_stats
+            .iter()
             .map(|(var, values)| {
                 if values.is_empty() {
                     return format!("{},0.0,0.0,0.0,0.0,0.0", var);
                 }
-                
+
                 let sum: f64 = values.iter().sum();
                 let mean = sum / values.len() as f64;
                 let sum_squared: f64 = values.iter().map(|v| (v - mean).powi(2)).sum();
                 let std_dev = (sum_squared / values.len() as f64).sqrt();
                 let abs_mean = values.iter().map(|v| v.abs()).sum::<f64>() / values.len() as f64;
-                
-                format!("{},{},{},{},{},{}",
+
+                format!(
+                    "{},{},{},{},{},{}",
                     var,
                     values.iter().cloned().fold(f64::INFINITY, f64::min),
                     values.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
@@ -171,13 +177,13 @@ impl StructuredOutputManager {
             })
             .collect();
         self.write_csv_data(&std_diff_path, std_diff_header, &std_diff_data)?;
-        
+
         // Generate HTML report
         self.generate_balance_html_report(results, filename_prefix)?;
-        
+
         Ok(())
     }
-    
+
     /// Output matched pairs data in structured format
     pub fn output_matched_pairs(
         &self,
@@ -188,15 +194,17 @@ impl StructuredOutputManager {
         let matched_pairs = CaseWithControls::from_matched_pair_records(matched_pair_records);
         let matching_dir = self.get_dir_path(OutputDirType::MatchingData);
         let prefix = filename_prefix.unwrap_or("matching");
-        
+
         // Main matched pairs CSV
         let pairs_path = matching_dir.join(format!("{}_pairs.csv", prefix));
         let pairs_header = "case_id,case_pnr,case_birth_date,case_treatment_date,control_id,control_pnr,control_birth_date,birth_date_diff_days,mother_age_diff_days,father_age_diff_days";
-        
-        let pairs_data: Vec<String> = matched_pairs.iter()
+
+        let pairs_data: Vec<String> = matched_pairs
+            .iter()
             .flat_map(|record| {
                 record.controls.iter().map(move |control| {
-                    format!("{},{},{},{},{},{},{},{},{},{}",
+                    format!(
+                        "{},{},{},{},{},{},{},{},{},{}",
                         record.case_id,
                         record.case_pnr,
                         record.case_birth_date,
@@ -211,41 +219,55 @@ impl StructuredOutputManager {
                 })
             })
             .collect();
-        
+
         self.write_csv_data(&pairs_path, pairs_header, &pairs_data)?;
-        
+
         // Matching statistics
         let stats_path = matching_dir.join(format!("{}_stats.csv", prefix));
-        let stats_header = "case_id,n_controls,avg_birth_diff,max_birth_diff,avg_mother_diff,avg_father_diff";
-        
-        let stats_data: Vec<String> = matched_pairs.iter()
+        let stats_header =
+            "case_id,n_controls,avg_birth_diff,max_birth_diff,avg_mother_diff,avg_father_diff";
+
+        let stats_data: Vec<String> = matched_pairs
+            .iter()
             .map(|record| {
                 let n_controls = record.controls.len();
-                
+
                 if n_controls == 0 {
                     return format!("{},0,0,0,0,0", record.case_id);
                 }
-                
-                let avg_birth_diff: f64 = record.controls.iter()
+
+                let avg_birth_diff: f64 = record
+                    .controls
+                    .iter()
                     .map(|c| c.birth_date_diff as f64)
-                    .sum::<f64>() / n_controls as f64;
-                
-                let max_birth_diff = record.controls.iter()
+                    .sum::<f64>()
+                    / n_controls as f64;
+
+                let max_birth_diff = record
+                    .controls
+                    .iter()
                     .map(|c| c.birth_date_diff)
                     .max()
                     .unwrap_or(0);
-                
-                let avg_mother_diff: f64 = record.controls.iter()
+
+                let avg_mother_diff: f64 = record
+                    .controls
+                    .iter()
                     .filter_map(|c| c.mother_age_diff)
                     .map(|diff| diff as f64)
-                    .sum::<f64>() / n_controls as f64;
-                
-                let avg_father_diff: f64 = record.controls.iter()
+                    .sum::<f64>()
+                    / n_controls as f64;
+
+                let avg_father_diff: f64 = record
+                    .controls
+                    .iter()
                     .filter_map(|c| c.father_age_diff)
                     .map(|diff| diff as f64)
-                    .sum::<f64>() / n_controls as f64;
-                
-                format!("{},{},{:.2},{},{:.2},{:.2}",
+                    .sum::<f64>()
+                    / n_controls as f64;
+
+                format!(
+                    "{},{},{:.2},{},{:.2},{:.2}",
                     record.case_id,
                     n_controls,
                     avg_birth_diff,
@@ -255,21 +277,22 @@ impl StructuredOutputManager {
                 )
             })
             .collect();
-        
+
         self.write_csv_data(&stats_path, stats_header, &stats_data)?;
-        
+
         // Generate HTML report
         self.generate_matching_html_report(&matched_pairs, filename_prefix)?;
-        
+
         Ok(())
     }
-    
+
     /// Generate a comprehensive index.html report
     pub fn generate_index_html(&self) -> Result<(), IdsError> {
         let report_dir = self.get_dir_path(OutputDirType::Report);
         let index_path = report_dir.join("index.html");
-        
-        let html_content = format!(r#"<!DOCTYPE html>
+
+        let html_content = format!(
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -419,17 +442,22 @@ impl StructuredOutputManager {
     </div>
 </body>
 </html>"#,
-            generated_at = self.runtime_info.get("generated_at").unwrap_or(&String::from("Unknown")),
-            version = self.runtime_info.get("version").unwrap_or(&String::from("Unknown"))
+            generated_at = self
+                .runtime_info
+                .get("generated_at")
+                .unwrap_or(&String::from("Unknown")),
+            version = self
+                .runtime_info
+                .get("version")
+                .unwrap_or(&String::from("Unknown"))
         );
-        
-        fs::write(&index_path, html_content).map_err(|e| {
-            IdsError::io_error(format!("Failed to write index.html: {}", e))
-        })?;
-        
+
+        fs::write(&index_path, html_content)
+            .map_err(|e| IdsError::io_error(format!("Failed to write index.html: {}", e)))?;
+
         Ok(())
     }
-    
+
     /// Utility method to write CSV data to a file
     fn write_csv_data<P: AsRef<Path>>(
         &self,
@@ -438,11 +466,10 @@ impl StructuredOutputManager {
         data: &[String],
     ) -> Result<(), IdsError> {
         let content = format!("{}\n{}", header, data.join("\n"));
-        fs::write(path, content).map_err(|e| {
-            IdsError::io_error(format!("Failed to write CSV data: {}", e))
-        })
+        fs::write(path, content)
+            .map_err(|e| IdsError::io_error(format!("Failed to write CSV data: {}", e)))
     }
-    
+
     /// Generate a detailed HTML report for balance analysis
     fn generate_balance_html_report(
         &self,
@@ -452,49 +479,85 @@ impl StructuredOutputManager {
         let report_dir = self.get_dir_path(OutputDirType::Report);
         let prefix = filename_prefix.unwrap_or("balance");
         let report_path = report_dir.join(format!("{}_report.html", prefix));
-        
+
         // Group variables by category
         let mut demographic_rows = String::new();
         let mut income_rows = String::new();
-        let mut education_rows = String::new(); 
+        let mut education_rows = String::new();
         let mut occupation_rows = String::new();
         let mut other_rows = String::new();
-        
+
         // Variable tooltips for better explanation
         let variable_tooltips: HashMap<&str, &str> = [
             // Demographics
-            ("Family Size", "Number of people in the family unit (ANTPERSF/ANTPERSH)"),
+            (
+                "Family Size",
+                "Number of people in the family unit (ANTPERSF/ANTPERSH)",
+            ),
             ("Municipality", "Municipality code (KOM)"),
             ("Family Type", "Type of family unit (FAMILIE_TYPE)"),
             ("Civil Status", "Civil/marital status (CIVST)"),
             ("Gender", "Gender of the individual (KOEN)"),
             ("Citizenship", "Citizenship/nationality (STATSB)"),
             ("Age", "Age of the individual (ALDER)"),
-            ("Children Count", "Number of children in the family (ANTBOERNF/ANTBOERNH)"),
-            
+            (
+                "Children Count",
+                "Number of children in the family (ANTBOERNF/ANTBOERNH)",
+            ),
             // Income
             ("Income", "Total personal income (PERINDKIALT_13)"),
             ("Wage Income", "Income from wages (LOENMV_13)"),
             ("Employment Status", "Employment status code (BESKST13)"),
-            ("Employment Status Category", "Employment status category (BESKST13)"),
-            
+            (
+                "Employment Status Category",
+                "Employment status category (BESKST13)",
+            ),
             // Education
             ("Education Level", "Highest education level attained"),
-            ("ISCED Level", "International Standard Classification of Education level"),
+            (
+                "ISCED Level",
+                "International Standard Classification of Education level",
+            ),
             ("Education Years", "Years of education completed"),
-            
             // Occupation
-            ("SOCIO13 Code", "Socioeconomic classification code (SOCIO13)"),
-            ("SOCIO13 Value", "Socioeconomic classification numeric value (SOCIO13)"),
-            ("Classification System", "Classification system used for occupational coding"),
+            (
+                "SOCIO13 Code",
+                "Socioeconomic classification code (SOCIO13)",
+            ),
+            (
+                "SOCIO13 Value",
+                "Socioeconomic classification numeric value (SOCIO13)",
+            ),
+            (
+                "Classification System",
+                "Classification system used for occupational coding",
+            ),
             ("SOCIO", "Previous socioeconomic classification code"),
-            ("SOCIO Category", "Previous socioeconomic classification category"),
-            ("SOCIO02", "Alternative socioeconomic classification from 2002"),
-            ("SOCIO02 Category", "Alternative socioeconomic classification category from 2002"),
-            ("Previous Socioeconomic Status", "Previous socioeconomic status (PRE_SOCIO)"),
-            ("Previous Socioeconomic Category", "Previous socioeconomic status category (PRE_SOCIO)"),
-        ].iter().cloned().collect();
-        
+            (
+                "SOCIO Category",
+                "Previous socioeconomic classification category",
+            ),
+            (
+                "SOCIO02",
+                "Alternative socioeconomic classification from 2002",
+            ),
+            (
+                "SOCIO02 Category",
+                "Alternative socioeconomic classification category from 2002",
+            ),
+            (
+                "Previous Socioeconomic Status",
+                "Previous socioeconomic status (PRE_SOCIO)",
+            ),
+            (
+                "Previous Socioeconomic Category",
+                "Previous socioeconomic status category (PRE_SOCIO)",
+            ),
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
         for summary in &results.summaries {
             // Determine if there's an imbalance (std_diff > 0.1)
             let row_class = if summary.std_diff.abs() > 0.1 {
@@ -502,11 +565,12 @@ impl StructuredOutputManager {
             } else {
                 ""
             };
-            
+
             // Get tooltip for this variable
-            let tooltip = variable_tooltips.get(summary.variable.as_str())
+            let tooltip = variable_tooltips
+                .get(summary.variable.as_str())
                 .map_or("", |&s| s);
-            
+
             let row_html = format!(
                 r#"<tr class="{}">
                     <td title="{}">{}</td>
@@ -523,59 +587,70 @@ impl StructuredOutputManager {
                 summary.std_diff,
                 summary.variance_ratio
             );
-            
+
             // Categorize the row based on variable name
-            if summary.variable.contains("Family") || 
-               summary.variable.contains("Municipality") ||
-               summary.variable.contains("Civil Status") ||
-               summary.variable.contains("Gender") ||
-               summary.variable.contains("Citizenship") ||
-               summary.variable.contains("Age") ||
-               summary.variable.contains("Children") {
+            if summary.variable.contains("Family")
+                || summary.variable.contains("Municipality")
+                || summary.variable.contains("Civil Status")
+                || summary.variable.contains("Gender")
+                || summary.variable.contains("Citizenship")
+                || summary.variable.contains("Age")
+                || summary.variable.contains("Children")
+            {
                 demographic_rows.push_str(&row_html);
-            } else if summary.variable.contains("Income") ||
-                     summary.variable.contains("Employment") {
+            } else if summary.variable.contains("Income") || summary.variable.contains("Employment")
+            {
                 income_rows.push_str(&row_html);
-            } else if summary.variable.contains("Education") ||
-                     summary.variable.contains("ISCED") {
+            } else if summary.variable.contains("Education") || summary.variable.contains("ISCED") {
                 education_rows.push_str(&row_html);
-            } else if summary.variable.contains("SOCIO") ||
-                     summary.variable.contains("Classification") ||
-                     summary.variable.contains("Socioeconomic") {
+            } else if summary.variable.contains("SOCIO")
+                || summary.variable.contains("Classification")
+                || summary.variable.contains("Socioeconomic")
+            {
                 occupation_rows.push_str(&row_html);
             } else {
                 other_rows.push_str(&row_html);
             }
         }
-        
+
         // Combine all rows with section headers
         let mut variable_rows = String::new();
-        
+
         if !demographic_rows.is_empty() {
-            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Demographics Variables</th></tr>");
+            variable_rows.push_str(
+                "<tr class=\"section-header\"><th colspan=\"5\">Demographics Variables</th></tr>",
+            );
             variable_rows.push_str(&demographic_rows);
         }
-        
+
         if !income_rows.is_empty() {
-            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Income Variables</th></tr>");
+            variable_rows.push_str(
+                "<tr class=\"section-header\"><th colspan=\"5\">Income Variables</th></tr>",
+            );
             variable_rows.push_str(&income_rows);
         }
-        
+
         if !education_rows.is_empty() {
-            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Education Variables</th></tr>");
+            variable_rows.push_str(
+                "<tr class=\"section-header\"><th colspan=\"5\">Education Variables</th></tr>",
+            );
             variable_rows.push_str(&education_rows);
         }
-        
+
         if !occupation_rows.is_empty() {
-            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Occupation Variables</th></tr>");
+            variable_rows.push_str(
+                "<tr class=\"section-header\"><th colspan=\"5\">Occupation Variables</th></tr>",
+            );
             variable_rows.push_str(&occupation_rows);
         }
-        
+
         if !other_rows.is_empty() {
-            variable_rows.push_str("<tr class=\"section-header\"><th colspan=\"5\">Other Variables</th></tr>");
+            variable_rows.push_str(
+                "<tr class=\"section-header\"><th colspan=\"5\">Other Variables</th></tr>",
+            );
             variable_rows.push_str(&other_rows);
         }
-        
+
         // Calculate missing data for report
         let mut missing_data_rows = String::new();
         for (var, (case_rate, ctrl_rate)) in &results.missing_data_rates {
@@ -590,9 +665,10 @@ impl StructuredOutputManager {
                 ctrl_rate * 100.0
             ));
         }
-        
+
         // Generate the HTML content
-        let html_content = format!(r#"<!DOCTYPE html>
+        let html_content = format!(
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -758,19 +834,25 @@ impl StructuredOutputManager {
     </div>
 </body>
 </html>"#,
-            generated_at = self.runtime_info.get("generated_at").unwrap_or(&String::from("Unknown")),
-            version = self.runtime_info.get("version").unwrap_or(&String::from("Unknown")),
+            generated_at = self
+                .runtime_info
+                .get("generated_at")
+                .unwrap_or(&String::from("Unknown")),
+            version = self
+                .runtime_info
+                .get("version")
+                .unwrap_or(&String::from("Unknown")),
             variable_rows = variable_rows,
             missing_data_rows = missing_data_rows
         );
-        
+
         fs::write(&report_path, html_content).map_err(|e| {
             IdsError::io_error(format!("Failed to write balance HTML report: {}", e))
         })?;
-        
+
         Ok(())
     }
-    
+
     /// Generate a detailed HTML report for matching analysis
     fn generate_matching_html_report(
         &self,
@@ -780,21 +862,20 @@ impl StructuredOutputManager {
         let report_dir = self.get_dir_path(OutputDirType::Report);
         let prefix = filename_prefix.unwrap_or("matching");
         let report_path = report_dir.join(format!("{}_report.html", prefix));
-        
+
         // Generate summary statistics
         let total_cases = matched_pairs.len();
-        let cases_with_controls = matched_pairs.iter()
+        let cases_with_controls = matched_pairs
+            .iter()
             .filter(|r| !r.controls.is_empty())
             .count();
-        let total_controls: usize = matched_pairs.iter()
-            .map(|r| r.controls.len())
-            .sum();
+        let total_controls: usize = matched_pairs.iter().map(|r| r.controls.len()).sum();
         let avg_controls_per_case = if total_cases > 0 {
             total_controls as f64 / total_cases as f64
         } else {
             0.0
         };
-        
+
         // Calculate birth date difference statistics
         let mut birth_diffs: Vec<i64> = Vec::new();
         for record in matched_pairs.iter() {
@@ -802,31 +883,30 @@ impl StructuredOutputManager {
                 birth_diffs.push(control.birth_date_diff);
             }
         }
-        
+
         let avg_birth_diff = if !birth_diffs.is_empty() {
             birth_diffs.iter().sum::<i64>() as f64 / birth_diffs.len() as f64
         } else {
             0.0
         };
-        
+
         let max_birth_diff = birth_diffs.iter().cloned().max().unwrap_or(0);
-        
+
         // Generate case summary rows
         let mut case_summary_rows = String::new();
-        for record in matched_pairs.iter().take(100) { // Limit to first 100 for performance
+        for record in matched_pairs.iter().take(100) {
+            // Limit to first 100 for performance
             let controls_count = record.controls.len();
             let control_info = if controls_count > 0 {
                 let first_control = &record.controls[0];
                 format!(
-                    "{} controls, first: {} (diff: {} days)", 
-                    controls_count,
-                    first_control.pnr,
-                    first_control.birth_date_diff
+                    "{} controls, first: {} (diff: {} days)",
+                    controls_count, first_control.pnr, first_control.birth_date_diff
                 )
             } else {
                 "No controls found".to_string()
             };
-            
+
             case_summary_rows.push_str(&format!(
                 r#"<tr>
                     <td>{}</td>
@@ -842,9 +922,10 @@ impl StructuredOutputManager {
                 control_info
             ));
         }
-        
+
         // Generate the HTML content
-        let html_content = format!(r#"<!DOCTYPE html>
+        let html_content = format!(
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1024,8 +1105,14 @@ impl StructuredOutputManager {
     </div>
 </body>
 </html>"#,
-            generated_at = self.runtime_info.get("generated_at").unwrap_or(&String::from("Unknown")),
-            version = self.runtime_info.get("version").unwrap_or(&String::from("Unknown")),
+            generated_at = self
+                .runtime_info
+                .get("generated_at")
+                .unwrap_or(&String::from("Unknown")),
+            version = self
+                .runtime_info
+                .get("version")
+                .unwrap_or(&String::from("Unknown")),
             total_cases = total_cases,
             cases_with_controls = cases_with_controls,
             total_controls = total_controls,
@@ -1034,21 +1121,22 @@ impl StructuredOutputManager {
             max_birth_diff = max_birth_diff,
             case_summary_rows = case_summary_rows
         );
-        
+
         fs::write(&report_path, html_content).map_err(|e| {
             IdsError::io_error(format!("Failed to write matching HTML report: {}", e))
         })?;
-        
+
         Ok(())
     }
-    
+
     /// Generate a basic data quality report
     pub fn generate_data_quality_report(&self) -> Result<(), IdsError> {
         let report_dir = self.get_dir_path(OutputDirType::Report);
         let report_path = report_dir.join("data_quality_report.html");
-        
+
         // Generate placeholder HTML
-        let html_content = format!(r#"<!DOCTYPE html>
+        let html_content = format!(
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1139,14 +1227,20 @@ impl StructuredOutputManager {
     </div>
 </body>
 </html>"#,
-            generated_at = self.runtime_info.get("generated_at").unwrap_or(&String::from("Unknown")),
-            version = self.runtime_info.get("version").unwrap_or(&String::from("Unknown"))
+            generated_at = self
+                .runtime_info
+                .get("generated_at")
+                .unwrap_or(&String::from("Unknown")),
+            version = self
+                .runtime_info
+                .get("version")
+                .unwrap_or(&String::from("Unknown"))
         );
-        
+
         fs::write(&report_path, html_content).map_err(|e| {
             IdsError::io_error(format!("Failed to write data quality HTML report: {}", e))
         })?;
-        
+
         Ok(())
     }
 }

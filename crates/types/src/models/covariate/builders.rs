@@ -1,5 +1,5 @@
-use hashbrown::HashMap;
 use super::types::{Covariate, CovariateType, CovariateValue, DemographicExtras};
+use hashbrown::HashMap;
 
 // Builder for education covariates
 #[derive(Clone)]

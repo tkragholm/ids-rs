@@ -35,19 +35,19 @@ pub trait CovariateProcessor: Send + Sync {
     /// - Processing fails due to invalid or inconsistent data
     /// - Type conversion errors occur
     fn process(&self, store: &dyn Store, year: i32) -> Result<Covariate>;
-    
+
     /// Get the type of covariate this processor handles
     ///
     /// # Returns
     /// * `CovariateType` - The type of covariate this processor generates
     fn covariate_type(&self) -> CovariateType;
-    
+
     /// Get the field names required by this processor
     ///
     /// # Returns
     /// * `Vec<String>` - List of field names needed from the store
     fn required_fields(&self) -> Vec<String>;
-    
+
     /// Check if the processor can run with the available data
     ///
     /// # Arguments
@@ -57,15 +57,17 @@ pub trait CovariateProcessor: Send + Sync {
     /// # Returns
     /// * `bool` - True if all required fields are available, false otherwise
     fn can_process(&self, store: &dyn Store, year: i32) -> bool {
-        self.required_fields().iter().all(|field| store.has_data(year, field))
+        self.required_fields()
+            .iter()
+            .all(|field| store.has_data(year, field))
     }
-    
+
     /// Get the name of this processor
     fn name(&self) -> &str;
-    
+
     /// Determine if this variable should be treated as categorical
     fn is_categorical(&self) -> bool;
-    
+
     /// Get the variable type for this processor
     fn variable_type(&self) -> VariableType {
         if self.is_categorical() {
@@ -74,17 +76,17 @@ pub trait CovariateProcessor: Send + Sync {
             VariableType::Numeric
         }
     }
-    
+
     /// Extract a numeric value from a covariate, returning None if not applicable
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64>;
-    
+
     /// Extract a categorical value from a covariate, returning None if not applicable
     fn process_categorical(&self, covariate: &Covariate) -> Option<String>;
-    
+
     /// Convert a categorical value to a numeric representation if needed for calculations
     fn categorical_to_numeric(&self, value: &str) -> f64 {
-        if let Ok(num) = value.parse::<f64>() { 
-            num 
+        if let Ok(num) = value.parse::<f64>() {
+            num
         } else {
             // Hash the string to create a stable numeric value
             let mut hash = 0.0;
@@ -110,7 +112,7 @@ pub trait CovariateProcessorExt: CovariateProcessor {
     /// # Errors
     /// Returns an error if processing fails for any year
     fn process_years(&self, store: &dyn Store, years: &[i32]) -> Result<Vec<Covariate>>;
-    
+
     /// Process all available years in the store
     ///
     /// # Arguments
@@ -122,7 +124,7 @@ pub trait CovariateProcessorExt: CovariateProcessor {
     /// # Errors
     /// Returns an error if processing fails for any year
     fn process_all_years(&self, store: &dyn Store) -> Result<Vec<Covariate>>;
-    
+
     /// Find the latest year that can be processed
     ///
     /// # Arguments
@@ -137,23 +139,25 @@ pub trait CovariateProcessorExt: CovariateProcessor {
 impl<T: CovariateProcessor> CovariateProcessorExt for T {
     fn process_years(&self, store: &dyn Store, years: &[i32]) -> Result<Vec<Covariate>> {
         let mut results = Vec::with_capacity(years.len());
-        
+
         for &year in years {
             if self.can_process(store, year) {
                 results.push(self.process(store, year)?);
             }
         }
-        
+
         Ok(results)
     }
-    
+
     fn process_all_years(&self, store: &dyn Store) -> Result<Vec<Covariate>> {
         let years = store.years();
         self.process_years(store, &years)
     }
-    
+
     fn latest_processable_year(&self, store: &dyn Store) -> Option<i32> {
-        store.years().into_iter()
+        store
+            .years()
+            .into_iter()
             .filter(|&year| self.can_process(store, year))
             .max()
     }
@@ -164,11 +168,11 @@ pub trait LegacyCovariateProcessor: CovariateProcessor {
     fn get_name(&self) -> &str {
         self.name()
     }
-    
+
     fn get_covariate_type(&self) -> CovariateType {
         self.covariate_type()
     }
-    
+
     fn get_variable_type(&self) -> VariableType {
         self.variable_type()
     }

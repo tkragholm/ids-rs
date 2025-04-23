@@ -31,10 +31,8 @@ pub fn save_config<T>(config: &T, path: impl AsRef<Path>) -> Result<()>
 where
     T: Serialize,
 {
-    let file = File::create(path.as_ref()).with_context(|| format!(
-        "Failed to create config file: {:?}",
-        path.as_ref()
-    ))?;
+    let file = File::create(path.as_ref())
+        .with_context(|| format!("Failed to create config file: {:?}", path.as_ref()))?;
 
     if path.as_ref().extension().is_some_and(|ext| ext == "json") {
         serde_json::to_writer_pretty(file, config)
@@ -77,7 +75,7 @@ mod tests {
         // Create a temp file with a .json extension
         let temp_file_path = NamedTempFile::new().unwrap().path().with_extension("json");
         let mut temp_file = std::fs::File::create(&temp_file_path).unwrap();
-        
+
         let test_config = TestConfig {
             name: "test".to_string(),
             value: 42,
@@ -122,7 +120,7 @@ mod tests {
 
         // Create default config - add file extension to make it work with the detection
         let path_with_extension = path.with_extension("json");
-        
+
         // Create default config
         create_default_config(&path_with_extension, default_config.clone()).unwrap();
 

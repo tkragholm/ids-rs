@@ -14,8 +14,8 @@
 //!
 //! ```
 //! use types::models::{
-//!     CovariateType, 
-//!     EducationBuilder, 
+//!     CovariateType,
+//!     EducationBuilder,
 //!     DemographicsBuilder,
 //! };
 //!
@@ -47,26 +47,18 @@
 
 // Submodules
 pub mod covariate;
-pub mod time_varying;
 pub mod family;
 pub mod pnr;
+pub mod time_varying;
 
 // Re-exports
 
 /// Covariate models
-pub use covariate::{
-    Covariate, 
-    CovariateType, 
-    CovariateValue, 
-    DemographicExtras,
-};
+pub use covariate::{Covariate, CovariateType, CovariateValue, DemographicExtras};
 
 /// Builder types for creating covariates
 pub use covariate::builders::{
-    EducationBuilder, 
-    IncomeBuilder, 
-    OccupationBuilder, 
-    DemographicsBuilder,
+    DemographicsBuilder, EducationBuilder, IncomeBuilder, OccupationBuilder,
 };
 
 /// Time-varying value models

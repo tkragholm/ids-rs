@@ -69,7 +69,7 @@ pub mod utils;
 // To maintain backward compatibility while encouraging use of the newer APIs,
 // these modules are exported with #[doc(hidden)] to discourage their use.
 #[doc(hidden)]
-pub mod arrow;
+pub use storage::arrow;
 #[doc(hidden)]
 pub mod config;
 #[doc(hidden)]
@@ -84,10 +84,10 @@ pub mod translation;
 pub use self::error::{IdsError, Result};
 pub use self::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};
 pub use self::models::{Pnr, PnrPool};
-pub use self::store::DataStore;
 #[cfg(feature = "arrow-integration")]
 pub use self::storage::arrow::ArrowBackend;
-pub use self::traits::{Store, DateHelpers};
+pub use self::store::DataStore;
+pub use self::traits::{DateHelpers, Store};
 
 // Type aliases for backward compatibility
 #[doc(hidden)]

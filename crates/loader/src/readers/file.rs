@@ -28,7 +28,10 @@ impl DataReader for FileReader {
     fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError> {
         // Get the absolute path for better diagnostics
         let absolute_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        log::debug!("FileReader attempting to access file: {}", absolute_path.display());
+        log::debug!(
+            "FileReader attempting to access file: {}",
+            absolute_path.display()
+        );
         log::debug!("Checking if exists: {}", path.exists());
 
         if !path.exists() {
@@ -42,7 +45,11 @@ impl DataReader for FileReader {
         log::debug!("Reading batches from {}", path.display());
         let batches = match crate::formats::parquet::read_parquet(path, Some(schema), None, None) {
             Ok(b) => {
-                log::debug!("Successfully read {} batches from {}", b.len(), path.display());
+                log::debug!(
+                    "Successfully read {} batches from {}",
+                    b.len(),
+                    path.display()
+                );
                 b
             }
             Err(e) => {
@@ -52,16 +59,19 @@ impl DataReader for FileReader {
         };
         Ok(batches)
     }
-    
+
     fn read_batches_with_filter(
-        &self, 
-        path: &Path, 
+        &self,
+        path: &Path,
         schema: &Schema,
-        pnr_filter: &HashSet<String>
+        pnr_filter: &HashSet<String>,
     ) -> Result<Vec<RecordBatch>, IdsError> {
         // Get the absolute path for better diagnostics
         let absolute_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        log::debug!("FileReader attempting to access file with filter: {}", absolute_path.display());
+        log::debug!(
+            "FileReader attempting to access file with filter: {}",
+            absolute_path.display()
+        );
         log::debug!("Checking if exists: {}", path.exists());
 
         if !path.exists() {
@@ -73,13 +83,26 @@ impl DataReader for FileReader {
         }
 
         log::debug!("Reading batches with PNR filter from {}", path.display());
-        let batches = match crate::formats::parquet::read_parquet_with_filter(path, Some(schema), pnr_filter, None) {
+        let batches = match crate::formats::parquet::read_parquet_with_filter(
+            path,
+            Some(schema),
+            pnr_filter,
+            None,
+        ) {
             Ok(b) => {
-                log::debug!("Successfully read {} filtered batches from {}", b.len(), path.display());
+                log::debug!(
+                    "Successfully read {} filtered batches from {}",
+                    b.len(),
+                    path.display()
+                );
                 b
             }
             Err(e) => {
-                log::debug!("Error reading parquet file with filter {}: {}", path.display(), e);
+                log::debug!(
+                    "Error reading parquet file with filter {}: {}",
+                    path.display(),
+                    e
+                );
                 return Err(e);
             }
         };
@@ -118,7 +141,10 @@ impl DataReader for FileReader {
 
     fn read_family(&self) -> Result<Vec<RecordBatch>, IdsError> {
         let path = Path::new(&self.base_path).join("family.parquet");
-        log::debug!("FileReader attempting to read family.parquet from: {}", path.display());
+        log::debug!(
+            "FileReader attempting to read family.parquet from: {}",
+            path.display()
+        );
         self.read_batches(&path, &schema::family_schema())
     }
 }

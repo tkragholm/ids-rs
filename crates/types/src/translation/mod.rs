@@ -39,60 +39,100 @@ impl TranslationMaps {
 
     fn load_from_files() -> Result<Self, Box<dyn std::error::Error>> {
         let mut maps = HashMap::new();
-        
-        maps.insert(TranslationType::Statsb, load_translation_map("mappings/statsb.json")?);
-        maps.insert(TranslationType::Civst, load_translation_map("mappings/civst.json")?);
-        maps.insert(TranslationType::FamilyType, load_translation_map("mappings/family_type.json")?);
-        maps.insert(TranslationType::FmMark, load_translation_map("mappings/fm_mark.json")?);
-        maps.insert(TranslationType::Hustype, load_translation_map("mappings/hustype.json")?);
-        maps.insert(TranslationType::Reg, load_translation_map("mappings/reg.json")?);
-        maps.insert(TranslationType::Socio13, load_translation_map("mappings/socio13.json")?);
-        maps.insert(TranslationType::Hfaudd, load_translation_map("mappings/hfaudd.json")?);
-        
+
+        maps.insert(
+            TranslationType::Statsb,
+            load_translation_map("mappings/statsb.json")?,
+        );
+        maps.insert(
+            TranslationType::Civst,
+            load_translation_map("mappings/civst.json")?,
+        );
+        maps.insert(
+            TranslationType::FamilyType,
+            load_translation_map("mappings/family_type.json")?,
+        );
+        maps.insert(
+            TranslationType::FmMark,
+            load_translation_map("mappings/fm_mark.json")?,
+        );
+        maps.insert(
+            TranslationType::Hustype,
+            load_translation_map("mappings/hustype.json")?,
+        );
+        maps.insert(
+            TranslationType::Reg,
+            load_translation_map("mappings/reg.json")?,
+        );
+        maps.insert(
+            TranslationType::Socio13,
+            load_translation_map("mappings/socio13.json")?,
+        );
+        maps.insert(
+            TranslationType::Hfaudd,
+            load_translation_map("mappings/hfaudd.json")?,
+        );
+
         Ok(Self { maps })
     }
 
     fn load_embedded() -> Self {
         let mut maps = HashMap::new();
-        
+
         maps.insert(
             TranslationType::Statsb,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/statsb.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/statsb.json"
+            )),
         );
         maps.insert(
             TranslationType::Civst,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/civst.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/civst.json"
+            )),
         );
         maps.insert(
             TranslationType::FamilyType,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/family_type.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/family_type.json"
+            )),
         );
         maps.insert(
             TranslationType::FmMark,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/fm_mark.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/fm_mark.json"
+            )),
         );
         maps.insert(
             TranslationType::Hustype,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/hustype.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/hustype.json"
+            )),
         );
         maps.insert(
             TranslationType::Reg,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/reg.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/reg.json"
+            )),
         );
         maps.insert(
             TranslationType::Socio13,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/socio13.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/socio13.json"
+            )),
         );
         maps.insert(
             TranslationType::Hfaudd,
-            parse_embedded_json(include_str!("../../../ids/python/ids_toolkit/mappings/hfaudd.json"))
+            parse_embedded_json(include_str!(
+                "../../../ids/python/ids_toolkit/mappings/hfaudd.json"
+            )),
         );
-        
+
         Self { maps }
     }
 
     /// Create an empty translation map for diagnostic purposes
-    #[must_use] 
+    #[must_use]
     pub fn new_empty() -> Self {
         Self {
             maps: HashMap::new(),
@@ -100,12 +140,15 @@ impl TranslationMaps {
     }
 
     pub fn translate(&self, translation_type: TranslationType, code: &str) -> Option<&str> {
-        self.maps.get(&translation_type)?.get(code).map(String::as_str)
+        self.maps
+            .get(&translation_type)?
+            .get(code)
+            .map(String::as_str)
     }
 
     /// Get all codes that translate to a specific value for a given translation type
     /// Useful for finding all HFAUDD codes that map to a specific ISCED level
-    #[must_use] 
+    #[must_use]
     pub fn get_codes_for_value(
         &self,
         translation_type: TranslationType,
@@ -152,7 +195,7 @@ fn load_translation_map(path: &str) -> Result<HashMap<String, String>, Box<dyn s
             let map: HashMap<String, String> = serde_json::from_reader(file)?;
             return Ok(map);
         }
-        
+
         log::warn!(
             "Failed to open translation map at environment path: {}",
             env_path.display()

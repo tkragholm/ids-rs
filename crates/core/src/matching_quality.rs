@@ -1,10 +1,6 @@
-use crate::plotting::{DefaultPlotter, Plottable};
-use std::error::Error;
-
 #[derive(Debug)]
 pub struct MatchingQuality {
     pub stats: MatchingStats,
-    plotting: Box<dyn Plottable>,
 }
 
 #[derive(Debug)]
@@ -54,7 +50,8 @@ pub struct MatchingQualityParams {
 }
 
 impl MatchingQuality {
-    #[must_use] pub fn new(params: MatchingQualityParams) -> Self {
+    #[must_use]
+    pub fn new(params: MatchingQualityParams) -> Self {
         let stats = MatchingStats {
             total_cases: params.total_cases,
             matched_cases: params.matched_cases,
@@ -76,13 +73,11 @@ impl MatchingQuality {
             },
         };
 
-        // Create default plotting implementation
-        let plotting = Box::new(DefaultPlotter::new());
-
-        Self { stats, plotting }
+        Self { stats }
     }
 
-    #[must_use] pub fn calculate_percentiles(values: &[i64], percentiles: &[f64]) -> Vec<i64> {
+    #[must_use]
+    pub fn calculate_percentiles(values: &[i64], percentiles: &[f64]) -> Vec<i64> {
         let mut sorted_values = values.to_vec();
         sorted_values.sort_unstable();
 
@@ -95,102 +90,23 @@ impl MatchingQuality {
             .collect()
     }
 
-    fn plot_all_distributions(&self, base_filename: &str) -> Result<(), Box<dyn Error>> {
-        self.plotting
-            .plot_distribution(
-                &self.stats.differences.birth_date,
-                &format!("{base_filename}_birth.png"),
-                "Birth Date Differences",
-                "Difference in Days",
-            )
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
-
-        self.plotting
-            .plot_distribution(
-                &self.stats.differences.mother_age,
-                &format!("{base_filename}_mother.png"),
-                "Mother Age Differences",
-                "Difference in Days",
-            )
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
-
-        self.plotting
-            .plot_distribution(
-                &self.stats.differences.father_age,
-                &format!("{base_filename}_father.png"),
-                "Father Age Differences",
-                "Difference in Days",
-            )
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
-
-        Ok(())
-    }
-
-    pub fn generate_summary_plots(&self, output_dir: &str) -> Result<(), Box<dyn Error>> {
-        std::fs::create_dir_all(output_dir)?;
-        
-        // 1. Generate the traditional distribution plots
-        self.plot_all_distributions(&format!("{output_dir}/distributions"))?;
-
-        // 2. Generate utilization summary (pie chart)
-        let (utilization_rate, average_reuse) = {
-            let total_matched_controls =
-                self.stats.matched_cases as f64 * self.stats.avg_controls_per_case;
-            let utilization_rate = total_matched_controls / self.stats.total_controls as f64;
-            let average_reuse = if self.stats.total_controls > 0 {
-                total_matched_controls / self.stats.total_controls as f64
-            } else {
-                0.0
-            };
-            (utilization_rate, average_reuse)
-        };
-
-        self.plotting
-            .plot_utilization_summary(
-                &format!("{output_dir}/utilization.png"),
-                utilization_rate,
-                average_reuse,
-            )
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
-            
-        // 3. Generate overall matching statistics visualization
-        self.plotting
-            .plot_matching_stats(
-                &format!("{output_dir}/matching_stats.png"),
-                self.stats.matched_cases,
-                self.stats.total_cases - self.stats.matched_cases,
-                self.stats.avg_controls_per_case,
-            )
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
-            
-        // 4. Generate combined differences visualization
-        self.plotting
-            .plot_matched_pairs_summary(
-                &format!("{output_dir}/pairs_summary.png"),
-                &self.stats.differences.birth_date,
-                &self.stats.differences.mother_age,
-                &self.stats.differences.father_age,
-            )
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?;
-            
-        Ok(())
-    }
-
-    #[must_use] pub fn format_report(&self) -> String {
-        use colored::Colorize;
+    #[must_use]
+    pub fn format_report(&self) -> String {
         use crate::utils::console::ConsoleOutput;
+        use colored::Colorize;
 
         let mut report = String::new();
 
         // Title
         report.push_str(&format!("\n{}\n", "Matching Quality Report".bold().green()));
         report.push_str(&format!("{}\n", "═".repeat(22).green()));
-        
+
         // Matching metrics
         let matching_rate = self.stats.matched_cases as f64 / self.stats.total_cases as f64;
-        let control_utilization = self.stats.matched_cases as f64 * self.stats.avg_controls_per_case
+        let control_utilization = self.stats.matched_cases as f64
+            * self.stats.avg_controls_per_case
             / self.stats.total_controls as f64;
-        
+
         report.push_str(&format!(
             "│ {} {}/{} ({})\n",
             "Matching Rate:".bold(),
@@ -202,7 +118,9 @@ impl MatchingQuality {
         report.push_str(&format!(
             "│ {} {}/{} ({})\n",
             "Control Utilization:".bold(),
-            (self.stats.matched_cases * self.stats.avg_controls_per_case as usize).to_string().yellow(),
+            (self.stats.matched_cases * self.stats.avg_controls_per_case as usize)
+                .to_string()
+                .yellow(),
             self.stats.total_controls,
             ConsoleOutput::format_percentage(control_utilization)
         ));
@@ -264,7 +182,7 @@ impl MatchingQuality {
         // Balance metrics
         report.push_str(&format!("\n{}\n", "Balance Metrics".blue().bold()));
         report.push_str(&format!("{}\n", "─".repeat(14).blue()));
-        
+
         // Color-code the balance metrics (lower is better)
         let birth_balance_str = format!("{:.3}", self.stats.balance.birth_date);
         let birth_balance = if self.stats.balance.birth_date < 0.1 {
@@ -274,7 +192,7 @@ impl MatchingQuality {
         } else {
             birth_balance_str.red()
         };
-        
+
         let parent_balance_str = format!("{:.3}", self.stats.balance.parent_age);
         let parent_balance = if self.stats.balance.parent_age < 0.1 {
             parent_balance_str.green()
@@ -283,13 +201,9 @@ impl MatchingQuality {
         } else {
             parent_balance_str.red()
         };
-        
-        report.push_str(&format!(
-            "  Birth Date Balance: {birth_balance}\n"
-        ));
-        report.push_str(&format!(
-            "  Parent Age Balance: {parent_balance}\n"
-        ));
+
+        report.push_str(&format!("  Birth Date Balance: {birth_balance}\n"));
+        report.push_str(&format!("  Parent Age Balance: {parent_balance}\n"));
 
         report
     }

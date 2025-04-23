@@ -8,11 +8,10 @@
 use crate::error::{IdsError, Result};
 use crate::models::{Covariate, CovariateType, TimeVaryingValue};
 use crate::traits::Store;
-use ahash::RandomState;
 use chrono::NaiveDate;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash, RandomState};
 use std::sync::Arc;
 
 /// Standard thread-safe wrapper for store implementations.
@@ -178,9 +177,9 @@ where
 
         // Calculate per-shard capacity, ensuring even distribution
         let per_shard_capacity = (capacity / num_shards) + 1;
-        
+
         // Create shards with pre-allocated capacity
-        let shards: Vec<_> = (0..num_shards)
+        let shards: Vec<DashMap<K, V>> = (0..num_shards)
             .map(|_| DashMap::with_capacity_and_hasher(per_shard_capacity, RandomState::new()))
             .collect();
 
@@ -283,16 +282,19 @@ where
         #[cfg(feature = "parallel")]
         {
             use rayon::prelude::*;
-            sharded_entries.into_par_iter().enumerate().for_each(|(idx, entries)| {
-                if !entries.is_empty() {
-                    let shard = &self.shards[idx];
-                    entries.into_iter().for_each(|(key, value)| {
-                        shard.insert(key, value);
-                    });
-                }
-            });
+            sharded_entries
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(idx, entries)| {
+                    if !entries.is_empty() {
+                        let shard = &self.shards[idx];
+                        entries.into_iter().for_each(|(key, value)| {
+                            shard.insert(key, value);
+                        });
+                    }
+                });
         }
-        
+
         // Sequential fallback when parallel feature is not enabled
         #[cfg(not(feature = "parallel"))]
         {
@@ -320,7 +322,7 @@ where
         let shard_idx = self.shard_idx(key);
         self.shards[shard_idx].remove(key).map(|(_, v)| v)
     }
-    
+
     /// Get or compute a value in the cache.
     ///
     /// If the key exists in the cache, returns the existing value.
@@ -334,15 +336,12 @@ where
     /// # Returns
     ///
     /// The existing or newly computed value
-    pub fn get_or_insert_with<F>(&self, key: K, f: F) -> V 
+    pub fn get_or_insert_with<F>(&self, key: K, f: F) -> V
     where
-        F: FnOnce() -> V
+        F: FnOnce() -> V,
     {
         let shard_idx = self.shard_idx(&key);
-        self.shards[shard_idx]
-            .entry(key)
-            .or_insert_with(f)
-            .clone()
+        self.shards[shard_idx].entry(key).or_insert_with(f).clone()
     }
 }
 
@@ -446,10 +445,10 @@ impl CovariateCache {
         let date = key.date;
 
         let value = store.covariate(pnr, cov_type, date)?;
-        
+
         // Cache the result
         self.cache.insert(key, value.clone());
-        
+
         Ok(value)
     }
 
@@ -492,7 +491,7 @@ impl CovariateCache {
 
         // Load missing values
         let mut loaded_entries = Vec::with_capacity(keys.len());
-        
+
         for (key, pnr, cov_type, date) in keys {
             match store.covariate(&pnr, cov_type, date) {
                 Ok(value) => {
@@ -500,7 +499,8 @@ impl CovariateCache {
                 }
                 Err(e) => {
                     return Err(IdsError::invalid_operation(format!(
-                        "Failed to load covariate: {}", e
+                        "Failed to load covariate: {}",
+                        e
                     )));
                 }
             }

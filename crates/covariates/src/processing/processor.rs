@@ -15,18 +15,18 @@ pub trait ConfigurableProcessor: CovariateProcessor {
 pub trait ConfigurableVariableProcessor {
     /// The variable type this processor handles
     fn variable_type() -> VariableType;
-    
+
     /// Create a new processor from configuration
     fn from_config(config: &CovariateVariableConfig) -> std::result::Result<Self, Error>
     where
         Self: Sized;
-    
+
     /// Process a covariate and return a value
     fn process(&self, covariate: &Covariate) -> Option<CovariateValue>;
-    
+
     /// Get the name of the variable
     fn get_name(&self) -> &str;
-    
+
     /// Get the description of the variable
     fn get_description(&self) -> Option<&str>;
 }

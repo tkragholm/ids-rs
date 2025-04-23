@@ -1,9 +1,9 @@
-use types::error::{IdsError, Result};
-use types::models::{Covariate, CovariateType};
-use types::traits::CovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;
+use types::error::{IdsError, Result};
+use types::models::{Covariate, CovariateType};
+use types::traits::CovariateProcessor;
 
 /// Processor for demographic covariates
 pub struct DemographicsProcessor {
@@ -24,11 +24,11 @@ impl CovariateProcessor for DemographicsProcessor {
         // Default implementation - would be overridden by concrete implementation
         Err(IdsError::invalid_operation("Not implemented".to_string()))
     }
-    
+
     fn covariate_type(&self) -> CovariateType {
         CovariateType::Demographics
     }
-    
+
     fn required_fields(&self) -> Vec<String> {
         vec![
             "KOM".to_string(),
@@ -37,16 +37,16 @@ impl CovariateProcessor for DemographicsProcessor {
             "ANTPERSF".to_string(),
         ]
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn is_categorical(&self) -> bool {
         // Demographics can be both, default to false
         false
     }
-    
+
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
         if covariate.type_() != CovariateType::Demographics {
             return None;
@@ -69,12 +69,12 @@ impl CovariateProcessor for DemographicsProcessor {
 impl ConfigurableProcessor for DemographicsProcessor {
     fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error> {
         if config.covariate_type != CovariateType::Demographics {
-            return Err(Error::config(
-                format!("Invalid covariate type: expected Demographics, got {:?}", 
-                config.covariate_type)
-            ));
+            return Err(Error::config(format!(
+                "Invalid covariate type: expected Demographics, got {:?}",
+                config.covariate_type
+            )));
         }
-        
+
         Ok(Self {
             name: config.name.clone(),
         })

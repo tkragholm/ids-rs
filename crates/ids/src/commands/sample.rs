@@ -200,24 +200,16 @@ fn process_sampling_results(
     let quality = sampler.evaluate_matching_quality(&case_control_pairs);
     println!("{}", quality.format_report());
 
-    // Generate plots
+    // Create plots directory for possible future use, but don't generate plots
+    // as the plotting functionality has been removed
     let plots_dir = Path::new(output_dir).join("plots");
     fs::create_dir_all(&plots_dir)?;
 
-    match quality.generate_summary_plots(&plots_dir.to_string_lossy()) {
-        Ok(()) => {
-            ConsoleOutput::success(&format!(
-                "Quality plots generated in {}",
-                plots_dir.display()
-            ));
-        }
-        Err(e) => {
-            ConsoleOutput::error(&format!("Error generating plots: {e}"));
-            return Err(crate::core::IdsError::sampling(format!(
-                "Error generating plots: {e}"
-            )));
-        }
-    }
+    // Plotting has been removed
+    ConsoleOutput::info(&format!(
+        "Note: Plotting functionality has been removed. No plots will be generated in {}",
+        plots_dir.display()
+    ));
 
     Ok(())
 }

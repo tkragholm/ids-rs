@@ -1,9 +1,9 @@
-use super::super::BalanceChecker;
 use super::super::memory::MemoryGuard;
-use super::OptimizationStrategy;
+use super::super::BalanceChecker;
+use super::config::ProcessorConfig;
 use super::date_grouping::DateGroupingParams;
 use super::progress::create_progress_style;
-use super::config::ProcessorConfig;
+use super::OptimizationStrategy;
 use chrono::NaiveDate;
 use hashbrown::HashMap;
 use indicatif::ParallelProgressIterator;
@@ -159,18 +159,16 @@ impl CategoricalProcessor {
                 // In balanced mode, only use date grouping for small chunks
                 if chunk.len() < 500 {
                     // For small chunks, try the date grouping optimization
-                    self.process_with_date_grouping_categorical(
-                        DateGroupingParams {
-                            chunk,
-                            covariate_type, 
-                            checker,
-                            extractor,
-                            values: &mut values,
-                            missing: &mut missing,
-                            cache_hits: &mut cache_hits,
-                            cache_misses: &mut cache_misses,
-                        }
-                    );
+                    self.process_with_date_grouping_categorical(DateGroupingParams {
+                        chunk,
+                        covariate_type,
+                        checker,
+                        extractor,
+                        values: &mut values,
+                        missing: &mut missing,
+                        cache_hits: &mut cache_hits,
+                        cache_misses: &mut cache_misses,
+                    });
                 } else {
                     // For larger chunks, process linearly to avoid memory issues
                     for (pnr, date) in chunk {
@@ -192,18 +190,16 @@ impl CategoricalProcessor {
             }
             OptimizationStrategy::Performance => {
                 // Performance mode: use date grouping optimization for all chunk sizes
-                self.process_with_date_grouping_categorical(
-                    DateGroupingParams {
-                        chunk,
-                        covariate_type,
-                        checker,
-                        extractor,
-                        values: &mut values,
-                        missing: &mut missing,
-                        cache_hits: &mut cache_hits,
-                        cache_misses: &mut cache_misses,
-                    }
-                );
+                self.process_with_date_grouping_categorical(DateGroupingParams {
+                    chunk,
+                    covariate_type,
+                    checker,
+                    extractor,
+                    values: &mut values,
+                    missing: &mut missing,
+                    cache_hits: &mut cache_hits,
+                    cache_misses: &mut cache_misses,
+                });
             }
         }
 
@@ -266,10 +262,8 @@ impl CategoricalProcessor {
 
     /// Process a chunk of subjects with date grouping optimization for categorical values
     #[inline]
-    fn process_with_date_grouping_categorical<F>(
-        &self,
-        params: DateGroupingParams<'_, F, String>,
-    ) where
+    fn process_with_date_grouping_categorical<F>(&self, params: DateGroupingParams<'_, F, String>)
+    where
         F: Fn(&Covariate) -> Option<String> + Send + Sync,
     {
         // Create a memory reservation for the temporary date grouping
@@ -278,8 +272,8 @@ impl CategoricalProcessor {
             params.covariate_type as u8,
             params.chunk.len()
         );
-        let estimated_size =
-            params.chunk.len() * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
+        let estimated_size = params.chunk.len()
+            * (std::mem::size_of::<String>() + std::mem::size_of::<NaiveDate>() * 2);
         let _memory_guard = MemoryGuard::new(&guard_id, estimated_size);
 
         // Use date grouping for better cache locality

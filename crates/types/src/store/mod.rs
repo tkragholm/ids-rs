@@ -1,5 +1,5 @@
 mod data_store;
-pub use data_store::{DataStore, CacheKey};
+pub use data_store::{CacheKey, DataStore};
 
 // We're consolidating on the storage::arrow::backend implementation
 pub mod time_varying_backend;

@@ -2,10 +2,10 @@ use crate::error::Result;
 use crate::models::family::relations::FamilyRelations;
 
 // Conditionally import ArrowValue based on feature
-#[cfg(feature = "arrow-integration")]
-use crate::storage::arrow::values::ArrowValue;
 #[cfg(not(feature = "arrow-integration"))]
 use crate::models::TimeVaryingValue as ArrowValue;
+#[cfg(feature = "arrow-integration")]
+use crate::storage::arrow::values::ArrowValue;
 
 /// Core trait for accessing data from a backend store
 ///
@@ -40,7 +40,7 @@ pub trait Store {
     /// # }
     /// ```
     fn data(&self, year: i32, field: &str) -> Result<ArrowValue>;
-    
+
     /// Checks if data exists for a specific year and field
     ///
     /// # Arguments
@@ -61,7 +61,7 @@ pub trait Store {
     /// }
     /// ```
     fn has_data(&self, year: i32, field: &str) -> bool;
-    
+
     /// Returns all years available in the store
     ///
     /// # Returns
@@ -77,7 +77,7 @@ pub trait Store {
     /// println!("Data available for years: {:?}", available_years);
     /// ```
     fn years(&self) -> Vec<i32>;
-    
+
     /// Returns all fields available in the store
     ///
     /// # Returns
@@ -93,7 +93,7 @@ pub trait Store {
     /// println!("Available fields: {:?}", available_fields);
     /// ```
     fn fields(&self) -> Vec<String>;
-    
+
     /// Returns family relations if available
     ///
     /// # Returns
@@ -121,4 +121,3 @@ pub trait Backend: Store {}
 
 // Automatically implement Backend for any type that implements Store
 impl<T: Store> Backend for T {}
-

@@ -34,28 +34,20 @@
 //! ```
 
 // Error handling
-pub use crate::error::{IdsError, Result, ErrorContext};
+pub use crate::error::{ErrorContext, IdsError, Result};
 pub use crate::{bail, ensure, try_with_context};
 
 // Core data models
-pub use crate::models::{
-    Covariate, 
-    CovariateType, 
-    CovariateValue, 
-    TimeVaryingValue,
-};
+pub use crate::models::{Covariate, CovariateType, CovariateValue, TimeVaryingValue};
 
 // Builder types
 pub use crate::models::covariate::builders::{
-    EducationBuilder,
-    IncomeBuilder,
-    OccupationBuilder,
-    DemographicsBuilder,
+    DemographicsBuilder, EducationBuilder, IncomeBuilder, OccupationBuilder,
 };
 
 // PNR and Family
-pub use crate::models::{Pnr, PnrPool, PersonInfo, ParentPair, FamilyInfo};
-pub use crate::models::family::{FamilyRelations};
+pub use crate::models::family::FamilyRelations;
+pub use crate::models::{FamilyInfo, ParentPair, PersonInfo, Pnr, PnrPool};
 
 // Storage and backends
 pub use crate::store::DataStore;
@@ -63,19 +55,13 @@ pub use crate::traits::access::Backend;
 
 // Arrow integration (only when arrow-integration feature is enabled)
 #[cfg(feature = "arrow-integration")]
-pub use crate::storage::arrow::{ArrowBackend, ArrowAccess, ArrowValue};
+pub use crate::storage::arrow::{ArrowAccess, ArrowBackend, ArrowValue};
 
 // TimeVaryingBackend (only when serde-support feature is enabled)
 pub use crate::store::TimeVaryingBackend;
 
 // Traits
-pub use crate::traits::{
-    Store, 
-    DateHelpers, 
-    FamilyAccess, 
-    CovariateProcessor,
-    Cacheable,
-};
+pub use crate::traits::{Cacheable, CovariateProcessor, DateHelpers, FamilyAccess, Store};
 
 // Legacy traits have been removed in this version
 
@@ -85,11 +71,11 @@ pub use crate::utils::string::{sanitize_identifier, truncate};
 
 // Logging utilities (only when logging feature is enabled)
 #[cfg(feature = "logging")]
-pub use crate::{log_debug, log_info, log_warn, log_error};
+pub use crate::{log_debug, log_error, log_info, log_warn};
 
 // Common external types
+pub use chrono::{Datelike, NaiveDate};
 pub use hashbrown::HashMap;
-pub use chrono::{NaiveDate, Datelike};
 
 /// Commonly used modules namespace.
 ///
@@ -99,9 +85,9 @@ pub use chrono::{NaiveDate, Datelike};
 /// use types::prelude::models::covariate::builders::EducationBuilder;
 /// ```
 pub mod modules {
+    pub use crate::error;
     pub use crate::models;
     pub use crate::storage;
     pub use crate::traits;
     pub use crate::utils;
-    pub use crate::error;
 }

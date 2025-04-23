@@ -18,8 +18,8 @@
 //! - `ShardedCache`: High-performance sharded cache for concurrent access
 //! - `CovariateCache`: Optimized cache for covariates with low contention
 
-use chrono::NaiveDate;
 use crate::models::CovariateType;
+use chrono::NaiveDate;
 
 /// Common cache key for covariate lookups
 /// Used across various caching implementations
@@ -52,25 +52,10 @@ impl CacheKey {
     #[must_use]
     pub fn new(pnr: &str, covariate_type: CovariateType, date: NaiveDate) -> Self {
         use std::sync::Arc;
-        
-        // Use a thread-local cache for PNRs to avoid duplicate allocations
-        thread_local! {
-            static PNR_CACHE: std::cell::RefCell<dashmap::DashMap<String, Arc<str>>> = 
-                std::cell::RefCell::new(dashmap::DashMap::with_capacity(1000));
-        }
-        
-        // Try to get the PNR from the cache first
-        let pnr_arc = PNR_CACHE.with(|cache| {
-            let cache = cache.borrow();
-            if let Some(cached) = cache.get(pnr) {
-                cached.clone()
-            } else {
-                // Not in cache, create new Arc and add to cache
-                let pnr_arc = Arc::from(pnr);
-                cache.insert(pnr.to_string(), pnr_arc.clone());
-                pnr_arc
-            }
-        });
+
+        // Simply create a new Arc directly without caching
+        // This avoids the borrowing issues with the complex RefCell/DashMap combination
+        let pnr_arc: Arc<str> = Arc::from(pnr);
         
         Self {
             pnr: pnr_arc,
@@ -78,7 +63,7 @@ impl CacheKey {
             date,
         }
     }
-    
+
     /// Create a new cache key with a pre-allocated Arc<str>
     ///
     /// This is useful when you already have an Arc<str> from another source,
@@ -92,7 +77,11 @@ impl CacheKey {
     /// # Returns
     /// A new cache key using the provided Arc<str>
     #[must_use]
-    pub fn from_arc(pnr: std::sync::Arc<str>, covariate_type: CovariateType, date: NaiveDate) -> Self {
+    pub fn from_arc(
+        pnr: std::sync::Arc<str>,
+        covariate_type: CovariateType,
+        date: NaiveDate,
+    ) -> Self {
         Self {
             pnr,
             covariate_type,
@@ -110,8 +99,8 @@ pub use crate::store::DataStore;
 pub use crate::traits::Store as Backend;
 
 // Export the consolidated backends
-pub use arrow::backend::ArrowBackend;
 pub use crate::store::time_varying_backend::TimeVaryingBackend;
+pub use arrow::backend::ArrowBackend;
 
 // Export concurrency utilities
-pub use concurrency::{ThreadSafeStore, ShardedCache, CovariateCache};
+pub use concurrency::{CovariateCache, ShardedCache, ThreadSafeStore};

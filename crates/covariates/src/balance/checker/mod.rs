@@ -1,17 +1,14 @@
 // Core structure for the BalanceChecker with essential methods
-pub mod builder;
 mod balance_calculation;
+pub mod builder;
 mod paired_analysis;
 mod performance;
 
-use crate::balance::{
-    metrics::BalanceMetrics,
-    results::BalanceResults,
-};
-use types::storage::{CacheKey, CovariateCache, ThreadSafeStore};
+use crate::balance::{metrics::BalanceMetrics, results::BalanceResults};
 use crate::models::{CovariateSummary, MatchedPairDetail};
 use chrono::NaiveDate;
 use std::collections::HashMap;
+use types::storage::{CacheKey, CovariateCache, ThreadSafeStore};
 use types::{
     error::Result,
     models::{Covariate, CovariateType},
@@ -41,7 +38,7 @@ impl BalanceChecker {
             results: None,
         }
     }
-    
+
     /// Returns a builder for creating a BalanceChecker with custom settings
     pub fn builder() -> BalanceCheckerBuilder {
         BalanceCheckerBuilder::new()
@@ -55,22 +52,22 @@ impl BalanceChecker {
         date: NaiveDate,
     ) -> Result<Option<Covariate>> {
         let key = CacheKey::new(pnr, covariate_type, date);
-        
+
         // First check the cache
         if let Some(value) = self.cache.get(&key) {
             return Ok(value);
         }
-        
+
         // Not in cache, get from store
         let mut store = self.store.write();
         let value = store.covariate(pnr, covariate_type, date)?;
-        
+
         // Cache the result
         self.cache.insert(key, value.clone());
-        
+
         Ok(value)
     }
-    
+
     /// Backward compatibility method, deprecated
     #[deprecated(note = "Use covariate method instead")]
     pub fn get_covariate(
@@ -91,12 +88,12 @@ impl BalanceChecker {
     pub fn cache_size(&self) -> usize {
         self.cache.len()
     }
-    
+
     /// Alias for cache_size for backward compatibility
     pub fn cache_len(&self) -> usize {
         self.cache.len()
     }
-    
+
     /// Add a value to the cache (used for testing)
     pub fn add_to_cache(&self, key: CacheKey, value: Option<types::models::Covariate>) {
         self.cache.insert(key, value);
@@ -108,7 +105,7 @@ impl BalanceChecker {
             .as_ref()
             .and_then(|r| r.summaries.iter().find(|s| s.variable == variable))
     }
-    
+
     /// Get a reference to the results (mainly for testing)
     pub fn results(&self) -> Option<&BalanceResults> {
         self.results.as_ref()

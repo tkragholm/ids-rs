@@ -1471,7 +1471,10 @@ impl ArrowAccess for ArrowBackend {
         _column: &str,
         _row: usize,
     ) -> std::result::Result<T, IdsError> {
-        Err(IdsError::invalid_operation("ArrowBackend does not implement direct get_value. Use get_covariate instead.".to_string()))
+        Err(IdsError::invalid_operation(
+            "ArrowBackend does not implement direct get_value. Use get_covariate instead."
+                .to_string(),
+        ))
     }
 
     fn get_optional_value<T: ArrowType>(
@@ -1479,10 +1482,16 @@ impl ArrowAccess for ArrowBackend {
         _column: &str,
         _row: usize,
     ) -> std::result::Result<Option<T>, IdsError> {
-        Err(IdsError::invalid_operation("ArrowBackend does not implement direct get_optional_value. Use get_covariate instead.".to_string()))
+        Err(IdsError::invalid_operation(
+            "ArrowBackend does not implement direct get_optional_value. Use get_covariate instead."
+                .to_string(),
+        ))
     }
     fn get_column(&self, _column: &str) -> std::result::Result<arrow::array::ArrayRef, IdsError> {
-        Err(IdsError::invalid_operation("ArrowBackend does not implement direct get_column. Use get_covariate instead.".to_string()))
+        Err(IdsError::invalid_operation(
+            "ArrowBackend does not implement direct get_column. Use get_covariate instead."
+                .to_string(),
+        ))
     }
 
     fn has_column(&self, _column: &str) -> bool {

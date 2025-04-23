@@ -1,5 +1,5 @@
-use std::path::Path;
 use log;
+use std::path::Path;
 
 use super::resolver::check_path_exists;
 
@@ -47,8 +47,7 @@ pub fn normalize_path(path: &str, register_type: &str, base_dir: Option<&str>) -
         }
 
         // Try relative to current directory
-        let current_dir =
-            std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
         let relative_path = current_dir.join(&family_path);
         let relative_str = relative_path.to_string_lossy().to_string();
 

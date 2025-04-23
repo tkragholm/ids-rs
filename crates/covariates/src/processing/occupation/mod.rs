@@ -1,9 +1,9 @@
-use types::error::{IdsError, Result};
-use types::models::{Covariate, CovariateType};
-use types::traits::CovariateProcessor;
 use crate::core::config::CovariateTypeConfig;
 use crate::core::Error;
 use crate::processing::processor::ConfigurableProcessor;
+use types::error::{IdsError, Result};
+use types::models::{Covariate, CovariateType};
+use types::traits::CovariateProcessor;
 
 /// Processor for occupation covariates
 pub struct OccupationProcessor {
@@ -24,26 +24,23 @@ impl CovariateProcessor for OccupationProcessor {
         // Default implementation - would be overridden by concrete implementation
         Err(IdsError::invalid_operation("Not implemented".to_string()))
     }
-    
+
     fn covariate_type(&self) -> CovariateType {
         CovariateType::Occupation
     }
-    
+
     fn required_fields(&self) -> Vec<String> {
-        vec![
-            "DISCO08".to_string(),
-            "SOCIO".to_string(),
-        ]
+        vec!["DISCO08".to_string(), "SOCIO".to_string()]
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn is_categorical(&self) -> bool {
         true
     }
-    
+
     fn process_numeric(&self, covariate: &Covariate) -> Option<f64> {
         if covariate.type_() != CovariateType::Occupation {
             return None;
@@ -66,12 +63,12 @@ impl CovariateProcessor for OccupationProcessor {
 impl ConfigurableProcessor for OccupationProcessor {
     fn from_config(config: &CovariateTypeConfig) -> std::result::Result<Self, Error> {
         if config.covariate_type != CovariateType::Occupation {
-            return Err(Error::config(
-                format!("Invalid covariate type: expected Occupation, got {:?}", 
-                config.covariate_type)
-            ));
+            return Err(Error::config(format!(
+                "Invalid covariate type: expected Occupation, got {:?}",
+                config.covariate_type
+            )));
         }
-        
+
         Ok(Self {
             name: config.name.clone(),
         })

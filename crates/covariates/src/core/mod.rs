@@ -1,7 +1,9 @@
 pub mod config;
 pub mod registry;
 
-pub use config::{CovariatesConfig, CovariateTypeConfig, CovariateVariableConfig, generate_default_config};
+pub use config::{
+    generate_default_config, CovariateTypeConfig, CovariateVariableConfig, CovariatesConfig,
+};
 pub use registry::CovariateProcessorRegistry;
 
 // Re-export common error types that we use

@@ -33,7 +33,7 @@ pub trait Cacheable<K, V> {
     fn get_or_compute<F>(&self, key: K, compute_fn: F) -> Result<V, IdsError>
     where
         F: FnOnce() -> Result<V, IdsError>;
-        
+
     /// Prefetch multiple values into the cache
     ///
     /// This method can be used to load multiple values into the cache
@@ -47,7 +47,7 @@ pub trait Cacheable<K, V> {
     ///
     /// * `Result<usize, IdsError>` - Number of items successfully prefetched, or an error
     fn prefetch(&self, keys: &[K]) -> Result<usize, IdsError>;
-    
+
     /// Invalidate a cached value
     ///
     /// This method removes a value from the cache, forcing it to be
@@ -61,7 +61,7 @@ pub trait Cacheable<K, V> {
     ///
     /// * `bool` - True if the key was found and removed, false if not found
     fn invalidate(&self, key: &K) -> bool;
-    
+
     /// Clear all cached values
     ///
     /// This method removes all values from the cache.

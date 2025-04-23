@@ -3,11 +3,11 @@
 //! This module provides utilities for generating synthetic PNRs for testing
 //! and development purposes.
 
-use chrono::{Duration, NaiveDate};
-use rand::Rng;
+use super::types::{FamilyInfo, ParentPair, PersonInfo};
+use crate::error::{validation_error, Result};
+use chrono::{Datelike, Duration, NaiveDate};
 use hashbrown::HashMap;
-use crate::error::{Result, validation_error};
-use super::types::{PersonInfo, ParentPair, FamilyInfo};
+use rand::Rng;
 
 /// A pool of generated PNRs for testing and development
 #[derive(Debug)]
@@ -48,24 +48,24 @@ impl PnrPool {
         // Generate children first
         for i in 0..total_records {
             // Generate child's birth date within study period
-            let days_offset = rng.gen_range(0..=birth_range_days);
+            let days_offset = rng.random_range(0..=birth_range_days);
             let birth_date = earliest_birth + Duration::days(i64::from(days_offset));
 
-            let sequence = rng.gen_range(0..10000);
+            let sequence = rng.random_range(0..10000);
             let pnr = format!("{}-{:04}", birth_date.format("%d%m%y"), sequence);
 
             children.insert(i, (birth_date, pnr.clone()));
             pool.insert(i, (birth_date, pnr));
 
             // Generate parents based on child's birth date
-            let mother_age = rng.gen_range(20..46); // mothers aged 20-45 at birth
-            let father_age = rng.gen_range(20..50); // fathers aged 20-49 at birth
+            let mother_age = rng.random_range(20..46); // mothers aged 20-45 at birth
+            let father_age = rng.random_range(20..50); // fathers aged 20-49 at birth
 
             let mother_birth = birth_date - Duration::days(mother_age * 365);
             let father_birth = birth_date - Duration::days(father_age * 365);
 
-            let mother_sequence = rng.gen_range(0..10000);
-            let father_sequence = rng.gen_range(0..10000);
+            let mother_sequence = rng.random_range(0..10000);
+            let father_sequence = rng.random_range(0..10000);
 
             let mother_pnr = format!("{}-{:04}", mother_birth.format("%d%m%y"), mother_sequence);
             let father_pnr = format!("{}-{:04}", father_birth.format("%d%m%y"), father_sequence);
@@ -137,7 +137,7 @@ impl PnrPool {
         let parents = self.get_parents(index)?;
         Some((child, parents))
     }
-    
+
     /// Get the total number of records in the pool
     ///
     /// # Returns
@@ -146,7 +146,7 @@ impl PnrPool {
     pub fn len(&self) -> usize {
         self.pool.len()
     }
-    
+
     /// Check if the pool is empty
     ///
     /// # Returns
@@ -155,7 +155,7 @@ impl PnrPool {
     pub fn is_empty(&self) -> bool {
         self.pool.is_empty()
     }
-    
+
     /// Get the number of children in the pool
     ///
     /// # Returns
@@ -164,7 +164,7 @@ impl PnrPool {
     pub fn num_children(&self) -> usize {
         self.children.len()
     }
-    
+
     /// Get the number of parents in the pool
     ///
     /// # Returns
@@ -197,80 +197,78 @@ pub fn generate_pnr(date: &NaiveDate, sequence: u16) -> String {
 /// # Returns
 /// A vector of PNRs
 pub fn generate_test_pnrs(size: usize, start_year: i32, end_year: i32) -> Vec<String> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut pnrs = Vec::with_capacity(size);
-    
-    let start_date = NaiveDate::from_ymd_opt(start_year, 1, 1).unwrap_or_else(|| {
-        NaiveDate::from_ymd_opt(2000, 1, 1).unwrap()
-    });
-    
-    let end_date = NaiveDate::from_ymd_opt(end_year, 12, 31).unwrap_or_else(|| {
-        NaiveDate::from_ymd_opt(2020, 12, 31).unwrap()
-    });
-    
+
+    let start_date = NaiveDate::from_ymd_opt(start_year, 1, 1)
+        .unwrap_or_else(|| NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+
+    let end_date = NaiveDate::from_ymd_opt(end_year, 12, 31)
+        .unwrap_or_else(|| NaiveDate::from_ymd_opt(2020, 12, 31).unwrap());
+
     let days = (end_date - start_date).num_days() as i32;
-    
+
     for _ in 0..size {
-        let offset = rng.gen_range(0..=days);
+        let offset = rng.random_range(0..=days);
         let date = start_date + Duration::days(i64::from(offset));
-        let sequence = rng.gen_range(0..10000);
-        
+        let sequence = rng.random_range(0..10000);
+
         pnrs.push(generate_pnr(&date, sequence));
     }
-    
+
     pnrs
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
-    
+    use rand::SeedableRng;
+
     #[test]
     fn test_generate_pnr() {
         let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         assert_eq!(generate_pnr(&date, 1234), "010100-1234");
-        
+
         let date = NaiveDate::from_ymd_opt(1995, 12, 31).unwrap();
         assert_eq!(generate_pnr(&date, 5678), "311295-5678");
     }
-    
+
     #[test]
     fn test_generate_test_pnrs() {
         let pnrs = generate_test_pnrs(10, 2000, 2010);
         assert_eq!(pnrs.len(), 10);
-        
+
         // All PNRs should match the expected format
         for pnr in &pnrs {
             assert!(pnr.len() == 11);
             assert!(pnr.contains('-'));
         }
     }
-    
+
     #[test]
     fn test_pnr_pool() {
         let mut rng = StdRng::seed_from_u64(42); // Use a seeded RNG for deterministic tests
         let pool = PnrPool::new(10, &mut rng).unwrap();
-        
+
         assert_eq!(pool.num_children(), 10);
         assert_eq!(pool.num_parents(), 20); // 10 fathers, 10 mothers
         assert_eq!(pool.len(), 30); // 10 children + 20 parents
-        
+
         // Test getting a child
         let child = pool.get_child(&0).unwrap();
         assert!(child.0.year() >= 1995 && child.0.year() <= 2018);
-        
+
         // Test getting parents
         let parents = pool.get_parents(&0).unwrap();
         let (father, mother) = parents;
-        
+
         // Father should be older than child
         assert!(father.0 < child.0);
-        
+
         // Mother should be older than child
         assert!(mother.0 < child.0);
-        
+
         // Test getting a family
         let family = pool.get_family(&0).unwrap();
         assert_eq!(family.0, child);
