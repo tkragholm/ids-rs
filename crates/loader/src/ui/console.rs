@@ -4,9 +4,9 @@
 /// * `title` - The title for the section
 pub fn print_section(title: &str) {
     let line = "=".repeat(title.len() + 8);
-    println!("\n{}", line);
-    println!("    {}    ", title);
-    println!("{}\n", line);
+    println!("\n{line}");
+    println!("    {title}    ");
+    println!("{line}\n");
 }
 
 /// Print a success message to the console
@@ -14,7 +14,7 @@ pub fn print_section(title: &str) {
 /// # Arguments
 /// * `message` - The success message
 pub fn print_success(message: &str) {
-    println!("✅ {}", message);
+    println!("✅ {message}");
 }
 
 /// Print a warning message to the console
@@ -22,5 +22,5 @@ pub fn print_success(message: &str) {
 /// # Arguments
 /// * `message` - The warning message
 pub fn print_warning(message: &str) {
-    println!("⚠️ {}", message);
+    println!("⚠️ {message}");
 }

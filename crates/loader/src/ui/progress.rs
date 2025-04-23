@@ -16,7 +16,7 @@ impl Default for LoaderProgress {
 
 impl LoaderProgress {
     /// Create a new progress tracker
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         let multi_progress = MultiProgress::new();
         let main_style = ProgressStyle::default_bar()
             .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
@@ -34,7 +34,7 @@ impl LoaderProgress {
     }
 
     /// Create a progress bar for tracking file loading progress
-    pub fn create_file_progress(&self, size: u64, filename: &str) -> ProgressBar {
+    #[must_use] pub fn create_file_progress(&self, size: u64, filename: &str) -> ProgressBar {
         let style = ProgressStyle::default_bar()
                 .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.yellow/red} {bytes}/{total_bytes} ({percent}%) {msg}")
                 .expect("Failed to create progress bar template - this is a static template that should never fail")

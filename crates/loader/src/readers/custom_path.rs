@@ -24,15 +24,15 @@ pub struct CustomPathReader {
 }
 
 impl CustomPathReader {
-    /// Create a new CustomPathReader with the given base path and custom paths
+    /// Create a new `CustomPathReader` with the given base path and custom paths
     ///
     /// # Arguments
     /// * `base_path` - The base directory for relative paths
     /// * `paths` - A map of register names to paths
     ///
     /// # Returns
-    /// A new CustomPathReader instance
-    pub fn new(base_path: &Path, paths: std::collections::HashMap<String, PathBuf>) -> Self {
+    /// A new `CustomPathReader` instance
+    #[must_use] pub fn new(base_path: &Path, paths: std::collections::HashMap<String, PathBuf>) -> Self {
         log::debug!(
             "Creating CustomPathReader with base path: {}",
             base_path.display()
@@ -44,11 +44,11 @@ impl CustomPathReader {
         let uddf_path = paths.get("uddf").map(|p| base_path.join(p));
         let family_path = paths.get("family").map(|p| base_path.join(p));
 
-        log::debug!("AKM path: {:?}", akm_path);
-        log::debug!("BEF path: {:?}", bef_path);
-        log::debug!("IND path: {:?}", ind_path);
-        log::debug!("UDDF path: {:?}", uddf_path);
-        log::debug!("Family path: {:?}", family_path);
+        log::debug!("AKM path: {akm_path:?}");
+        log::debug!("BEF path: {bef_path:?}");
+        log::debug!("IND path: {ind_path:?}");
+        log::debug!("UDDF path: {uddf_path:?}");
+        log::debug!("Family path: {family_path:?}");
 
         Self {
             base_path: base_path.to_path_buf(),
@@ -116,7 +116,7 @@ impl DataReader for CustomPathReader {
             }
             Err(e) => {
                 log::error!("Failed to open file {}: {}", path.display(), e);
-                log::debug!(" Failed to open file: {}", e);
+                log::debug!(" Failed to open file: {e}");
                 return Err(IdsError::Io(e));
             }
         }
@@ -208,7 +208,7 @@ impl DataReader for CustomPathReader {
     }
 
     fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
-        log::info!("Reading AKM data for year {}", year);
+        log::info!("Reading AKM data for year {year}");
 
         let path = match &self.akm_path {
             Some(p) => p.clone(),
@@ -223,8 +223,8 @@ impl DataReader for CustomPathReader {
 
     fn read_bef(&self, year: i32, quarter: Option<i32>) -> Result<Vec<RecordBatch>, IdsError> {
         match quarter {
-            Some(q) => log::info!("Reading BEF data for year {}, quarter {}", year, q),
-            None => log::info!("Reading BEF data for year {}", year),
+            Some(q) => log::info!("Reading BEF data for year {year}, quarter {q}"),
+            None => log::info!("Reading BEF data for year {year}"),
         }
 
         let path = match &self.bef_path {
@@ -239,7 +239,7 @@ impl DataReader for CustomPathReader {
     }
 
     fn read_ind(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
-        log::info!("Reading IND data for year {}", year);
+        log::info!("Reading IND data for year {year}");
 
         let path = match &self.ind_path {
             Some(p) => p.clone(),
@@ -253,7 +253,7 @@ impl DataReader for CustomPathReader {
     }
 
     fn read_uddf(&self, period: &str) -> Result<Vec<RecordBatch>, IdsError> {
-        log::info!("Reading UDDF data for period {}", period);
+        log::info!("Reading UDDF data for period {period}");
 
         let path = match &self.uddf_path {
             Some(p) => p.clone(),

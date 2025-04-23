@@ -42,7 +42,7 @@ impl RegisterPathConfig {
     /// Resolve all paths, handling relative and absolute paths correctly
     ///
     /// # Returns
-    /// A HashMap of register names to their resolved paths
+    /// A `HashMap` of register names to their resolved paths
     ///
     /// # Errors
     /// Returns an error if a non-empty base path doesn't exist and is needed
@@ -90,12 +90,12 @@ impl RegisterPathConfig {
             }
 
             // For relative paths, only prepend base_path if it's not empty
-            if !self.base_path.trim().is_empty() {
-                let full_path = base_path_obj.join(path_obj);
-                resolved.insert(key.clone(), full_path);
-            } else {
+            if self.base_path.trim().is_empty() {
                 // When base_path is empty, treat custom paths as relative to current directory
                 resolved.insert(key.clone(), path_obj.to_path_buf());
+            } else {
+                let full_path = base_path_obj.join(path_obj);
+                resolved.insert(key.clone(), full_path);
             }
         }
 
@@ -205,7 +205,7 @@ impl LoaderConfig {
     /// Returns an error if the file cannot be read
     pub fn with_pnr_filter_file(mut self, filter_file: &str) -> Result<Self, IdsError> {
         let content = std::fs::read_to_string(filter_file).map_err(|e| {
-            IdsError::invalid_operation(format!("Failed to read PNR filter file: {}", e))
+            IdsError::invalid_operation(format!("Failed to read PNR filter file: {e}"))
         })?;
 
         let pnr_set: HashSet<String> = content

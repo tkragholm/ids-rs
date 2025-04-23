@@ -29,13 +29,13 @@ impl Default for ParallelLoader {
 }
 
 impl ParallelLoader {
-    /// Create a new ParallelLoader instance with parallel loading enabled
+    /// Create a new `ParallelLoader` instance with parallel loading enabled
     #[must_use]
     pub const fn new() -> Self {
         Self { parallel: true }
     }
 
-    /// Create a new ParallelLoader with specified parallel setting
+    /// Create a new `ParallelLoader` with specified parallel setting
     #[must_use]
     pub const fn with_parallel(parallel: bool) -> Self {
         Self { parallel }
@@ -56,8 +56,7 @@ impl ParallelLoader {
     ) -> Result<std::sync::MutexGuard<'a, ArrowStore>, IdsError> {
         store.lock().map_err(|e| {
             IdsError::invalid_operation(format!(
-                "Failed to lock store mutex for {} data: {}",
-                register_type, e
+                "Failed to lock store mutex for {register_type} data: {e}"
             ))
         })
     }
@@ -94,7 +93,7 @@ impl ParallelLoader {
                     log::error!("Failed to add {} data: {}", register_type.to_uppercase(), e);
                 }
             }
-            Err(e) => log::error!("{}", e),
+            Err(e) => log::error!("{e}"),
         }
 
         progress.inc_main();
@@ -106,7 +105,7 @@ impl ParallelLoader {
     /// * `store` - The Arc<Mutex<ArrowStore>> to unwrap
     ///
     /// # Returns
-    /// The unwrapped ArrowStore or an error with descriptive message
+    /// The unwrapped `ArrowStore` or an error with descriptive message
     #[allow(dead_code)]
     fn unwrap_store(store: Arc<Mutex<ArrowStore>>) -> Result<ArrowStore, IdsError> {
         // First try to unwrap from Arc
@@ -114,7 +113,7 @@ impl ParallelLoader {
             Ok(mutex) => {
                 // Then try to get inner value from Mutex
                 mutex.into_inner().map_err(|e| {
-                    IdsError::invalid_operation(format!("Failed to unwrap store from mutex: {}", e))
+                    IdsError::invalid_operation(format!("Failed to unwrap store from mutex: {e}"))
                 })
             }
             Err(_) => Err(IdsError::invalid_operation(
@@ -126,7 +125,7 @@ impl ParallelLoader {
 
 impl StoreLoader for ParallelLoader {
     fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError> {
-        log::info!("Loading register data from path: {}", base_path);
+        log::info!("Loading register data from path: {base_path}");
 
         // Create a progress tracker
         let progress = LoaderProgress::new();
@@ -143,7 +142,7 @@ impl StoreLoader for ParallelLoader {
         let store = Arc::new(Mutex::new(match store_result {
             Ok(store) => store,
             Err(e) => {
-                log::error!("Failed to create ArrowBackend: {}", e);
+                log::error!("Failed to create ArrowBackend: {e}");
                 return Err(e);
             }
         }));
@@ -176,11 +175,11 @@ impl StoreLoader for ParallelLoader {
                     Ok(mut store_guard) => {
                         let current_year = chrono::Local::now().year();
                         if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
-                            log::error!("Failed to add AKM data: {}", e);
+                            log::error!("Failed to add AKM data: {e}");
                             // Continue with loading instead of returning error, to get as much data as possible
                         }
                     }
-                    Err(e) => log::error!("{}", e),
+                    Err(e) => log::error!("{e}"),
                 }
                 progress.inc_main();
             }
@@ -207,11 +206,11 @@ impl StoreLoader for ParallelLoader {
                 match self.lock_store(&store, "BEF") {
                     Ok(mut store_guard) => {
                         if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
-                            log::error!("Failed to add BEF data: {}", e);
+                            log::error!("Failed to add BEF data: {e}");
                             // Continue with loading instead of returning error, to get as much data as possible
                         }
                     }
-                    Err(e) => log::error!("{}", e),
+                    Err(e) => log::error!("{e}"),
                 }
                 progress.inc_main();
             }
@@ -239,11 +238,11 @@ impl StoreLoader for ParallelLoader {
                     Ok(mut store_guard) => {
                         let current_year = chrono::Local::now().year();
                         if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
-                            log::error!("Failed to add IND data: {}", e);
+                            log::error!("Failed to add IND data: {e}");
                             // Continue with loading instead of returning error, to get as much data as possible
                         }
                     }
-                    Err(e) => log::error!("{}", e),
+                    Err(e) => log::error!("{e}"),
                 }
                 progress.inc_main();
             }
@@ -271,11 +270,11 @@ impl StoreLoader for ParallelLoader {
                     Ok(mut store_guard) => {
                         if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data)
                         {
-                            log::error!("Failed to add UDDF data: {}", e);
+                            log::error!("Failed to add UDDF data: {e}");
                             // Continue with loading instead of returning error, to get as much data as possible
                         }
                     }
-                    Err(e) => log::error!("{}", e),
+                    Err(e) => log::error!("{e}"),
                 }
                 progress.inc_main();
             }
@@ -292,7 +291,7 @@ impl StoreLoader for ParallelLoader {
                     let mut store_guard = store.lock().unwrap();
                     let current_year = chrono::Local::now().year();
                     if let Err(e) = store_guard.add_akm_data(current_year, data) {
-                        log::error!("Failed to add AKM data: {}", e);
+                        log::error!("Failed to add AKM data: {e}");
                     }
                     progress.inc_main();
                 }
@@ -300,7 +299,7 @@ impl StoreLoader for ParallelLoader {
                     progress.set_main_message("Adding BEF data to store");
                     let mut store_guard = store.lock().unwrap();
                     if let Err(e) = store_guard.add_bef_data("current".to_string(), data) {
-                        log::error!("Failed to add BEF data: {}", e);
+                        log::error!("Failed to add BEF data: {e}");
                     }
                     progress.inc_main();
                 }
@@ -309,7 +308,7 @@ impl StoreLoader for ParallelLoader {
                     let mut store_guard = store.lock().unwrap();
                     let current_year = chrono::Local::now().year();
                     if let Err(e) = store_guard.add_ind_data(current_year, data) {
-                        log::error!("Failed to add IND data: {}", e);
+                        log::error!("Failed to add IND data: {e}");
                     }
                     progress.inc_main();
                 }
@@ -317,15 +316,15 @@ impl StoreLoader for ParallelLoader {
                     progress.set_main_message("Adding UDDF data to store");
                     let mut store_guard = store.lock().unwrap();
                     if let Err(e) = store_guard.add_uddf_data("current".to_string(), data) {
-                        log::error!("Failed to add UDDF data: {}", e);
+                        log::error!("Failed to add UDDF data: {e}");
                     }
                     progress.inc_main();
                 }
                 (register_type, Err(e)) => {
-                    log::error!("Error loading {} data: {}", register_type, e);
+                    log::error!("Error loading {register_type} data: {e}");
                 }
                 (unknown_type, Ok(_)) => {
-                    log::warn!("Received data for unknown register type: {}", unknown_type);
+                    log::warn!("Received data for unknown register type: {unknown_type}");
                 }
             }
         }
@@ -388,7 +387,7 @@ impl StoreLoader for ParallelLoader {
         let store = Arc::new(Mutex::new(match store_result {
             Ok(store) => store,
             Err(e) => {
-                log::error!("Failed to create ArrowBackend: {}", e);
+                log::error!("Failed to create ArrowBackend: {e}");
                 return Err(e);
             }
         }));
@@ -421,7 +420,7 @@ impl StoreLoader for ParallelLoader {
                 let mut store_guard = store.lock().unwrap();
                 let current_year = chrono::Local::now().year();
                 if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
-                    log::error!("Failed to add AKM data: {}", e);
+                    log::error!("Failed to add AKM data: {e}");
                 }
                 progress.inc_main();
             }
@@ -448,7 +447,7 @@ impl StoreLoader for ParallelLoader {
             if let Ok(bef_data) = registry::load_bef(bef_path.to_str().unwrap_or_default(), None) {
                 let mut store_guard = store.lock().unwrap();
                 if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
-                    log::error!("Failed to add BEF data: {}", e);
+                    log::error!("Failed to add BEF data: {e}");
                 }
                 progress.inc_main();
             }
@@ -476,7 +475,7 @@ impl StoreLoader for ParallelLoader {
                 let mut store_guard = store.lock().unwrap();
                 let current_year = chrono::Local::now().year();
                 if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
-                    log::error!("Failed to add IND data: {}", e);
+                    log::error!("Failed to add IND data: {e}");
                 }
                 progress.inc_main();
             }
@@ -504,7 +503,7 @@ impl StoreLoader for ParallelLoader {
             {
                 let mut store_guard = store.lock().unwrap();
                 if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data) {
-                    log::error!("Failed to add UDDF data: {}", e);
+                    log::error!("Failed to add UDDF data: {e}");
                 }
                 progress.inc_main();
             }
@@ -521,7 +520,7 @@ impl StoreLoader for ParallelLoader {
                     let mut store_guard = store.lock().unwrap();
                     let current_year = chrono::Local::now().year();
                     if let Err(e) = store_guard.add_akm_data(current_year, data) {
-                        log::error!("Failed to add AKM data: {}", e);
+                        log::error!("Failed to add AKM data: {e}");
                     }
                     progress.inc_main();
                 }
@@ -529,7 +528,7 @@ impl StoreLoader for ParallelLoader {
                     progress.set_main_message("Adding BEF data to store");
                     let mut store_guard = store.lock().unwrap();
                     if let Err(e) = store_guard.add_bef_data("current".to_string(), data) {
-                        log::error!("Failed to add BEF data: {}", e);
+                        log::error!("Failed to add BEF data: {e}");
                     }
                     progress.inc_main();
                 }
@@ -538,7 +537,7 @@ impl StoreLoader for ParallelLoader {
                     let mut store_guard = store.lock().unwrap();
                     let current_year = chrono::Local::now().year();
                     if let Err(e) = store_guard.add_ind_data(current_year, data) {
-                        log::error!("Failed to add IND data: {}", e);
+                        log::error!("Failed to add IND data: {e}");
                     }
                     progress.inc_main();
                 }
@@ -546,15 +545,15 @@ impl StoreLoader for ParallelLoader {
                     progress.set_main_message("Adding UDDF data to store");
                     let mut store_guard = store.lock().unwrap();
                     if let Err(e) = store_guard.add_uddf_data("current".to_string(), data) {
-                        log::error!("Failed to add UDDF data: {}", e);
+                        log::error!("Failed to add UDDF data: {e}");
                     }
                     progress.inc_main();
                 }
                 (register_type, Err(e)) => {
-                    log::error!("Error loading {} data: {}", register_type, e);
+                    log::error!("Error loading {register_type} data: {e}");
                 }
                 (unknown_type, Ok(_)) => {
-                    log::warn!("Received data for unknown register type: {}", unknown_type);
+                    log::warn!("Received data for unknown register type: {unknown_type}");
                 }
             }
         }

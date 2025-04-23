@@ -17,7 +17,7 @@ use crate::ui::LoaderProgress;
 /// * `pnr_filter` - Optional set of PNRs to filter the data by
 ///
 /// # Returns
-/// A vector of RecordBatches containing family relation data or an error
+/// A vector of `RecordBatches` containing family relation data or an error
 ///
 /// # Errors
 /// Returns an error if:
@@ -28,7 +28,7 @@ pub fn load_family(
     base_path: &str,
     pnr_filter: Option<&HashSet<String>>,
 ) -> Result<Vec<RecordBatch>, IdsError> {
-    log::info!("Loading family relation data from {}", base_path);
+    log::info!("Loading family relation data from {base_path}");
 
     // Create a progress tracker
     let progress = LoaderProgress::new();
@@ -73,7 +73,7 @@ pub fn load_family(
         if family_file.exists() && family_file.extension().is_some_and(|ext| ext == "parquet") {
             read_parquet(&family_file, Some(&schema), Some(&progress), pnr_filter)?
         } else {
-            log::warn!("No family relation data found at {}", base_path);
+            log::warn!("No family relation data found at {base_path}");
             Vec::new()
         };
 

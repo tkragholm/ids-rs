@@ -146,15 +146,12 @@ pub fn read_parquet(
                 Some(pnr_column) => {
                     // Convert column to strings
                     // Try to cast to string array
-                    let pnr_strings = match pnr_column.as_any().downcast_ref::<StringArray>() {
-                        Some(arr) => arr,
-                        None => {
-                            log::warn!("Could not cast PNR column to StringArray");
-                            // Create a string array once and reuse it
-                            static EMPTY_ARRAY: once_cell::sync::Lazy<StringArray> =
-                                once_cell::sync::Lazy::new(|| StringArray::from(vec![""]));
-                            &EMPTY_ARRAY
-                        }
+                    let pnr_strings = if let Some(arr) = pnr_column.as_any().downcast_ref::<StringArray>() { arr } else {
+                        log::warn!("Could not cast PNR column to StringArray");
+                        // Create a string array once and reuse it
+                        static EMPTY_ARRAY: std::sync::LazyLock<StringArray> =
+                            std::sync::LazyLock::new(|| StringArray::from(vec![""]));
+                        &EMPTY_ARRAY
                     };
 
                     let _pnr_vec: Vec<bool> = (0..pnr_strings.len())
@@ -271,7 +268,7 @@ pub fn load_parquet_files_parallel(
         ))
     })? {
         let entry = entry
-            .map_err(|e| IdsError::io_error(format!("Failed to read directory entry: {}", e)))?;
+            .map_err(|e| IdsError::io_error(format!("Failed to read directory entry: {e}")))?;
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
             parquet_files.push(path);
@@ -371,9 +368,9 @@ pub fn load_parquet_files_parallel(
                     // Process the file
                     let result = read_parquet(
                         &path,
-                        schema.as_ref().map(|s| s.as_ref()),
+                        schema.as_ref().map(std::convert::AsRef::as_ref),
                         worker_progress.as_ref(),
-                        pnr_filter.as_ref().map(|p| p.as_ref()),
+                        pnr_filter.as_ref().map(std::convert::AsRef::as_ref),
                     );
 
                     // Send the result back through the channel
@@ -386,7 +383,7 @@ pub fn load_parquet_files_parallel(
                                 path.display()
                             );
                             if let Err(e) = sender.send((path, Ok(batches))) {
-                                log::error!("Failed to send result: {}", e);
+                                log::error!("Failed to send result: {e}");
                             }
                         }
                         Err(err) => {
@@ -397,13 +394,13 @@ pub fn load_parquet_files_parallel(
                                 err
                             );
                             if let Err(e) = sender.send((path, Err(err))) {
-                                log::error!("Failed to send error: {}", e);
+                                log::error!("Failed to send error: {e}");
                             }
                         }
                     }
                 }
 
-                log::debug!("Thread {} exiting", thread_id);
+                log::debug!("Thread {thread_id} exiting");
             })
         })
         .collect();

@@ -22,7 +22,7 @@ impl Default for SequentialLoader {
 }
 
 impl SequentialLoader {
-    /// Create a new SequentialLoader instance
+    /// Create a new `SequentialLoader` instance
     #[must_use]
     pub const fn new() -> Self {
         Self
@@ -31,7 +31,7 @@ impl SequentialLoader {
 
 impl StoreLoader for SequentialLoader {
     fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError> {
-        log::info!("Loading register data sequentially from {}", base_path);
+        log::info!("Loading register data sequentially from {base_path}");
 
         // Create a progress tracker
         let progress = LoaderProgress::new();
@@ -44,7 +44,7 @@ impl StoreLoader for SequentialLoader {
         progress.set_main_message("Loading family relations");
         if let Ok(families) = registry::load_family(&base_path, None) {
             if let Err(e) = store.add_family_data(families) {
-                log::error!("Failed to add family data: {}", e);
+                log::error!("Failed to add family data: {e}");
             }
             progress.inc_main();
         }
@@ -55,7 +55,7 @@ impl StoreLoader for SequentialLoader {
             // Default AKM year to current year
             let current_year = chrono::Local::now().year();
             if let Err(e) = store.add_akm_data(current_year, akm_data) {
-                log::error!("Failed to add AKM data: {}", e);
+                log::error!("Failed to add AKM data: {e}");
             }
             progress.inc_main();
         }
@@ -65,7 +65,7 @@ impl StoreLoader for SequentialLoader {
         if let Ok(bef_data) = registry::load_bef(&base_path, None) {
             // Default BEF period to "current" if missing
             if let Err(e) = store.add_bef_data("current".to_string(), bef_data) {
-                log::error!("Failed to add BEF data: {}", e);
+                log::error!("Failed to add BEF data: {e}");
             }
             progress.inc_main();
         }
@@ -76,7 +76,7 @@ impl StoreLoader for SequentialLoader {
             // Default IND year to current year
             let current_year = chrono::Local::now().year();
             if let Err(e) = store.add_ind_data(current_year, ind_data) {
-                log::error!("Failed to add IND data: {}", e);
+                log::error!("Failed to add IND data: {e}");
             }
             progress.inc_main();
         }
@@ -86,7 +86,7 @@ impl StoreLoader for SequentialLoader {
         if let Ok(uddf_data) = registry::load_uddf(&base_path, None) {
             // Default UDDF period to "current" if missing
             if let Err(e) = store.add_uddf_data("current".to_string(), uddf_data) {
-                log::error!("Failed to add UDDF data: {}", e);
+                log::error!("Failed to add UDDF data: {e}");
             }
             progress.inc_main();
         }
@@ -118,7 +118,7 @@ impl StoreLoader for SequentialLoader {
                 registry::load_family(family_path.to_str().unwrap_or_default(), None)
             {
                 if let Err(e) = store.add_family_data(families) {
-                    log::error!("Failed to add family data: {}", e);
+                    log::error!("Failed to add family data: {e}");
                 }
                 progress.inc_main();
             }
@@ -131,7 +131,7 @@ impl StoreLoader for SequentialLoader {
                 // Default AKM year to current year
                 let current_year = chrono::Local::now().year();
                 if let Err(e) = store.add_akm_data(current_year, akm_data) {
-                    log::error!("Failed to add AKM data: {}", e);
+                    log::error!("Failed to add AKM data: {e}");
                 }
                 progress.inc_main();
             }
@@ -143,7 +143,7 @@ impl StoreLoader for SequentialLoader {
             if let Ok(bef_data) = registry::load_bef(bef_path.to_str().unwrap_or_default(), None) {
                 // Default BEF period to "current" if missing
                 if let Err(e) = store.add_bef_data("current".to_string(), bef_data) {
-                    log::error!("Failed to add BEF data: {}", e);
+                    log::error!("Failed to add BEF data: {e}");
                 }
                 progress.inc_main();
             }
@@ -156,7 +156,7 @@ impl StoreLoader for SequentialLoader {
                 // Default IND year to current year
                 let current_year = chrono::Local::now().year();
                 if let Err(e) = store.add_ind_data(current_year, ind_data) {
-                    log::error!("Failed to add IND data: {}", e);
+                    log::error!("Failed to add IND data: {e}");
                 }
                 progress.inc_main();
             }
@@ -169,7 +169,7 @@ impl StoreLoader for SequentialLoader {
             {
                 // Default UDDF period to "current" if missing
                 if let Err(e) = store.add_uddf_data("current".to_string(), uddf_data) {
-                    log::error!("Failed to add UDDF data: {}", e);
+                    log::error!("Failed to add UDDF data: {e}");
                 }
                 progress.inc_main();
             }

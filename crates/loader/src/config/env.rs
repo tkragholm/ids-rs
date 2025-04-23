@@ -2,7 +2,7 @@ use std::env;
 
 /// Get batch size from environment or use default
 ///
-/// This function reads the IDS_BATCH_SIZE environment variable,
+/// This function reads the `IDS_BATCH_SIZE` environment variable,
 /// defaulting to 65536 (64K rows) if not defined.
 #[must_use]
 pub fn get_batch_size() -> usize {
@@ -14,7 +14,7 @@ pub fn get_batch_size() -> usize {
 
 /// Get max threads from environment or use system CPU count
 ///
-/// This function reads the IDS_MAX_THREADS environment variable,
+/// This function reads the `IDS_MAX_THREADS` environment variable,
 /// defaulting to the number of CPU cores if not defined.
 #[must_use]
 pub fn get_max_threads() -> usize {
@@ -27,14 +27,13 @@ pub fn get_max_threads() -> usize {
 
 /// Check if family filtering should be enabled
 ///
-/// This function reads the IDS_USE_FAMILY_FILTERING environment variable,
+/// This function reads the `IDS_USE_FAMILY_FILTERING` environment variable,
 /// defaulting to false if not defined.
 #[must_use]
 pub fn should_use_family_filtering() -> bool {
     env::var("IDS_USE_FAMILY_FILTERING")
         .ok()
-        .map(|s| s.to_lowercase() == "true" || s == "1")
-        .unwrap_or(false)
+        .is_some_and(|s| s.to_lowercase() == "true" || s == "1")
 }
 
 /// Check if a specific register should use parallel loading
@@ -49,6 +48,5 @@ pub fn use_parallel_loading(register_name: &str) -> bool {
     let env_var = format!("IDS_PARALLEL_{}", register_name.to_uppercase());
     env::var(env_var)
         .ok()
-        .map(|s| s.to_lowercase() == "true" || s == "1")
-        .unwrap_or(true) // Default to true for all registers
+        .is_none_or(|s| s.to_lowercase() == "true" || s == "1") // Default to true for all registers
 }

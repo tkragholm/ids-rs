@@ -8,7 +8,7 @@ use types::error::IdsError;
 /// * `base_path` - The base path to check
 ///
 /// # Returns
-/// A HashMap of register names to their paths
+/// A `HashMap` of register names to their paths
 ///
 /// # Errors
 /// Returns an error if the base path doesn't exist
@@ -61,7 +61,7 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
                             path.display(),
                             parquet_files.len()
                         );
-                        paths.insert(dir.to_string(), path.clone());
+                        paths.insert((*dir).to_string(), path.clone());
                         break;
                     }
                 }
@@ -76,10 +76,10 @@ pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf
 ///
 /// # Arguments
 /// * `base_path` - The base path for resolving relative paths
-/// * `paths` - HashMap of register names to their paths
+/// * `paths` - `HashMap` of register names to their paths
 ///
 /// # Returns
-/// A HashMap of register names to their resolved paths
+/// A `HashMap` of register names to their resolved paths
 ///
 /// # Errors
 /// Returns an error if the base path doesn't exist
@@ -93,8 +93,7 @@ pub fn resolve_paths(
 
     if !base_path_obj.exists() {
         return Err(IdsError::invalid_operation(format!(
-            "Base path does not exist: {}",
-            base_path
+            "Base path does not exist: {base_path}"
         )));
     }
 
@@ -131,7 +130,7 @@ pub fn resolve_paths(
 /// Validate that all paths exist
 ///
 /// # Arguments
-/// * `paths` - HashMap of register names to their paths
+/// * `paths` - `HashMap` of register names to their paths
 ///
 /// # Returns
 /// Ok if all paths exist, otherwise an error with the invalid paths
