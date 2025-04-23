@@ -57,62 +57,6 @@ pub struct Cli {
 /// including data generation, sampling, and balance analysis.
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
-    /// Generate synthetic register data for research purposes
-    GenerateRegisters {
-        /// Directory for register data output
-        #[arg(
-            short = 'o',
-            long,
-            default_value = "data/registers",
-            help = "Directory where generated register data will be saved"
-        )]
-        output_dir: String,
-
-        /// Number of total records to generate
-        #[arg(
-            short = 't',
-            long,
-            default_value_t = 1_000_000,
-            help = "Total number of records to generate across all registers"
-        )]
-        num_records: usize,
-
-        /// Number of treatment cases to generate
-        #[arg(
-            short = 'c',
-            long,
-            default_value_t = 50_000,
-            help = "Number of cases with treatment events (must be less than total records)"
-        )]
-        num_cases: usize,
-
-        /// Start year for data generation
-        #[arg(
-            short = 's',
-            long,
-            default_value_t = 2000,
-            help = "Start year for the generated data range (min: 1980)"
-        )]
-        start_year: i32,
-
-        /// End year for data generation
-        #[arg(
-            short = 'e',
-            long,
-            default_value_t = 2023,
-            help = "End year for the generated data range (max: 2023)"
-        )]
-        end_year: i32,
-
-        /// Random seed for reproducibility
-        #[arg(
-            short = 'r',
-            long,
-            help = "Seed for random number generation to ensure reproducible results"
-        )]
-        seed: Option<u64>,
-    },
-
     /// Configuration utilities for the system
     Config {
         #[command(subcommand)]

@@ -26,11 +26,11 @@ env_logger = "0.10"
 chrono = { version = "0.4", features = ["serde"] }
 csv = "1.2"
 serde = { version = "1.0", features = ["derive"] }
-arrow = { version = "54.1.0", features = ["prettyprint"] }
-arrow-array = "54.1.0"
-arrow-schema = "54.1.0"
-arrow-select = "54.1.0"
-parquet = { version = "54.1.0", features = ["arrow"] }
+arrow = { version = "55.0.0", features = ["prettyprint"] }
+arrow-array = "55.0.0"
+arrow-schema = "55.0.0"
+arrow-select = "55.0.0"
+parquet = { version = "55.0.0", features = ["arrow"] }
 thiserror = "2.0.11"
 rayon = "1.10.0"
 indicatif = { version = "0.17.11", features = ["rayon"] }

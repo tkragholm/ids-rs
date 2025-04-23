@@ -219,22 +219,21 @@ fn dispatch_command(cli: &cli::types::Cli) -> IdsResult<()> {
     match &cli.command {
         Commands::Config { command } => commands::config::handle_config_command(command),
 
-        Commands::GenerateRegisters {
-            output_dir,
-            num_records,
-            num_cases,
-            start_year,
-            end_year,
-            seed,
-        } => commands::generate::handle_generate_registers(
-            output_dir,
-            *num_records,
-            *num_cases,
-            *start_year,
-            *end_year,
-            *seed,
-        ),
-
+        // Commands::GenerateRegisters {
+        //     output_dir,
+        //     num_records,
+        //     num_cases,
+        //     start_year,
+        //     end_year,
+        //     seed,
+        // } => commands::generate::handle_generate_registers(
+        //     output_dir,
+        //     *num_records,
+        //     *num_cases,
+        //     *start_year,
+        //     *end_year,
+        //     *seed,
+        // ),
         Commands::Sample {
             input,
             controls,

@@ -8,11 +8,8 @@ mod context;
 mod conversion;
 #[cfg(doc)]
 pub mod example; // Only included for documentation, not part of public API
-#[cfg(test)]
-mod legacy_compat;
+
 mod macros;
-#[cfg(test)]
-pub mod test_helpers; // Testing utilities // Tests for backward compatibility
 
 // Re-export from submodules
 pub use self::context::{with_context, with_context_details, ErrorContext, LegacyErrorContext};

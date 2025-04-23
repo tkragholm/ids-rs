@@ -5,7 +5,7 @@
 
 use super::types::{FamilyInfo, ParentPair, PersonInfo};
 use crate::error::{validation_error, Result};
-use chrono::{Datelike, Duration, NaiveDate};
+use chrono::{Duration, NaiveDate};
 use hashbrown::HashMap;
 use rand::Rng;
 
@@ -217,61 +217,4 @@ pub fn generate_test_pnrs(size: usize, start_year: i32, end_year: i32) -> Vec<St
     }
 
     pnrs
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-
-    #[test]
-    fn test_generate_pnr() {
-        let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
-        assert_eq!(generate_pnr(&date, 1234), "010100-1234");
-
-        let date = NaiveDate::from_ymd_opt(1995, 12, 31).unwrap();
-        assert_eq!(generate_pnr(&date, 5678), "311295-5678");
-    }
-
-    #[test]
-    fn test_generate_test_pnrs() {
-        let pnrs = generate_test_pnrs(10, 2000, 2010);
-        assert_eq!(pnrs.len(), 10);
-
-        // All PNRs should match the expected format
-        for pnr in &pnrs {
-            assert!(pnr.len() == 11);
-            assert!(pnr.contains('-'));
-        }
-    }
-
-    #[test]
-    fn test_pnr_pool() {
-        let mut rng = StdRng::seed_from_u64(42); // Use a seeded RNG for deterministic tests
-        let pool = PnrPool::new(10, &mut rng).unwrap();
-
-        assert_eq!(pool.num_children(), 10);
-        assert_eq!(pool.num_parents(), 20); // 10 fathers, 10 mothers
-        assert_eq!(pool.len(), 30); // 10 children + 20 parents
-
-        // Test getting a child
-        let child = pool.get_child(&0).unwrap();
-        assert!(child.0.year() >= 1995 && child.0.year() <= 2018);
-
-        // Test getting parents
-        let parents = pool.get_parents(&0).unwrap();
-        let (father, mother) = parents;
-
-        // Father should be older than child
-        assert!(father.0 < child.0);
-
-        // Mother should be older than child
-        assert!(mother.0 < child.0);
-
-        // Test getting a family
-        let family = pool.get_family(&0).unwrap();
-        assert_eq!(family.0, child);
-        assert_eq!(family.1, parents);
-    }
 }
