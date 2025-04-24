@@ -1,0 +1,3215 @@
+<directory_structure>
+src/
+  config/
+    env.rs
+    loader_config.rs
+    mod.rs
+    path.rs
+  formats/
+    mod.rs
+    parquet.rs
+  loaders/
+    base.rs
+    mod.rs
+    parallel.rs
+    sequential.rs
+  readers/
+    custom_path.rs
+    file.rs
+    mod.rs
+  registry/
+    akm.rs
+    bef.rs
+    family.rs
+    ind.rs
+    mod.rs
+    uddf.rs
+  schema/
+    akm.rs
+    bef.rs
+    family.rs
+    ind.rs
+    mod.rs
+    uddf.rs
+    utils.rs
+  ui/
+    console.rs
+    mod.rs
+    progress.rs
+  lib.rs
+Cargo.toml
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/config/env.rs">
+use std::env;
+
+/// Get batch size from environment or use default
+///
+/// This function reads the `IDS_BATCH_SIZE` environment variable,
+/// defaulting to 65536 (64K rows) if not defined.
+#[must_use]
+pub fn get_batch_size() -> usize {
+    env::var("IDS_BATCH_SIZE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(65536) // 64K rows default for better performance
+}
+
+/// Get max threads from environment or use system CPU count
+///
+/// This function reads the `IDS_MAX_THREADS` environment variable,
+/// defaulting to the number of CPU cores if not defined.
+#[must_use]
+pub fn get_max_threads() -> usize {
+    env::var("IDS_MAX_THREADS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or_else(num_cpus::get)
+        .max(2) // At least 2 threads for parallelism
+}
+
+/// Check if family filtering should be enabled
+///
+/// This function reads the `IDS_USE_FAMILY_FILTERING` environment variable,
+/// defaulting to false if not defined.
+#[must_use]
+pub fn should_use_family_filtering() -> bool {
+    env::var("IDS_USE_FAMILY_FILTERING")
+        .ok()
+        .is_some_and(|s| s.to_lowercase() == "true" || s == "1")
+}
+
+/// Check if a specific register should use parallel loading
+///
+/// # Arguments
+/// * `register_name` - The name of the register to check
+///
+/// # Returns
+/// `true` if parallel loading is enabled for this register
+#[must_use]
+pub fn use_parallel_loading(register_name: &str) -> bool {
+    let env_var = format!("IDS_PARALLEL_{}", register_name.to_uppercase());
+    env::var(env_var)
+        .ok()
+        .is_none_or(|s| s.to_lowercase() == "true" || s == "1") // Default to true for all registers
+}
+</file>
+
+<file path="src/config/loader_config.rs">
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use super::env::{get_batch_size, get_max_threads, should_use_family_filtering};
+
+/// Configuration for customizing register file paths
+#[derive(Clone, Debug)]
+pub struct RegisterPathConfig {
+    /// Base directory for register files
+    pub base_path: String,
+
+    /// Custom paths for specific register types
+    pub custom_paths: HashMap<String, String>,
+}
+
+impl RegisterPathConfig {
+    /// Create a new configuration with a base path
+    ///
+    /// # Arguments
+    /// * `base_path` - Base directory containing register files
+    #[must_use]
+    pub fn new(base_path: String) -> Self {
+        Self {
+            base_path,
+            custom_paths: HashMap::new(),
+        }
+    }
+
+    /// Add a custom path for a specific register type
+    ///
+    /// # Arguments
+    /// * `register_type` - Register type (e.g., "akm", "bef")
+    /// * `path` - Path to the register files
+    #[must_use]
+    pub fn with_custom_path(mut self, register_type: &str, path: &str) -> Self {
+        self.custom_paths
+            .insert(register_type.to_string(), path.to_string());
+        self
+    }
+
+    /// Resolve all paths, handling relative and absolute paths correctly
+    ///
+    /// # Returns
+    /// A `HashMap` of register names to their resolved paths
+    ///
+    /// # Errors
+    /// Returns an error if a non-empty base path doesn't exist and is needed
+    pub fn resolve_paths(&self) -> Result<HashMap<String, PathBuf>, IdsError> {
+        let mut resolved = HashMap::new();
+        let base_path_obj = Path::new(&self.base_path);
+        let _using_custom_paths_only = !self.custom_paths.is_empty();
+        // We need a valid base path when:
+        // 1. We have no custom paths (need to load everything from base)
+        // 2. We have some custom paths but they might be relative paths needing the base
+        let need_base_path = self.custom_paths.is_empty() || !self.base_path.trim().is_empty();
+
+        // Only check if base path exists when it's not empty and we need it
+        if !self.base_path.trim().is_empty() && need_base_path && !base_path_obj.exists() {
+            return Err(IdsError::invalid_operation(format!(
+                "Base path does not exist: {}",
+                self.base_path
+            )));
+        }
+
+        // Normalize base_path for easier comparison (only if it exists)
+        let normalized_base_path = if !self.base_path.trim().is_empty() && base_path_obj.exists() {
+            if let Ok(canonical) = base_path_obj.canonicalize() {
+                canonical.to_string_lossy().to_string()
+            } else {
+                self.base_path.clone()
+            }
+        } else {
+            self.base_path.clone()
+        };
+
+        for (key, path) in &self.custom_paths {
+            let path_obj = Path::new(path);
+
+            // If path is already absolute, use it as-is
+            if path_obj.is_absolute() {
+                resolved.insert(key.clone(), path_obj.to_path_buf());
+                continue;
+            }
+
+            // Check if path already includes the base_path
+            if path.contains(&self.base_path) || path.contains(&normalized_base_path) {
+                resolved.insert(key.clone(), path_obj.to_path_buf());
+                continue;
+            }
+
+            // For relative paths, only prepend base_path if it's not empty
+            if self.base_path.trim().is_empty() {
+                // When base_path is empty, treat custom paths as relative to current directory
+                resolved.insert(key.clone(), path_obj.to_path_buf());
+            } else {
+                let full_path = base_path_obj.join(path_obj);
+                resolved.insert(key.clone(), full_path);
+            }
+        }
+
+        Ok(resolved)
+    }
+
+    /// Validate that all custom paths exist
+    ///
+    /// # Returns
+    /// Ok if all paths exist, otherwise an error
+    ///
+    /// # Errors
+    /// Returns an error if any of the paths don't exist
+    pub fn validate(&self) -> Result<(), IdsError> {
+        // If we have an empty base path and no custom paths, fail early
+        if self.base_path.trim().is_empty() && self.custom_paths.is_empty() {
+            return Err(IdsError::invalid_operation(
+                "No base path or custom paths specified".to_string(),
+            ));
+        }
+
+        let resolved = self.resolve_paths()?;
+        let mut invalid_paths = Vec::new();
+
+        for (key, path) in resolved {
+            if !path.exists() {
+                invalid_paths.push(format!("{} ({})", key, path.display()));
+            }
+        }
+
+        if invalid_paths.is_empty() {
+            Ok(())
+        } else {
+            Err(IdsError::invalid_operation(format!(
+                "The following paths do not exist: {}",
+                invalid_paths.join(", ")
+            )))
+        }
+    }
+}
+
+/// Complete loader configuration with additional options
+#[derive(Clone, Debug)]
+pub struct LoaderConfig {
+    /// Path configuration for register files
+    pub path_config: RegisterPathConfig,
+
+    /// Batch size for loading data
+    pub batch_size: usize,
+
+    /// Maximum number of threads to use
+    pub max_threads: usize,
+
+    /// Optional set of PNRs to filter by
+    pub filter_by_pnr: Option<HashSet<String>>,
+
+    /// Whether to use family-based filtering
+    pub use_family_filtering: bool,
+}
+
+impl LoaderConfig {
+    /// Create a new loader configuration with default settings
+    ///
+    /// # Arguments
+    /// * `base_path` - Base directory containing register files
+    #[must_use]
+    pub fn new(base_path: String) -> Self {
+        Self {
+            path_config: RegisterPathConfig::new(base_path),
+            batch_size: get_batch_size(),
+            max_threads: get_max_threads(),
+            filter_by_pnr: None,
+            use_family_filtering: should_use_family_filtering(),
+        }
+    }
+
+    /// Set a custom path for a specific register type
+    ///
+    /// # Arguments
+    /// * `register_type` - Register type (e.g., "akm", "bef")
+    /// * `path` - Path to the register files
+    #[must_use]
+    pub fn with_custom_path(mut self, register_type: &str, path: &str) -> Self {
+        self.path_config = self.path_config.with_custom_path(register_type, path);
+        self
+    }
+
+    /// Filter by a set of PNR values
+    ///
+    /// # Arguments
+    /// * `pnr_set` - Set of PNRs to filter by
+    #[must_use]
+    pub fn with_pnr_filter(mut self, pnr_set: HashSet<String>) -> Self {
+        self.filter_by_pnr = Some(pnr_set);
+        self
+    }
+
+    /// Filter by PNR values from a file (one PNR per line)
+    ///
+    /// # Arguments
+    /// * `filter_file` - Path to the file containing PNRs
+    ///
+    /// # Returns
+    /// Updated configuration or an error
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read
+    pub fn with_pnr_filter_file(mut self, filter_file: &str) -> Result<Self, IdsError> {
+        let content = std::fs::read_to_string(filter_file).map_err(|e| {
+            IdsError::invalid_operation(format!("Failed to read PNR filter file: {e}"))
+        })?;
+
+        let pnr_set: HashSet<String> = content
+            .lines()
+            .map(|line| line.trim().to_string())
+            .filter(|line| !line.is_empty())
+            .collect();
+
+        self.filter_by_pnr = Some(pnr_set);
+        Ok(self)
+    }
+
+    /// Enable or disable family-based filtering
+    ///
+    /// # Arguments
+    /// * `enabled` - Whether to enable family-based filtering
+    #[must_use]
+    pub const fn with_family_filtering(mut self, enabled: bool) -> Self {
+        self.use_family_filtering = enabled;
+        self
+    }
+
+    /// Set batch size
+    ///
+    /// # Arguments
+    /// * `batch_size` - Batch size for loading data
+    #[must_use]
+    pub const fn with_batch_size(mut self, batch_size: usize) -> Self {
+        self.batch_size = batch_size;
+        self
+    }
+
+    /// Set maximum number of threads
+    ///
+    /// # Arguments
+    /// * `max_threads` - Maximum number of threads to use
+    #[must_use]
+    pub const fn with_max_threads(mut self, max_threads: usize) -> Self {
+        self.max_threads = max_threads;
+        self
+    }
+}
+</file>
+
+<file path="src/config/mod.rs">
+pub mod env;
+mod loader_config;
+pub mod path;
+
+pub use loader_config::{LoaderConfig, RegisterPathConfig};
+</file>
+
+<file path="src/config/path.rs">
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+/// Detect the data directory structure
+///
+/// # Arguments
+/// * `base_path` - The base path to check
+///
+/// # Returns
+/// A `HashMap` of register names to their paths
+///
+/// # Errors
+/// Returns an error if the base path doesn't exist
+#[allow(dead_code)]
+pub fn detect_data_structure(base_path: &Path) -> Result<HashMap<String, PathBuf>, IdsError> {
+    if !base_path.exists() {
+        return Err(IdsError::io_error(format!(
+            "Base directory not found: {}",
+            base_path.display()
+        )));
+    }
+
+    let mut paths = HashMap::new();
+
+    // Check for direct vs nested structure (with /registers subdirectory)
+    let registers_path = base_path.join("registers");
+    let _has_registers_subdir = registers_path.exists() && registers_path.is_dir();
+
+    // Check for family.parquet
+    let family_paths = [
+        base_path.join("family.parquet"),
+        registers_path.join("family.parquet"),
+    ];
+
+    for path in &family_paths {
+        if path.exists() && path.is_file() {
+            log::info!("Found family relations file at: {}", path.display());
+            paths.insert("family".to_string(), path.clone());
+            break;
+        }
+    }
+
+    // Check for register subdirectories
+    let register_dirs = ["akm", "bef", "ind", "uddf"];
+    for dir in &register_dirs {
+        let paths_to_check = [base_path.join(dir), registers_path.join(dir)];
+
+        for path in &paths_to_check {
+            if path.exists() && path.is_dir() {
+                // Check if it has parquet files
+                if let Ok(entries) = std::fs::read_dir(path) {
+                    let parquet_files: Vec<_> = entries
+                        .filter_map(Result::ok)
+                        .filter(|e| e.path().extension().is_some_and(|ext| ext == "parquet"))
+                        .collect();
+
+                    if !parquet_files.is_empty() {
+                        log::info!(
+                            "Found directory {} with {} parquet files",
+                            path.display(),
+                            parquet_files.len()
+                        );
+                        paths.insert((*dir).to_string(), path.clone());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(paths)
+}
+
+/// Resolve paths, handling relative and absolute paths correctly
+///
+/// # Arguments
+/// * `base_path` - The base path for resolving relative paths
+/// * `paths` - `HashMap` of register names to their paths
+///
+/// # Returns
+/// A `HashMap` of register names to their resolved paths
+///
+/// # Errors
+/// Returns an error if the base path doesn't exist
+#[allow(dead_code)]
+pub fn resolve_paths(
+    base_path: &str,
+    paths: &HashMap<String, String>,
+) -> Result<HashMap<String, PathBuf>, IdsError> {
+    let mut resolved = HashMap::new();
+    let base_path_obj = Path::new(base_path);
+
+    if !base_path_obj.exists() {
+        return Err(IdsError::invalid_operation(format!(
+            "Base path does not exist: {base_path}"
+        )));
+    }
+
+    // Normalize base_path for easier comparison
+    let normalized_base_path = if let Ok(canonical) = base_path_obj.canonicalize() {
+        canonical.to_string_lossy().to_string()
+    } else {
+        base_path.to_string()
+    };
+
+    for (key, path) in paths {
+        let path_obj = Path::new(path);
+
+        // If path is already absolute, use it as-is
+        if path_obj.is_absolute() {
+            resolved.insert(key.clone(), path_obj.to_path_buf());
+            continue;
+        }
+
+        // Check if path already includes the base_path
+        if path.contains(base_path) || path.contains(&normalized_base_path) {
+            resolved.insert(key.clone(), path_obj.to_path_buf());
+            continue;
+        }
+
+        // Prepend base_path for relative paths
+        let full_path = base_path_obj.join(path_obj);
+        resolved.insert(key.clone(), full_path);
+    }
+
+    Ok(resolved)
+}
+
+/// Validate that all paths exist
+///
+/// # Arguments
+/// * `paths` - `HashMap` of register names to their paths
+///
+/// # Returns
+/// Ok if all paths exist, otherwise an error with the invalid paths
+///
+/// # Errors
+/// Returns an error if any of the paths don't exist
+#[allow(dead_code)]
+pub fn validate_paths(paths: &HashMap<String, PathBuf>) -> Result<(), IdsError> {
+    let mut invalid_paths = Vec::new();
+
+    for (key, path) in paths {
+        if !path.exists() {
+            invalid_paths.push(format!("{} ({})", key, path.display()));
+        }
+    }
+
+    if invalid_paths.is_empty() {
+        Ok(())
+    } else {
+        Err(IdsError::invalid_operation(format!(
+            "The following paths do not exist: {}",
+            invalid_paths.join(", ")
+        )))
+    }
+}
+</file>
+
+<file path="src/formats/mod.rs">
+pub mod parquet;
+// Future: mod csv;
+
+pub use parquet::{load_parquet_files_parallel, read_parquet, read_parquet_with_filter};
+</file>
+
+<file path="src/formats/parquet.rs">
+use crate::ui::LoaderProgress;
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
+
+use crossbeam_channel::bounded;
+use crossbeam_deque::{Injector, Steal, Worker};
+use parking_lot::Mutex;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+// use rayon::prelude::*;
+use arrow::array::{Array, StringArray};
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::path::Path;
+use std::sync::Arc;
+use std::thread;
+use types::error::IdsError;
+
+/// Read a Parquet file and return its contents as a vector of `RecordBatches`.
+///
+/// Uses a parallel processing pipeline with crossbeam channels and worker threads
+/// for better performance.
+///
+/// # Arguments
+/// * `path` - File path to the Parquet file to be read
+/// * `schema` - Optional Arrow Schema for projecting specific columns
+/// * `progress` - Optional progress tracker for user feedback
+/// * `pnr_filter` - Optional set of PNRs to filter the data by
+///
+/// # Returns
+/// Vector of `RecordBatches` or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The file cannot be opened
+/// - The file is not a valid Parquet file
+/// - There are issues reading the record batches
+pub fn read_parquet(
+    path: &Path,
+    schema: Option<&Schema>,
+    progress: Option<&LoaderProgress>,
+    pnr_filter: Option<&HashSet<String>>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!("Reading parquet file: {}", path.display());
+
+    // Check if the file exists
+    if !path.exists() {
+        log::error!("File not found: {}", path.display());
+        return Err(IdsError::io_error(format!(
+            "File not found: {}",
+            path.display()
+        )));
+    }
+
+    // Create a progress bar if provided
+    let progress_bar = if let Some(progress) = progress {
+        let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(1000);
+
+        let filename = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("unknown");
+
+        Some(progress.create_file_progress(file_size, filename))
+    } else {
+        None
+    };
+
+    // Open the file
+    let file = File::open(path).map_err(|e| {
+        log::error!("Failed to open file {}: {}", path.display(), e);
+        IdsError::io_error(format!("Failed to open file {}: {}", path.display(), e))
+    })?;
+
+    // Create a reader builder
+    let mut builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(|e| {
+        log::error!(
+            "Failed to create parquet reader for {}: {}",
+            path.display(),
+            e
+        );
+        IdsError::invalid_operation(format!(
+            "Failed to create parquet reader for {}: {}",
+            path.display(),
+            e
+        ))
+    })?;
+
+    // Apply projection if schema is provided
+    if let Some(_schema) = schema {
+        // Currently, projection mask doesn't work correctly with the Arrow schema
+        // To fix this properly, we'd need to get column indices from the schema
+        // For now, we'll just read all columns
+        // let mask = ProjectionMask::leaves(builder.schema(), vec![0, 1, 2]);
+        // builder = builder.with_projection(mask);
+    }
+
+    // Get the batch size from environment or use a reasonable default
+    let batch_size = std::env::var("IDS_BATCH_SIZE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(16384);
+
+    builder = builder.with_batch_size(batch_size);
+
+    // Create the reader
+    let reader = builder.build().map_err(|e| {
+        log::error!(
+            "Failed to build parquet reader for {}: {}",
+            path.display(),
+            e
+        );
+        IdsError::invalid_operation(format!(
+            "Failed to build parquet reader for {}: {}",
+            path.display(),
+            e
+        ))
+    })?;
+
+    // If we have a PNR filter, we'll apply it to each batch
+    let has_pnr_filter = pnr_filter.is_some();
+
+    // Collect the batches
+    let mut all_batches = Vec::new();
+    let mut filtered_batches = Vec::new();
+
+    for batch_result in reader {
+        let batch = batch_result.map_err(|e| {
+            log::error!("Failed to read batch from {}: {}", path.display(), e);
+            IdsError::invalid_operation(format!(
+                "Failed to read batch from {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
+
+        // Update progress if provided
+        if let Some(pb) = &progress_bar {
+            pb.inc(1);
+        }
+
+        // Apply PNR filter if provided
+        if let Some(pnr_filter) = pnr_filter {
+            // Use ArrowAccess to filter the batch by PNR
+            // Create a manual filter function
+            let filtered_batch = match batch.column_by_name("pnr") {
+                Some(pnr_column) => {
+                    // Convert column to strings
+                    // Try to cast to string array
+                    let pnr_strings = if let Some(arr) = pnr_column.as_any().downcast_ref::<StringArray>() { arr } else {
+                        log::warn!("Could not cast PNR column to StringArray");
+                        // Create a string array once and reuse it
+                        static EMPTY_ARRAY: std::sync::LazyLock<StringArray> =
+                            std::sync::LazyLock::new(|| StringArray::from(vec![""]));
+                        &EMPTY_ARRAY
+                    };
+
+                    let _pnr_vec: Vec<bool> = (0..pnr_strings.len())
+                        .map(|i| {
+                            let pnr = pnr_strings.value(i);
+                            pnr_filter.contains(pnr)
+                        })
+                        .collect();
+
+                    // Create a filtered batch - this would require additional work
+                    // For now, just return the original batch
+                    // In a real implementation, you would use the boolean mask to filter rows
+                    batch.clone() // Return original for now
+                }
+                None => batch.clone(), // If no PNR column, return the original batch
+            };
+
+            // RecordBatch doesn't have is_empty() method
+            // Instead we can check if it has any rows
+            if filtered_batch.num_rows() > 0 {
+                filtered_batches.push(filtered_batch);
+            }
+        } else {
+            all_batches.push(batch);
+        }
+    }
+
+    // Finish progress if provided
+    if let Some(pb) = progress_bar {
+        pb.finish_with_message("Done");
+    }
+
+    // Return the filtered batches if we applied a filter, otherwise all batches
+    if has_pnr_filter {
+        log::info!(
+            "Read {} batches from {} (after filtering)",
+            filtered_batches.len(),
+            path.display()
+        );
+        Ok(filtered_batches)
+    } else {
+        log::info!("Read {} batches from {}", all_batches.len(), path.display());
+        Ok(all_batches)
+    }
+}
+
+/// Read a Parquet file with PNR filtering applied.
+///
+/// This is a convenience wrapper around `read_parquet` that applies a PNR filter.
+///
+/// # Arguments
+/// * `path` - File path to the Parquet file to be read
+/// * `schema` - Optional Arrow Schema for projecting specific columns
+/// * `pnr_filter` - Set of PNRs to filter the data by
+/// * `progress` - Optional progress tracker for user feedback
+///
+/// # Returns
+/// Vector of `RecordBatches` or an error
+///
+/// # Errors
+/// Returns an error if the underlying `read_parquet` function fails
+pub fn read_parquet_with_filter(
+    path: &Path,
+    schema: Option<&Schema>,
+    pnr_filter: &HashSet<String>,
+    progress: Option<&LoaderProgress>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    read_parquet(path, schema, progress, Some(pnr_filter))
+}
+
+/// Load Parquet files in parallel from a directory.
+///
+/// Scans the directory for Parquet files and loads them in parallel using Rayon.
+///
+/// # Arguments
+/// * `dir_path` - Directory containing Parquet files
+/// * `schema` - Optional Arrow Schema for projecting specific columns
+/// * `pnr_filter` - Optional set of PNRs to filter by
+/// * `progress` - Optional progress tracker for user feedback
+///
+/// # Returns
+/// Vector of `RecordBatches` from all Parquet files or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The directory cannot be read
+/// - Any Parquet file cannot be read
+pub fn load_parquet_files_parallel(
+    dir_path: &Path,
+    schema: Option<&Schema>,
+    pnr_filter: Option<&HashSet<String>>,
+    progress: Option<&LoaderProgress>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!(
+        "Loading Parquet files from directory: {}",
+        dir_path.display()
+    );
+
+    // Check if the directory exists
+    if !dir_path.exists() || !dir_path.is_dir() {
+        return Err(IdsError::io_error(format!(
+            "Directory not found: {}",
+            dir_path.display()
+        )));
+    }
+
+    // Scan for Parquet files
+    let mut parquet_files = Vec::new();
+    for entry in std::fs::read_dir(dir_path).map_err(|e| {
+        IdsError::io_error(format!(
+            "Failed to read directory {}: {}",
+            dir_path.display(),
+            e
+        ))
+    })? {
+        let entry = entry
+            .map_err(|e| IdsError::io_error(format!("Failed to read directory entry: {e}")))?;
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
+            parquet_files.push(path);
+        }
+    }
+
+    if parquet_files.is_empty() {
+        log::warn!(
+            "No Parquet files found in directory: {}",
+            dir_path.display()
+        );
+        return Ok(Vec::new());
+    }
+
+    log::info!(
+        "Found {} Parquet files in directory: {}",
+        parquet_files.len(),
+        dir_path.display()
+    );
+
+    // Sort by modification time (newest first)
+    parquet_files.sort_by(|a, b| {
+        let a_meta = match std::fs::metadata(a) {
+            Ok(meta) => meta,
+            Err(_) => return std::cmp::Ordering::Equal,
+        };
+        let b_meta = match std::fs::metadata(b) {
+            Ok(meta) => meta,
+            Err(_) => return std::cmp::Ordering::Equal,
+        };
+        a_meta
+            .modified()
+            .unwrap_or_else(|_| std::time::SystemTime::now())
+            .cmp(
+                &b_meta
+                    .modified()
+                    .unwrap_or_else(|_| std::time::SystemTime::now()),
+            )
+    });
+
+    // Create a progress reporter if provided
+    if let Some(progress) = progress {
+        progress.set_main_message(&format!(
+            "Loading {} Parquet files from {}",
+            parquet_files.len(),
+            dir_path.display()
+        ));
+    }
+
+    // Process files in parallel
+    let schema_arc = schema.map(|s| Arc::new(s.clone()));
+    let pnr_filter_arc = pnr_filter.map(|p| Arc::new(p.clone()));
+
+    let global_queue = Arc::new(Injector::new());
+    for file in parquet_files {
+        global_queue.push(file);
+    }
+
+    let max_threads = std::env::var("IDS_MAX_THREADS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or_else(num_cpus::get)
+        .max(2); // At least 2 threads
+
+    // Create a channel to collect results
+    let (sender, receiver) = bounded(max_threads * 2);
+
+    // Spawn worker threads
+    let workers: Vec<_> = (0..max_threads)
+        .map(|i| {
+            let local_queue = Worker::new_fifo();
+            let global_queue = Arc::clone(&global_queue);
+            let schema = schema_arc.clone();
+            let pnr_filter = pnr_filter_arc.clone();
+            let sender = sender.clone();
+            let thread_id = i; // For debugging
+
+            thread::spawn(move || {
+                let worker_progress = None; // Individual thread progress tracking disabled
+
+                loop {
+                    // Try to get work from the local queue
+                    let path = match local_queue.pop() {
+                        Some(path) => path,
+                        None => {
+                            // If local queue is empty, try to steal from global queue
+                            match global_queue.steal() {
+                                Steal::Success(path) => path,
+                                Steal::Empty => break, // Exit if global queue is empty
+                                Steal::Retry => continue, // Retry if steal failed
+                            }
+                        }
+                    };
+
+                    log::debug!("Thread {} processing file: {}", thread_id, path.display());
+
+                    // Process the file
+                    let result = read_parquet(
+                        &path,
+                        schema.as_ref().map(std::convert::AsRef::as_ref),
+                        worker_progress.as_ref(),
+                        pnr_filter.as_ref().map(std::convert::AsRef::as_ref),
+                    );
+
+                    // Send the result back through the channel
+                    match result {
+                        Ok(batches) => {
+                            log::debug!(
+                                "Thread {} successfully read {} batches from {}",
+                                thread_id,
+                                batches.len(),
+                                path.display()
+                            );
+                            if let Err(e) = sender.send((path, Ok(batches))) {
+                                log::error!("Failed to send result: {e}");
+                            }
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Thread {} failed to read file {}: {}",
+                                thread_id,
+                                path.display(),
+                                err
+                            );
+                            if let Err(e) = sender.send((path, Err(err))) {
+                                log::error!("Failed to send error: {e}");
+                            }
+                        }
+                    }
+                }
+
+                log::debug!("Thread {thread_id} exiting");
+            })
+        })
+        .collect();
+
+    // Drop the original sender to close the channel when all workers exit
+    drop(sender);
+
+    // Collect results
+    let results_mutex = Arc::new(Mutex::new(HashMap::new()));
+    let errors_mutex = Arc::new(Mutex::new(Vec::new()));
+
+    // Process results as they come in
+    for (path, result) in receiver {
+        match result {
+            Ok(batches) => {
+                let mut results = results_mutex.lock();
+                results.insert(path, batches);
+            }
+            Err(err) => {
+                let mut errors = errors_mutex.lock();
+                errors.push((path, err));
+            }
+        }
+    }
+
+    // Join all worker threads
+    for worker in workers {
+        let _ = worker.join();
+    }
+
+    // Check if we have any errors
+    let errors = errors_mutex.lock();
+    if !errors.is_empty() {
+        let error_paths: Vec<_> = errors
+            .iter()
+            .map(|(path, _)| path.display().to_string())
+            .collect();
+        return Err(IdsError::invalid_operation(format!(
+            "Failed to read {} Parquet files: {}",
+            errors.len(),
+            error_paths.join(", ")
+        )));
+    }
+
+    // Combine all batches
+    let mut all_batches = Vec::new();
+    for (_, batches) in results_mutex.lock().iter() {
+        all_batches.extend(batches.clone());
+    }
+
+    log::info!(
+        "Successfully loaded {} batches from {} Parquet files",
+        all_batches.len(),
+        results_mutex.lock().len()
+    );
+
+    Ok(all_batches)
+}
+</file>
+
+<file path="src/loaders/base.rs">
+use types::error::IdsError;
+use types::storage::arrow::backend::ArrowBackend as ArrowStore;
+
+use crate::config::RegisterPathConfig;
+
+/// Core trait for store loader implementations
+///
+/// This trait defines the required methods for loading data into an `ArrowStore`.
+pub trait StoreLoader {
+    /// Load data from a specified base path
+    ///
+    /// # Arguments
+    /// * `base_path` - Path to the directory containing register data
+    ///
+    /// # Returns
+    /// A populated `ArrowStore` or an error
+    ///
+    /// # Errors
+    /// Returns an error if loading fails
+    fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError>;
+
+    /// Load data with custom paths for different register types
+    ///
+    /// # Arguments
+    /// * `config` - Configuration specifying paths for different register types
+    ///
+    /// # Returns
+    /// A populated `ArrowStore` or an error
+    ///
+    /// # Errors
+    /// Returns an error if loading fails
+    fn load_with_custom_paths(&self, config: RegisterPathConfig) -> Result<ArrowStore, IdsError>;
+}
+</file>
+
+<file path="src/loaders/mod.rs">
+mod base;
+mod parallel;
+mod sequential;
+
+pub use base::StoreLoader;
+pub use parallel::ParallelLoader;
+pub use sequential::SequentialLoader;
+</file>
+
+<file path="src/loaders/parallel.rs">
+use chrono::Datelike;
+use std::path::PathBuf;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
+
+use types::error::IdsError;
+use types::storage::arrow::backend::ArrowBackend as ArrowStore;
+
+use crate::config::RegisterPathConfig;
+use crate::loaders::StoreLoader;
+use crate::registry;
+use crate::ui::LoaderProgress;
+
+/// Parallel Register Loader implementation
+///
+/// This loader loads registers in parallel, which is useful for:
+/// 1. Performance - faster loading on multi-core systems
+/// 2. Efficiency - takes advantage of multiple CPU cores
+/// 3. Systems with adequate memory resources
+pub struct ParallelLoader {
+    /// Whether to load data in parallel
+    parallel: bool,
+}
+
+impl Default for ParallelLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ParallelLoader {
+    /// Create a new `ParallelLoader` instance with parallel loading enabled
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { parallel: true }
+    }
+
+    /// Create a new `ParallelLoader` with specified parallel setting
+    #[must_use]
+    pub const fn with_parallel(parallel: bool) -> Self {
+        Self { parallel }
+    }
+
+    /// Lock the shared store and handle mutex errors
+    ///
+    /// # Arguments
+    /// * `store` - The Arc<Mutex<ArrowStore>> to lock
+    /// * `register_type` - The type of register being processed (for error messages)
+    ///
+    /// # Returns
+    /// A result containing the locked store guard or an error
+    fn lock_store<'a>(
+        &self,
+        store: &'a Arc<Mutex<ArrowStore>>,
+        register_type: &str,
+    ) -> Result<std::sync::MutexGuard<'a, ArrowStore>, IdsError> {
+        store.lock().map_err(|e| {
+            IdsError::invalid_operation(format!(
+                "Failed to lock store mutex for {register_type} data: {e}"
+            ))
+        })
+    }
+
+    /// Handle receiver results with proper error handling
+    ///
+    /// This consolidates common logic for handling register data from parallel processing
+    ///
+    /// # Arguments
+    /// * `store` - The shared store
+    /// * `register_type` - Type of register ("akm", "bef", etc.)
+    /// * `data` - The loaded data
+    /// * `progress` - Progress tracker
+    /// * `add_fn` - Function to add data to store
+    #[allow(dead_code)]
+    fn handle_receiver_result<F>(
+        &self,
+        store: &Arc<Mutex<ArrowStore>>,
+        register_type: &str,
+        _data: Vec<arrow::record_batch::RecordBatch>, // Prefixed with underscore as it's passed to add_fn internally
+        progress: &LoaderProgress,
+        add_fn: F,
+    ) where
+        F: FnOnce(&mut ArrowStore) -> Result<(), IdsError>,
+    {
+        progress.set_main_message(&format!(
+            "Adding {} data to store",
+            register_type.to_uppercase()
+        ));
+
+        match self.lock_store(store, register_type) {
+            Ok(mut store_guard) => {
+                if let Err(e) = add_fn(&mut store_guard) {
+                    log::error!("Failed to add {} data: {}", register_type.to_uppercase(), e);
+                }
+            }
+            Err(e) => log::error!("{e}"),
+        }
+
+        progress.inc_main();
+    }
+
+    /// Safely unwrap store from Arc<Mutex<>> with comprehensive error handling
+    ///
+    /// # Arguments
+    /// * `store` - The Arc<Mutex<ArrowStore>> to unwrap
+    ///
+    /// # Returns
+    /// The unwrapped `ArrowStore` or an error with descriptive message
+    #[allow(dead_code)]
+    fn unwrap_store(store: Arc<Mutex<ArrowStore>>) -> Result<ArrowStore, IdsError> {
+        // First try to unwrap from Arc
+        match Arc::try_unwrap(store) {
+            Ok(mutex) => {
+                // Then try to get inner value from Mutex
+                mutex.into_inner().map_err(|e| {
+                    IdsError::invalid_operation(format!("Failed to unwrap store from mutex: {e}"))
+                })
+            }
+            Err(_) => Err(IdsError::invalid_operation(
+                "Failed to unwrap store from Arc - still referenced by other threads".to_string(),
+            )),
+        }
+    }
+}
+
+impl StoreLoader for ParallelLoader {
+    fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError> {
+        log::info!("Loading register data from path: {base_path}");
+
+        // Create a progress tracker
+        let progress = LoaderProgress::new();
+        progress.set_main_message("Initializing data loading");
+
+        // Determine which loaders to run in parallel
+        let load_akm_parallel = self.parallel;
+        let load_bef_parallel = self.parallel;
+        let load_ind_parallel = self.parallel;
+        let load_uddf_parallel = self.parallel;
+
+        // Create a shared store to collect all data
+        let store_result = ArrowStore::new();
+        let store = Arc::new(Mutex::new(match store_result {
+            Ok(store) => store,
+            Err(e) => {
+                log::error!("Failed to create ArrowBackend: {e}");
+                return Err(e);
+            }
+        }));
+
+        // Create a channel for collecting results
+        let (sender, receiver) = mpsc::channel();
+
+        // Create thread handles
+        let mut handles = Vec::new();
+
+        // AKM data
+        if load_akm_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_akm(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("akm", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("akm", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading AKM data");
+            if let Ok(akm_data) = registry::load_akm(&base_path, None) {
+                match self.lock_store(&store, "AKM") {
+                    Ok(mut store_guard) => {
+                        let current_year = chrono::Local::now().year();
+                        if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
+                            log::error!("Failed to add AKM data: {e}");
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    }
+                    Err(e) => log::error!("{e}"),
+                }
+                progress.inc_main();
+            }
+        }
+
+        // BEF data
+        if load_bef_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_bef(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("bef", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("bef", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading BEF data");
+            if let Ok(bef_data) = registry::load_bef(&base_path, None) {
+                match self.lock_store(&store, "BEF") {
+                    Ok(mut store_guard) => {
+                        if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
+                            log::error!("Failed to add BEF data: {e}");
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    }
+                    Err(e) => log::error!("{e}"),
+                }
+                progress.inc_main();
+            }
+        }
+
+        // IND data
+        if load_ind_parallel {
+            let base_path_clone = base_path.clone();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_ind(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("ind", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("ind", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading IND data");
+            if let Ok(ind_data) = registry::load_ind(&base_path, None) {
+                match self.lock_store(&store, "IND") {
+                    Ok(mut store_guard) => {
+                        let current_year = chrono::Local::now().year();
+                        if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
+                            log::error!("Failed to add IND data: {e}");
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    }
+                    Err(e) => log::error!("{e}"),
+                }
+                progress.inc_main();
+            }
+        }
+
+        // UDDF data
+        if load_uddf_parallel {
+            let base_path_clone = base_path;
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_uddf(&base_path_clone, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("uddf", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("uddf", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading UDDF data");
+            if let Ok(uddf_data) = registry::load_uddf(&base_path, None) {
+                match self.lock_store(&store, "UDDF") {
+                    Ok(mut store_guard) => {
+                        if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data)
+                        {
+                            log::error!("Failed to add UDDF data: {e}");
+                            // Continue with loading instead of returning error, to get as much data as possible
+                        }
+                    }
+                    Err(e) => log::error!("{e}"),
+                }
+                progress.inc_main();
+            }
+        }
+
+        // Close the sender to signal no more messages
+        drop(sender);
+
+        // Process results from parallel loading
+        for (register_type, result) in receiver {
+            match (register_type, result) {
+                ("akm", Ok(data)) => {
+                    progress.set_main_message("Adding AKM data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    let current_year = chrono::Local::now().year();
+                    if let Err(e) = store_guard.add_akm_data(current_year, data) {
+                        log::error!("Failed to add AKM data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                ("bef", Ok(data)) => {
+                    progress.set_main_message("Adding BEF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_bef_data("current".to_string(), data) {
+                        log::error!("Failed to add BEF data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                ("ind", Ok(data)) => {
+                    progress.set_main_message("Adding IND data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    let current_year = chrono::Local::now().year();
+                    if let Err(e) = store_guard.add_ind_data(current_year, data) {
+                        log::error!("Failed to add IND data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                ("uddf", Ok(data)) => {
+                    progress.set_main_message("Adding UDDF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_uddf_data("current".to_string(), data) {
+                        log::error!("Failed to add UDDF data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                (register_type, Err(e)) => {
+                    log::error!("Error loading {register_type} data: {e}");
+                }
+                (unknown_type, Ok(_)) => {
+                    log::warn!("Received data for unknown register type: {unknown_type}");
+                }
+            }
+        }
+
+        // Wait for all threads to finish
+        for handle in handles {
+            let _ = handle.join();
+        }
+
+        progress.finish_main();
+
+        // Return the store
+        match Arc::try_unwrap(store) {
+            Ok(mutex) => Ok(mutex.into_inner().unwrap()),
+            Err(_) => Err(IdsError::invalid_operation(
+                "Failed to unwrap store from Arc".to_string(),
+            )),
+        }
+    }
+
+    fn load_with_custom_paths(&self, config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
+        log::info!("Loading register data in parallel with custom paths");
+
+        // Validate the config paths
+        config.validate()?;
+
+        // Resolve the paths
+        let paths = config.resolve_paths()?;
+
+        // Create a progress tracker
+        let progress = LoaderProgress::new();
+        progress.set_main_message("Initializing parallel data loading");
+
+        // Determine which loaders to run in parallel
+        let load_akm_parallel = self.parallel;
+        let load_bef_parallel = self.parallel;
+        let load_ind_parallel = self.parallel;
+        let load_uddf_parallel = self.parallel;
+
+        // Get the paths
+        let akm_path = paths
+            .get("akm")
+            .cloned()
+            .unwrap_or_else(|| PathBuf::from(&config.base_path));
+        let bef_path = paths
+            .get("bef")
+            .cloned()
+            .unwrap_or_else(|| PathBuf::from(&config.base_path));
+        let ind_path = paths
+            .get("ind")
+            .cloned()
+            .unwrap_or_else(|| PathBuf::from(&config.base_path));
+        let uddf_path = paths
+            .get("uddf")
+            .cloned()
+            .unwrap_or_else(|| PathBuf::from(&config.base_path));
+
+        // Create a shared store to collect all data
+        let store_result = ArrowStore::new();
+        let store = Arc::new(Mutex::new(match store_result {
+            Ok(store) => store,
+            Err(e) => {
+                log::error!("Failed to create ArrowBackend: {e}");
+                return Err(e);
+            }
+        }));
+
+        // Create a channel for collecting results
+        let (sender, receiver) = mpsc::channel();
+
+        // Create thread handles
+        let mut handles = Vec::new();
+
+        // AKM data
+        if load_akm_parallel {
+            let akm_path = akm_path;
+            let akm_path_str = akm_path.to_str().unwrap_or_default().to_string();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_akm(&akm_path_str, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("akm", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("akm", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading AKM data");
+            if let Ok(akm_data) = registry::load_akm(akm_path.to_str().unwrap_or_default(), None) {
+                let mut store_guard = store.lock().unwrap();
+                let current_year = chrono::Local::now().year();
+                if let Err(e) = store_guard.add_akm_data(current_year, akm_data) {
+                    log::error!("Failed to add AKM data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // BEF data
+        if load_bef_parallel {
+            let bef_path = bef_path;
+            let bef_path_str = bef_path.to_str().unwrap_or_default().to_string();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_bef(&bef_path_str, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("bef", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("bef", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading BEF data");
+            if let Ok(bef_data) = registry::load_bef(bef_path.to_str().unwrap_or_default(), None) {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_bef_data("current".to_string(), bef_data) {
+                    log::error!("Failed to add BEF data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // IND data
+        if load_ind_parallel {
+            let ind_path = ind_path;
+            let ind_path_str = ind_path.to_str().unwrap_or_default().to_string();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_ind(&ind_path_str, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("ind", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("ind", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading IND data");
+            if let Ok(ind_data) = registry::load_ind(ind_path.to_str().unwrap_or_default(), None) {
+                let mut store_guard = store.lock().unwrap();
+                let current_year = chrono::Local::now().year();
+                if let Err(e) = store_guard.add_ind_data(current_year, ind_data) {
+                    log::error!("Failed to add IND data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // UDDF data
+        if load_uddf_parallel {
+            let uddf_path = uddf_path;
+            let uddf_path_str = uddf_path.to_str().unwrap_or_default().to_string();
+            let sender_clone = sender.clone();
+            handles.push(thread::spawn(move || {
+                match registry::load_uddf(&uddf_path_str, None) {
+                    Ok(data) => {
+                        let _ = sender_clone.send(("uddf", Ok(data)));
+                    }
+                    Err(e) => {
+                        let _ = sender_clone.send(("uddf", Err(e)));
+                    }
+                }
+            }));
+        } else {
+            // Load sequentially
+            progress.set_main_message("Loading UDDF data");
+            if let Ok(uddf_data) = registry::load_uddf(uddf_path.to_str().unwrap_or_default(), None)
+            {
+                let mut store_guard = store.lock().unwrap();
+                if let Err(e) = store_guard.add_uddf_data("current".to_string(), uddf_data) {
+                    log::error!("Failed to add UDDF data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // Close the sender to signal no more messages
+        drop(sender);
+
+        // Process results from parallel loading
+        for (register_type, result) in receiver {
+            match (register_type, result) {
+                ("akm", Ok(data)) => {
+                    progress.set_main_message("Adding AKM data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    let current_year = chrono::Local::now().year();
+                    if let Err(e) = store_guard.add_akm_data(current_year, data) {
+                        log::error!("Failed to add AKM data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                ("bef", Ok(data)) => {
+                    progress.set_main_message("Adding BEF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_bef_data("current".to_string(), data) {
+                        log::error!("Failed to add BEF data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                ("ind", Ok(data)) => {
+                    progress.set_main_message("Adding IND data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    let current_year = chrono::Local::now().year();
+                    if let Err(e) = store_guard.add_ind_data(current_year, data) {
+                        log::error!("Failed to add IND data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                ("uddf", Ok(data)) => {
+                    progress.set_main_message("Adding UDDF data to store");
+                    let mut store_guard = store.lock().unwrap();
+                    if let Err(e) = store_guard.add_uddf_data("current".to_string(), data) {
+                        log::error!("Failed to add UDDF data: {e}");
+                    }
+                    progress.inc_main();
+                }
+                (register_type, Err(e)) => {
+                    log::error!("Error loading {register_type} data: {e}");
+                }
+                (unknown_type, Ok(_)) => {
+                    log::warn!("Received data for unknown register type: {unknown_type}");
+                }
+            }
+        }
+
+        // Wait for all threads to finish
+        for handle in handles {
+            let _ = handle.join();
+        }
+
+        progress.finish_main();
+
+        // Return the store
+        match Arc::try_unwrap(store) {
+            Ok(mutex) => Ok(mutex.into_inner().unwrap()),
+            Err(_) => Err(IdsError::invalid_operation(
+                "Failed to unwrap store from Arc".to_string(),
+            )),
+        }
+    }
+}
+</file>
+
+<file path="src/loaders/sequential.rs">
+use chrono::Datelike;
+use types::error::IdsError;
+use types::storage::arrow::backend::ArrowBackend as ArrowStore;
+
+use crate::config::RegisterPathConfig;
+use crate::loaders::StoreLoader;
+use crate::registry;
+use crate::ui::LoaderProgress;
+
+/// Sequential Register Loader implementation
+///
+/// This loader loads registers sequentially (one at a time), which is useful for:
+/// 1. Debugging - simpler execution flow makes issues easier to find
+/// 2. Reduced memory usage - loads one register at a time
+/// 3. Systems with limited resources - uses minimal threading
+pub struct SequentialLoader;
+
+impl Default for SequentialLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SequentialLoader {
+    /// Create a new `SequentialLoader` instance
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+impl StoreLoader for SequentialLoader {
+    fn load_from_path(&self, base_path: String) -> Result<ArrowStore, IdsError> {
+        log::info!("Loading register data sequentially from {base_path}");
+
+        // Create a progress tracker
+        let progress = LoaderProgress::new();
+        progress.set_main_message("Initializing data store");
+
+        // Create an empty store
+        let mut store = ArrowStore::new()?;
+
+        // Load family relations first (if they exist)
+        progress.set_main_message("Loading family relations");
+        if let Ok(families) = registry::load_family(&base_path, None) {
+            if let Err(e) = store.add_family_data(families) {
+                log::error!("Failed to add family data: {e}");
+            }
+            progress.inc_main();
+        }
+
+        // Load AKM data
+        progress.set_main_message("Loading annual register (AKM) data");
+        if let Ok(akm_data) = registry::load_akm(&base_path, None) {
+            // Default AKM year to current year
+            let current_year = chrono::Local::now().year();
+            if let Err(e) = store.add_akm_data(current_year, akm_data) {
+                log::error!("Failed to add AKM data: {e}");
+            }
+            progress.inc_main();
+        }
+
+        // Load BEF data
+        progress.set_main_message("Loading population register (BEF) data");
+        if let Ok(bef_data) = registry::load_bef(&base_path, None) {
+            // Default BEF period to "current" if missing
+            if let Err(e) = store.add_bef_data("current".to_string(), bef_data) {
+                log::error!("Failed to add BEF data: {e}");
+            }
+            progress.inc_main();
+        }
+
+        // Load IND data
+        progress.set_main_message("Loading individual register (IND) data");
+        if let Ok(ind_data) = registry::load_ind(&base_path, None) {
+            // Default IND year to current year
+            let current_year = chrono::Local::now().year();
+            if let Err(e) = store.add_ind_data(current_year, ind_data) {
+                log::error!("Failed to add IND data: {e}");
+            }
+            progress.inc_main();
+        }
+
+        // Load UDDF data
+        progress.set_main_message("Loading education register (UDDF) data");
+        if let Ok(uddf_data) = registry::load_uddf(&base_path, None) {
+            // Default UDDF period to "current" if missing
+            if let Err(e) = store.add_uddf_data("current".to_string(), uddf_data) {
+                log::error!("Failed to add UDDF data: {e}");
+            }
+            progress.inc_main();
+        }
+
+        progress.finish_main();
+        Ok(store)
+    }
+
+    fn load_with_custom_paths(&self, config: RegisterPathConfig) -> Result<ArrowStore, IdsError> {
+        log::info!("Loading register data sequentially with custom paths");
+
+        // Validate the config paths
+        config.validate()?;
+
+        // Resolve the paths
+        let paths = config.resolve_paths()?;
+
+        // Create a progress tracker
+        let progress = LoaderProgress::new();
+        progress.set_main_message("Initializing data store");
+
+        // Create an empty store
+        let mut store = ArrowStore::new()?;
+
+        // Load family relations first (if configured)
+        if let Some(family_path) = paths.get("family") {
+            progress.set_main_message("Loading family relations");
+            if let Ok(families) =
+                registry::load_family(family_path.to_str().unwrap_or_default(), None)
+            {
+                if let Err(e) = store.add_family_data(families) {
+                    log::error!("Failed to add family data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // Load AKM data
+        if let Some(akm_path) = paths.get("akm") {
+            progress.set_main_message("Loading annual register (AKM) data");
+            if let Ok(akm_data) = registry::load_akm(akm_path.to_str().unwrap_or_default(), None) {
+                // Default AKM year to current year
+                let current_year = chrono::Local::now().year();
+                if let Err(e) = store.add_akm_data(current_year, akm_data) {
+                    log::error!("Failed to add AKM data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // Load BEF data
+        if let Some(bef_path) = paths.get("bef") {
+            progress.set_main_message("Loading population register (BEF) data");
+            if let Ok(bef_data) = registry::load_bef(bef_path.to_str().unwrap_or_default(), None) {
+                // Default BEF period to "current" if missing
+                if let Err(e) = store.add_bef_data("current".to_string(), bef_data) {
+                    log::error!("Failed to add BEF data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // Load IND data
+        if let Some(ind_path) = paths.get("ind") {
+            progress.set_main_message("Loading individual register (IND) data");
+            if let Ok(ind_data) = registry::load_ind(ind_path.to_str().unwrap_or_default(), None) {
+                // Default IND year to current year
+                let current_year = chrono::Local::now().year();
+                if let Err(e) = store.add_ind_data(current_year, ind_data) {
+                    log::error!("Failed to add IND data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        // Load UDDF data
+        if let Some(uddf_path) = paths.get("uddf") {
+            progress.set_main_message("Loading education register (UDDF) data");
+            if let Ok(uddf_data) = registry::load_uddf(uddf_path.to_str().unwrap_or_default(), None)
+            {
+                // Default UDDF period to "current" if missing
+                if let Err(e) = store.add_uddf_data("current".to_string(), uddf_data) {
+                    log::error!("Failed to add UDDF data: {e}");
+                }
+                progress.inc_main();
+            }
+        }
+
+        progress.finish_main();
+        Ok(store)
+    }
+}
+</file>
+
+<file path="src/readers/custom_path.rs">
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
+use std::collections::HashSet;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use crate::readers::DataReader;
+use crate::schema;
+
+/// Reader for custom specified data paths
+///
+/// This reader is designed to work with data in custom locations.
+/// Instead of using conventional locations, it allows specifying exact file paths.
+pub struct CustomPathReader {
+    // The base path is used for building relative paths if needed
+    #[allow(dead_code)]
+    base_path: PathBuf,
+    akm_path: Option<PathBuf>,
+    bef_path: Option<PathBuf>,
+    ind_path: Option<PathBuf>,
+    uddf_path: Option<PathBuf>,
+    family_path: Option<PathBuf>,
+}
+
+impl CustomPathReader {
+    /// Create a new `CustomPathReader` with the given base path and custom paths
+    ///
+    /// # Arguments
+    /// * `base_path` - The base directory for relative paths
+    /// * `paths` - A map of register names to paths
+    ///
+    /// # Returns
+    /// A new `CustomPathReader` instance
+    #[must_use] pub fn new(base_path: &Path, paths: std::collections::HashMap<String, PathBuf>) -> Self {
+        log::debug!(
+            "Creating CustomPathReader with base path: {}",
+            base_path.display()
+        );
+
+        let akm_path = paths.get("akm").map(|p| base_path.join(p));
+        let bef_path = paths.get("bef").map(|p| base_path.join(p));
+        let ind_path = paths.get("ind").map(|p| base_path.join(p));
+        let uddf_path = paths.get("uddf").map(|p| base_path.join(p));
+        let family_path = paths.get("family").map(|p| base_path.join(p));
+
+        log::debug!("AKM path: {akm_path:?}");
+        log::debug!("BEF path: {bef_path:?}");
+        log::debug!("IND path: {ind_path:?}");
+        log::debug!("UDDF path: {uddf_path:?}");
+        log::debug!("Family path: {family_path:?}");
+
+        Self {
+            base_path: base_path.to_path_buf(),
+            akm_path,
+            bef_path,
+            ind_path,
+            uddf_path,
+            family_path,
+        }
+    }
+
+    /// Check if file exists and is accessible
+    fn check_file(&self, path: &Path) -> Result<(), IdsError> {
+        if !path.exists() {
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("File not found: {}", path.display()),
+            )));
+        }
+
+        if !path.is_file() {
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Path is not a file: {}", path.display()),
+            )));
+        }
+
+        // Check if file can be opened
+        match File::open(path) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!("Failed to open file {}: {}", path.display(), e);
+                Err(IdsError::Io(e))
+            }
+        }
+    }
+}
+
+impl DataReader for CustomPathReader {
+    fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError> {
+        log::info!("CustomPathReader attempting to read {}", path.display());
+
+        if !path.exists() {
+            // Be more explicit about missing files
+            log::warn!("File does not exist: {}", path.display());
+            log::debug!(" File does not exist: {}", path.display());
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("File not found: {}", path.display()),
+            )));
+        }
+
+        if !path.is_file() {
+            log::warn!("Path exists but is not a file: {}", path.display());
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Path is not a file: {}", path.display()),
+            )));
+        }
+
+        // Check if file can be opened
+        match File::open(path) {
+            Ok(_) => {
+                log::debug!("File {} can be opened", path.display());
+            }
+            Err(e) => {
+                log::error!("Failed to open file {}: {}", path.display(), e);
+                log::debug!(" Failed to open file: {e}");
+                return Err(IdsError::Io(e));
+            }
+        }
+
+        log::info!(
+            "File exists and is readable, loading parquet from {}",
+            path.display()
+        );
+
+        match crate::formats::parquet::read_parquet(path, Some(schema), None, None) {
+            Ok(batches) => {
+                log::info!(
+                    "Successfully read {} batches from {}",
+                    batches.len(),
+                    path.display()
+                );
+                Ok(batches)
+            }
+            Err(e) => {
+                log::error!("Error reading parquet file {}: {}", path.display(), e);
+                Err(e)
+            }
+        }
+    }
+
+    fn read_batches_with_filter(
+        &self,
+        path: &Path,
+        schema: &Schema,
+        pnr_filter: &HashSet<String>,
+    ) -> Result<Vec<RecordBatch>, IdsError> {
+        log::info!(
+            "CustomPathReader attempting to read {} with PNR filter",
+            path.display()
+        );
+
+        if !path.exists() {
+            log::warn!("File does not exist: {}", path.display());
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("File not found: {}", path.display()),
+            )));
+        }
+
+        if !path.is_file() {
+            log::warn!("Path exists but is not a file: {}", path.display());
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Path is not a file: {}", path.display()),
+            )));
+        }
+
+        // Check if file can be opened
+        match File::open(path) {
+            Ok(_) => {
+                log::debug!("File {} can be opened", path.display());
+            }
+            Err(e) => {
+                log::error!("Failed to open file {}: {}", path.display(), e);
+                return Err(IdsError::Io(e));
+            }
+        }
+
+        log::info!("Loading parquet with PNR filter from {}", path.display());
+
+        match crate::formats::parquet::read_parquet_with_filter(
+            path,
+            Some(schema),
+            pnr_filter,
+            None,
+        ) {
+            Ok(batches) => {
+                log::info!(
+                    "Successfully read {} batches from {} with PNR filter",
+                    batches.len(),
+                    path.display()
+                );
+                Ok(batches)
+            }
+            Err(e) => {
+                log::error!(
+                    "Error reading parquet file with filter {}: {}",
+                    path.display(),
+                    e
+                );
+                Err(e)
+            }
+        }
+    }
+
+    fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
+        log::info!("Reading AKM data for year {year}");
+
+        let path = match &self.akm_path {
+            Some(p) => p.clone(),
+            None => {
+                return Err(IdsError::config("AKM path not configured for this reader"));
+            }
+        };
+
+        self.check_file(&path)?;
+        self.read_batches(&path, &schema::akm_schema())
+    }
+
+    fn read_bef(&self, year: i32, quarter: Option<i32>) -> Result<Vec<RecordBatch>, IdsError> {
+        match quarter {
+            Some(q) => log::info!("Reading BEF data for year {year}, quarter {q}"),
+            None => log::info!("Reading BEF data for year {year}"),
+        }
+
+        let path = match &self.bef_path {
+            Some(p) => p.clone(),
+            None => {
+                return Err(IdsError::config("BEF path not configured for this reader"));
+            }
+        };
+
+        self.check_file(&path)?;
+        self.read_batches(&path, &schema::bef_schema())
+    }
+
+    fn read_ind(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
+        log::info!("Reading IND data for year {year}");
+
+        let path = match &self.ind_path {
+            Some(p) => p.clone(),
+            None => {
+                return Err(IdsError::config("IND path not configured for this reader"));
+            }
+        };
+
+        self.check_file(&path)?;
+        self.read_batches(&path, &schema::ind_schema())
+    }
+
+    fn read_uddf(&self, period: &str) -> Result<Vec<RecordBatch>, IdsError> {
+        log::info!("Reading UDDF data for period {period}");
+
+        let path = match &self.uddf_path {
+            Some(p) => p.clone(),
+            None => {
+                return Err(IdsError::config("UDDF path not configured for this reader"));
+            }
+        };
+
+        self.check_file(&path)?;
+        self.read_batches(&path, &schema::uddf_schema())
+    }
+
+    fn read_family(&self) -> Result<Vec<RecordBatch>, IdsError> {
+        log::info!("Reading family relation data");
+
+        let path = match &self.family_path {
+            Some(p) => p.clone(),
+            None => {
+                return Err(IdsError::config(
+                    "Family path not configured for this reader",
+                ));
+            }
+        };
+
+        self.check_file(&path)?;
+        self.read_batches(&path, &schema::family_schema())
+    }
+}
+</file>
+
+<file path="src/readers/file.rs">
+use crate::readers::DataReader;
+use crate::schema;
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
+use std::collections::HashSet;
+use std::path::Path;
+use types::error::IdsError;
+
+/// File-based data reader implementation
+///
+/// Provides concrete methods for reading different types of data from file system
+pub struct FileReader {
+    base_path: String,
+}
+
+impl FileReader {
+    /// Create a new `FileReader` with a specified base path
+    ///
+    /// # Arguments
+    /// * `base_path` - Root directory containing data files
+    #[must_use]
+    pub const fn new(base_path: String) -> Self {
+        Self { base_path }
+    }
+}
+
+impl DataReader for FileReader {
+    fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError> {
+        // Get the absolute path for better diagnostics
+        let absolute_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        log::debug!(
+            "FileReader attempting to access file: {}",
+            absolute_path.display()
+        );
+        log::debug!("Checking if exists: {}", path.exists());
+
+        if !path.exists() {
+            log::warn!("File does not exist: {}", path.display());
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("File not found: {}", path.display()),
+            )));
+        }
+
+        log::debug!("Reading batches from {}", path.display());
+        let batches = match crate::formats::parquet::read_parquet(path, Some(schema), None, None) {
+            Ok(b) => {
+                log::debug!(
+                    "Successfully read {} batches from {}",
+                    b.len(),
+                    path.display()
+                );
+                b
+            }
+            Err(e) => {
+                log::debug!("Error reading parquet file {}: {}", path.display(), e);
+                return Err(e);
+            }
+        };
+        Ok(batches)
+    }
+
+    fn read_batches_with_filter(
+        &self,
+        path: &Path,
+        schema: &Schema,
+        pnr_filter: &HashSet<String>,
+    ) -> Result<Vec<RecordBatch>, IdsError> {
+        // Get the absolute path for better diagnostics
+        let absolute_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        log::debug!(
+            "FileReader attempting to access file with filter: {}",
+            absolute_path.display()
+        );
+        log::debug!("Checking if exists: {}", path.exists());
+
+        if !path.exists() {
+            log::warn!("File does not exist: {}", path.display());
+            return Err(IdsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("File not found: {}", path.display()),
+            )));
+        }
+
+        log::debug!("Reading batches with PNR filter from {}", path.display());
+        let batches = match crate::formats::parquet::read_parquet_with_filter(
+            path,
+            Some(schema),
+            pnr_filter,
+            None,
+        ) {
+            Ok(b) => {
+                log::debug!(
+                    "Successfully read {} filtered batches from {}",
+                    b.len(),
+                    path.display()
+                );
+                b
+            }
+            Err(e) => {
+                log::debug!(
+                    "Error reading parquet file with filter {}: {}",
+                    path.display(),
+                    e
+                );
+                return Err(e);
+            }
+        };
+        Ok(batches)
+    }
+
+    fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
+        let path = Path::new(&self.base_path)
+            .join("akm")
+            .join(format!("{year}.parquet"));
+        self.read_batches(&path, &schema::akm_schema())
+    }
+
+    fn read_bef(&self, year: i32, quarter: Option<i32>) -> Result<Vec<RecordBatch>, IdsError> {
+        let filename = match quarter {
+            Some(q) => format!("{}{:02}.parquet", year, q * 3),
+            None => format!("{year}12.parquet"),
+        };
+        let path = Path::new(&self.base_path).join("bef").join(filename);
+        self.read_batches(&path, &schema::bef_schema())
+    }
+
+    fn read_ind(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError> {
+        let path = Path::new(&self.base_path)
+            .join("ind")
+            .join(format!("{year}.parquet"));
+        self.read_batches(&path, &schema::ind_schema())
+    }
+
+    fn read_uddf(&self, period: &str) -> Result<Vec<RecordBatch>, IdsError> {
+        let path = Path::new(&self.base_path)
+            .join("uddf")
+            .join(format!("{period}.parquet"));
+        self.read_batches(&path, &schema::uddf_schema())
+    }
+
+    fn read_family(&self) -> Result<Vec<RecordBatch>, IdsError> {
+        let path = Path::new(&self.base_path).join("family.parquet");
+        log::debug!(
+            "FileReader attempting to read family.parquet from: {}",
+            path.display()
+        );
+        self.read_batches(&path, &schema::family_schema())
+    }
+}
+</file>
+
+<file path="src/readers/mod.rs">
+mod custom_path;
+mod file;
+
+pub use custom_path::CustomPathReader;
+pub use file::FileReader;
+
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
+use std::collections::HashSet;
+use std::path::Path;
+use types::error::IdsError;
+
+/// Trait defining methods for reading different types of data records
+///
+/// This trait provides an abstraction for reading various data types from different sources,
+/// supporting different file formats and data categories.
+pub trait DataReader {
+    /// Read record batches from a given file path with a specified schema
+    ///
+    /// # Arguments
+    /// * `path` - Path to the file to be read
+    /// * `schema` - Schema defining the structure of the data
+    ///
+    /// # Returns
+    /// A vector of `RecordBatches` or an error
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_batches(&self, path: &Path, schema: &Schema) -> Result<Vec<RecordBatch>, IdsError>;
+
+    /// Read record batches with PNR filtering
+    ///
+    /// # Arguments
+    /// * `path` - Path to the file to be read
+    /// * `schema` - Schema defining the structure of the data
+    /// * `pnr_filter` - Set of PNRs to filter by
+    ///
+    /// # Returns
+    /// A vector of filtered `RecordBatches` or an error
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_batches_with_filter(
+        &self,
+        path: &Path,
+        schema: &Schema,
+        pnr_filter: &HashSet<String>,
+    ) -> Result<Vec<RecordBatch>, IdsError>;
+
+    /// Read Annual Register (AKM) data for a specific year
+    ///
+    /// # Arguments
+    /// * `year` - The year of data to read
+    ///
+    /// # Returns
+    /// A vector of `RecordBatches` containing AKM data
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_akm(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError>;
+
+    /// Read Population Register (BEF) data for a specific year, optionally with quarterly granularity
+    ///
+    /// # Arguments
+    /// * `year` - The year of data to read
+    /// * `quarter` - Optional quarter of the year
+    ///
+    /// # Returns
+    /// A vector of `RecordBatches` containing BEF data
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_bef(&self, year: i32, quarter: Option<i32>) -> Result<Vec<RecordBatch>, IdsError>;
+
+    /// Read Individual (IND) data for a specific year
+    ///
+    /// # Arguments
+    /// * `year` - The year of data to read
+    ///
+    /// # Returns
+    /// A vector of `RecordBatches` containing IND data
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_ind(&self, year: i32) -> Result<Vec<RecordBatch>, IdsError>;
+
+    /// Read Education Data (UDDF) for a specific period
+    ///
+    /// # Arguments
+    /// * `period` - The period of data to read (e.g., "202209")
+    ///
+    /// # Returns
+    /// A vector of `RecordBatches` containing UDDF data
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_uddf(&self, period: &str) -> Result<Vec<RecordBatch>, IdsError>;
+
+    /// Read Family Relations data
+    ///
+    /// # Returns
+    /// A vector of `RecordBatches` containing family relation data
+    ///
+    /// # Errors
+    /// Returns an error if reading fails
+    fn read_family(&self) -> Result<Vec<RecordBatch>, IdsError>;
+}
+</file>
+
+<file path="src/registry/akm.rs">
+use arrow::record_batch::RecordBatch;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use crate::formats::load_parquet_files_parallel;
+use crate::schema::akm_schema;
+use crate::ui::LoaderProgress;
+
+/// Load Annual Register (AKM) data from the given path
+///
+/// This function discovers and loads AKM (Annual Register) Parquet files
+/// from the specified directory.
+///
+/// # Arguments
+/// * `base_path` - Path to the directory containing AKM data
+/// * `pnr_filter` - Optional set of PNRs to filter the data by
+///
+/// # Returns
+/// A vector of `RecordBatches` containing AKM data or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The path doesn't exist
+/// - The files can't be parsed as Parquet
+/// - The data doesn't match the expected schema
+pub fn load_akm(
+    base_path: &str,
+    pnr_filter: Option<&HashSet<String>>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!("Loading AKM data from {base_path}");
+
+    // Create a progress tracker
+    let progress = LoaderProgress::new();
+    progress.set_main_message("Loading AKM data");
+
+    // Normalize path handling for both directory and file scenarios
+    let path = Path::new(base_path);
+
+    // Determine the actual path to search
+    let akm_path = if path.is_dir() {
+        // Check for an "akm" subdirectory
+        let akm_dir = path.join("akm");
+        if akm_dir.exists() && akm_dir.is_dir() {
+            akm_dir
+        } else {
+            // Check for a "registers" subdirectory with "akm" under it
+            let registers_akm = path.join("registers").join("akm");
+            if registers_akm.exists() && registers_akm.is_dir() {
+                registers_akm
+            } else {
+                // Fallback to the base path
+                path.to_path_buf()
+            }
+        }
+    } else {
+        // If path is a file, use its parent directory
+        path.parent().map_or_else(|| PathBuf::from("."), PathBuf::from)
+    };
+
+    // Get the schema for AKM data
+    let schema = akm_schema();
+
+    // Load the Parquet files
+    let batches = if akm_path.is_dir() {
+        load_parquet_files_parallel(&akm_path, Some(&schema), pnr_filter, Some(&progress))?
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
+        // If the path is a direct Parquet file
+        crate::formats::read_parquet(path, Some(&schema), Some(&progress), pnr_filter)?
+    } else {
+        log::warn!("No AKM data found at {base_path}");
+        Vec::new()
+    };
+
+    log::info!("Loaded {} record batches of AKM data", batches.len());
+    Ok(batches)
+}
+</file>
+
+<file path="src/registry/bef.rs">
+use arrow::record_batch::RecordBatch;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use crate::formats::load_parquet_files_parallel;
+use crate::schema::bef_schema;
+use crate::ui::LoaderProgress;
+
+/// Load Population Register (BEF) data from the given path
+///
+/// This function discovers and loads BEF (Population Register) Parquet files
+/// from the specified directory.
+///
+/// # Arguments
+/// * `base_path` - Path to the directory containing BEF data
+/// * `pnr_filter` - Optional set of PNRs to filter the data by
+///
+/// # Returns
+/// A vector of `RecordBatches` containing BEF data or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The path doesn't exist
+/// - The files can't be parsed as Parquet
+/// - The data doesn't match the expected schema
+pub fn load_bef(
+    base_path: &str,
+    pnr_filter: Option<&HashSet<String>>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!("Loading BEF data from {base_path}");
+
+    // Create a progress tracker
+    let progress = LoaderProgress::new();
+    progress.set_main_message("Loading BEF data");
+
+    // Normalize path handling for both directory and file scenarios
+    let path = Path::new(base_path);
+
+    // Determine the actual path to search
+    let bef_path = if path.is_dir() {
+        // Check for a "bef" subdirectory
+        let bef_dir = path.join("bef");
+        if bef_dir.exists() && bef_dir.is_dir() {
+            bef_dir
+        } else {
+            // Check for a "registers" subdirectory with "bef" under it
+            let registers_bef = path.join("registers").join("bef");
+            if registers_bef.exists() && registers_bef.is_dir() {
+                registers_bef
+            } else {
+                // Fallback to the base path
+                path.to_path_buf()
+            }
+        }
+    } else {
+        // If path is a file, use its parent directory
+        path.parent().map_or_else(|| PathBuf::from("."), PathBuf::from)
+    };
+
+    // Get the schema for BEF data
+    let schema = bef_schema();
+
+    // Load the Parquet files
+    let batches = if bef_path.is_dir() {
+        load_parquet_files_parallel(&bef_path, Some(&schema), pnr_filter, Some(&progress))?
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
+        // If the path is a direct Parquet file
+        crate::formats::read_parquet(path, Some(&schema), Some(&progress), pnr_filter)?
+    } else {
+        log::warn!("No BEF data found at {base_path}");
+        Vec::new()
+    };
+
+    log::info!("Loaded {} record batches of BEF data", batches.len());
+    Ok(batches)
+}
+</file>
+
+<file path="src/registry/family.rs">
+use arrow::record_batch::RecordBatch;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use crate::formats::read_parquet;
+use crate::schema::family_schema;
+use crate::ui::LoaderProgress;
+
+/// Load Family Relations data from the given path
+///
+/// This function discovers and loads Family Relations Parquet file
+/// from the specified directory.
+///
+/// # Arguments
+/// * `base_path` - Path to the directory containing family relation data
+/// * `pnr_filter` - Optional set of PNRs to filter the data by
+///
+/// # Returns
+/// A vector of `RecordBatches` containing family relation data or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The path doesn't exist
+/// - The file can't be parsed as Parquet
+/// - The data doesn't match the expected schema
+pub fn load_family(
+    base_path: &str,
+    pnr_filter: Option<&HashSet<String>>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!("Loading family relation data from {base_path}");
+
+    // Create a progress tracker
+    let progress = LoaderProgress::new();
+    progress.set_main_message("Loading family relation data");
+
+    // Normalize path handling
+    let path = Path::new(base_path);
+
+    // Try to find the family file in different possible locations
+    let family_file = if path.is_dir() {
+        // Check for a family.parquet directly in the base path
+        let direct_file = path.join("family.parquet");
+        if direct_file.exists() && direct_file.is_file() {
+            direct_file
+        } else {
+            // Check for a "family" subdirectory with "family.parquet" in it
+            let family_dir_file = path.join("family").join("family.parquet");
+            if family_dir_file.exists() && family_dir_file.is_file() {
+                family_dir_file
+            } else {
+                // Check for a "registers" subdirectory
+                let registers_file = path.join("registers").join("family").join("family.parquet");
+                if registers_file.exists() && registers_file.is_file() {
+                    registers_file
+                } else {
+                    PathBuf::from(base_path)
+                }
+            }
+        }
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
+        // If the path is directly to a Parquet file
+        path.to_path_buf()
+    } else {
+        PathBuf::from(base_path)
+    };
+
+    // Get the schema for family data
+    let schema = family_schema();
+
+    // Load the Parquet file
+    let batches =
+        if family_file.exists() && family_file.extension().is_some_and(|ext| ext == "parquet") {
+            read_parquet(&family_file, Some(&schema), Some(&progress), pnr_filter)?
+        } else {
+            log::warn!("No family relation data found at {base_path}");
+            Vec::new()
+        };
+
+    log::info!(
+        "Loaded {} record batches of family relation data",
+        batches.len()
+    );
+    Ok(batches)
+}
+</file>
+
+<file path="src/registry/ind.rs">
+use arrow::record_batch::RecordBatch;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use crate::formats::load_parquet_files_parallel;
+use crate::schema::ind_schema;
+use crate::ui::LoaderProgress;
+
+/// Load Individual Register (IND) data from the given path
+///
+/// This function discovers and loads IND (Individual Register) Parquet files
+/// from the specified directory.
+///
+/// # Arguments
+/// * `base_path` - Path to the directory containing IND data
+/// * `pnr_filter` - Optional set of PNRs to filter the data by
+///
+/// # Returns
+/// A vector of `RecordBatches` containing IND data or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The path doesn't exist
+/// - The files can't be parsed as Parquet
+/// - The data doesn't match the expected schema
+pub fn load_ind(
+    base_path: &str,
+    pnr_filter: Option<&HashSet<String>>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!("Loading IND data from {base_path}");
+
+    // Create a progress tracker
+    let progress = LoaderProgress::new();
+    progress.set_main_message("Loading IND data");
+
+    // Normalize path handling for both directory and file scenarios
+    let path = Path::new(base_path);
+
+    // Determine the actual path to search
+    let ind_path = if path.is_dir() {
+        // Check for an "ind" subdirectory
+        let ind_dir = path.join("ind");
+        if ind_dir.exists() && ind_dir.is_dir() {
+            ind_dir
+        } else {
+            // Check for a "registers" subdirectory with "ind" under it
+            let registers_ind = path.join("registers").join("ind");
+            if registers_ind.exists() && registers_ind.is_dir() {
+                registers_ind
+            } else {
+                // Fallback to the base path
+                path.to_path_buf()
+            }
+        }
+    } else {
+        // If path is a file, use its parent directory
+        path.parent().map_or_else(|| PathBuf::from("."), PathBuf::from)
+    };
+
+    // Get the schema for IND data
+    let schema = ind_schema();
+
+    // Load the Parquet files
+    let batches = if ind_path.is_dir() {
+        load_parquet_files_parallel(&ind_path, Some(&schema), pnr_filter, Some(&progress))?
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
+        // If the path is a direct Parquet file
+        crate::formats::read_parquet(path, Some(&schema), Some(&progress), pnr_filter)?
+    } else {
+        log::warn!("No IND data found at {base_path}");
+        Vec::new()
+    };
+
+    log::info!("Loaded {} record batches of IND data", batches.len());
+    Ok(batches)
+}
+</file>
+
+<file path="src/registry/mod.rs">
+mod akm;
+mod bef;
+mod family;
+mod ind;
+mod uddf;
+
+pub use akm::load_akm;
+pub use bef::load_bef;
+pub use family::load_family;
+pub use ind::load_ind;
+pub use uddf::load_uddf;
+</file>
+
+<file path="src/registry/uddf.rs">
+use arrow::record_batch::RecordBatch;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use types::error::IdsError;
+
+use crate::formats::load_parquet_files_parallel;
+use crate::schema::uddf_schema;
+use crate::ui::LoaderProgress;
+
+/// Load Education Register (UDDF) data from the given path
+///
+/// This function discovers and loads UDDF (Education Register) Parquet files
+/// from the specified directory.
+///
+/// # Arguments
+/// * `base_path` - Path to the directory containing UDDF data
+/// * `pnr_filter` - Optional set of PNRs to filter the data by
+///
+/// # Returns
+/// A vector of `RecordBatches` containing UDDF data or an error
+///
+/// # Errors
+/// Returns an error if:
+/// - The path doesn't exist
+/// - The files can't be parsed as Parquet
+/// - The data doesn't match the expected schema
+pub fn load_uddf(
+    base_path: &str,
+    pnr_filter: Option<&HashSet<String>>,
+) -> Result<Vec<RecordBatch>, IdsError> {
+    log::info!("Loading UDDF data from {base_path}");
+
+    // Create a progress tracker
+    let progress = LoaderProgress::new();
+    progress.set_main_message("Loading UDDF data");
+
+    // Normalize path handling for both directory and file scenarios
+    let path = Path::new(base_path);
+
+    // Determine the actual path to search
+    let uddf_path = if path.is_dir() {
+        // Check for a "uddf" subdirectory
+        let uddf_dir = path.join("uddf");
+        if uddf_dir.exists() && uddf_dir.is_dir() {
+            uddf_dir
+        } else {
+            // Check for a "registers" subdirectory with "uddf" under it
+            let registers_uddf = path.join("registers").join("uddf");
+            if registers_uddf.exists() && registers_uddf.is_dir() {
+                registers_uddf
+            } else {
+                // Fallback to the base path
+                path.to_path_buf()
+            }
+        }
+    } else {
+        // If path is a file, use its parent directory
+        path.parent().map_or_else(|| PathBuf::from("."), PathBuf::from)
+    };
+
+    // Get the schema for UDDF data
+    let schema = uddf_schema();
+
+    // Load the Parquet files
+    let batches = if uddf_path.is_dir() {
+        load_parquet_files_parallel(&uddf_path, Some(&schema), pnr_filter, Some(&progress))?
+    } else if path.exists() && path.extension().is_some_and(|ext| ext == "parquet") {
+        // If the path is a direct Parquet file
+        crate::formats::read_parquet(path, Some(&schema), Some(&progress), pnr_filter)?
+    } else {
+        log::warn!("No UDDF data found at {base_path}");
+        Vec::new()
+    };
+
+    log::info!("Loaded {} record batches of UDDF data", batches.len());
+    Ok(batches)
+}
+</file>
+
+<file path="src/schema/akm.rs">
+use arrow_schema::{DataType, Field, Schema};
+
+/// Defines the schema for Annual Register (AKM) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Various employment and occupation fields (nullable)
+///
+/// This schema matches the format in the actual parquet files
+/// Converted from the Polars datatypes in schemas.py to Arrow datatypes
+#[must_use]
+pub fn akm_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("PNR", DataType::Utf8, false),
+        Field::new("SOCIO", DataType::Int32, true),
+        Field::new("SOCIO02", DataType::Int32, true),
+        Field::new("SOCIO13", DataType::Int32, false),
+        Field::new("CPRTJEK", DataType::Int32, true),
+        Field::new("CPRTYPE", DataType::Int32, true),
+        Field::new("VERSION", DataType::Utf8, true),
+        Field::new("SENR", DataType::Utf8, true),
+    ])
+}
+</file>
+
+<file path="src/schema/bef.rs">
+use arrow_schema::{DataType, Field, Schema};
+
+/// Defines the schema for Population Register (BEF) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Various demographic fields (nullable)
+///
+/// This schema matches the format in the actual parquet files
+/// Converted from the Polars datatypes in schemas.py to Arrow datatypes
+#[must_use]
+pub fn bef_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("PNR", DataType::Utf8, false),
+        Field::new("AEGTE_ID", DataType::Utf8, true),
+        Field::new("ALDER", DataType::Utf8, false),
+        Field::new("ANTBOERNF", DataType::Int32, true),
+        Field::new("ANTBOERNH", DataType::Int32, true),
+        Field::new("ANTPERSF", DataType::Int32, true),
+        Field::new("ANTPERSH", DataType::Int32, true),
+        Field::new("BOP_VFRA", DataType::Date32, true),
+        Field::new("CIVST", DataType::Utf8, true),
+        Field::new("FAMILIE_ID", DataType::Utf8, true),
+        Field::new("FAMILIE_TYPE", DataType::Int32, true),
+        Field::new("FAR_ID", DataType::Utf8, true),
+        Field::new("FOED_DAG", DataType::Date32, false),
+        Field::new("KOEN", DataType::Utf8, false),
+        Field::new("KOM", DataType::Int32, true),
+        Field::new("MOR_ID", DataType::Utf8, true),
+        Field::new("STATSB", DataType::Utf8, true),
+    ])
+}
+</file>
+
+<file path="src/schema/family.rs">
+use arrow_schema::{DataType, Field, Schema};
+
+/// Defines the schema for Family Relations data
+///
+/// # Fields
+/// - `PERSON_PNR`: Personal identifier of the person (non-nullable)
+/// - `RELATION_PNR`: Personal identifier of the related person (non-nullable)
+/// - `RELATION_TYPE`: Type of relation (non-nullable)
+#[must_use]
+pub fn family_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("PERSON_PNR", DataType::Utf8, false),
+        Field::new("RELATION_PNR", DataType::Utf8, false),
+        Field::new("RELATION_TYPE", DataType::Int32, false),
+    ])
+}
+</file>
+
+<file path="src/schema/ind.rs">
+use arrow_schema::{DataType, Field, Schema};
+
+/// Defines the schema for Individual Register (IND) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Various individual income and socioeconomic fields (nullable)
+///
+/// This schema matches the format in the actual parquet files
+/// Converted from the Polars datatypes in schemas.py to Arrow datatypes
+#[must_use]
+pub fn ind_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("PNR", DataType::Utf8, false),
+        Field::new("BESKST13", DataType::Int32, true),
+        Field::new("LOENMV_13", DataType::Float64, true),
+        Field::new("PERINDKIALT_13", DataType::Float64, true),
+        Field::new("PRE_SOCIO", DataType::Int32, true),
+    ])
+}
+</file>
+
+<file path="src/schema/mod.rs">
+mod akm;
+mod bef;
+mod family;
+mod ind;
+mod uddf;
+mod utils;
+
+pub use akm::akm_schema;
+pub use bef::bef_schema;
+pub use family::family_schema;
+pub use ind::ind_schema;
+pub use uddf::uddf_schema;
+</file>
+
+<file path="src/schema/uddf.rs">
+use arrow_schema::{DataType, Field, Schema};
+
+/// Defines the schema for Education Register (UDDF) data
+///
+/// # Fields
+/// - `PNR`: Unique personal identifier (non-nullable)
+/// - Various education fields (nullable)
+///
+/// This schema matches the format in the actual parquet files
+/// Converted from the Polars datatypes in schemas.py to Arrow datatypes
+#[must_use]
+pub fn uddf_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("PNR", DataType::Utf8, false),
+        Field::new("HFAUDD", DataType::Utf8, true),
+        Field::new("HF_VFRA", DataType::Date32, true),
+        Field::new("HF_VTIL", DataType::Date32, true),
+        Field::new("INSTNR", DataType::Int32, true),
+    ])
+}
+</file>
+
+<file path="src/schema/utils.rs">
+use arrow_schema::{Field, Schema};
+
+/// Convert a Schema to a vector of Fields
+///
+/// This is a utility function for when you need to work with the fields
+/// directly, rather than the schema as a whole.
+///
+/// # Arguments
+/// * `schema` - The schema to convert
+///
+/// # Returns
+/// A vector of Field objects from the schema
+#[must_use]
+#[allow(dead_code)]
+pub fn schema_to_fields(schema: &Schema) -> Vec<Field> {
+    schema.fields().iter().map(|f| f.as_ref().clone()).collect()
+}
+
+/// Check if a schema contains a specific field
+///
+/// # Arguments
+/// * `schema` - The schema to check
+/// * `field_name` - The name of the field to look for
+///
+/// # Returns
+/// True if the field exists, false otherwise
+#[must_use]
+#[allow(dead_code)]
+pub fn schema_has_field(schema: &Schema, field_name: &str) -> bool {
+    schema.field_with_name(field_name).is_ok()
+}
+
+/// Get the position of a field in a schema
+///
+/// # Arguments
+/// * `schema` - The schema to check
+/// * `field_name` - The name of the field to look for
+///
+/// # Returns
+/// The position of the field, or None if it doesn't exist
+#[must_use]
+#[allow(dead_code)]
+pub fn schema_field_position(schema: &Schema, field_name: &str) -> Option<usize> {
+    schema.fields().iter().position(|f| f.name() == field_name)
+}
+</file>
+
+<file path="src/ui/console.rs">
+/// Print a section header to the console
+///
+/// # Arguments
+/// * `title` - The title for the section
+pub fn print_section(title: &str) {
+    let line = "=".repeat(title.len() + 8);
+    println!("\n{line}");
+    println!("    {title}    ");
+    println!("{line}\n");
+}
+
+/// Print a success message to the console
+///
+/// # Arguments
+/// * `message` - The success message
+pub fn print_success(message: &str) {
+    println!("✅ {message}");
+}
+
+/// Print a warning message to the console
+///
+/// # Arguments
+/// * `message` - The warning message
+pub fn print_warning(message: &str) {
+    println!("⚠️ {message}");
+}
+</file>
+
+<file path="src/ui/mod.rs">
+pub mod console;
+mod progress;
+
+pub use progress::LoaderProgress;
+</file>
+
+<file path="src/ui/progress.rs">
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use std::path::Path;
+
+/// Progress tracking for data loading operations
+pub struct LoaderProgress {
+    multi_progress: MultiProgress,
+    main_pb: ProgressBar,
+    sub_pb: Option<ProgressBar>,
+}
+
+impl Default for LoaderProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LoaderProgress {
+    /// Create a new progress tracker
+    #[must_use] pub fn new() -> Self {
+        let multi_progress = MultiProgress::new();
+        let main_style = ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+            .expect("Failed to create progress bar template - this is a static template that should never fail");
+
+        let main_pb = multi_progress.add(ProgressBar::new(5));
+        main_pb.set_style(main_style);
+        main_pb.set_prefix("Overall Progress");
+
+        Self {
+            multi_progress,
+            main_pb,
+            sub_pb: None,
+        }
+    }
+
+    /// Create a progress bar for tracking file loading progress
+    #[must_use] pub fn create_file_progress(&self, size: u64, filename: &str) -> ProgressBar {
+        let style = ProgressStyle::default_bar()
+                .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.yellow/red} {bytes}/{total_bytes} ({percent}%) {msg}")
+                .expect("Failed to create progress bar template - this is a static template that should never fail")
+                .progress_chars("█▇▆▅▄▃▂▁  ");
+
+        let pb = self.multi_progress.add(ProgressBar::new(size));
+        pb.set_style(style);
+        pb.set_prefix(filename.to_string());
+        pb
+    }
+
+    /// Start a sub-progress tracker for a specific operation
+    pub fn start_sub_progress(&mut self, total: u64, prefix: String) {
+        let style = ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.green/blue} {pos}/{len} ({percent}%) {msg}")
+            .expect("Failed to create progress bar template - this is a static template that should never fail");
+
+        let sub_pb = self.multi_progress.add(ProgressBar::new(total));
+        sub_pb.set_style(style);
+        sub_pb.set_prefix(prefix);
+        self.sub_pb = Some(sub_pb);
+    }
+
+    /// Start a sub-progress tracker for a specific file
+    pub fn start_file_progress(&mut self, path: &Path) -> ProgressBar {
+        let filename = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("unknown");
+
+        // Try to get file size for accurate progress
+        let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(1000);
+
+        self.create_file_progress(file_size, filename)
+    }
+
+    /// Start a batch progress tracker
+    pub fn start_batch_progress(&mut self, total_batches: u64, prefix: &str) {
+        let style = ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} [{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} batches ({percent}%)")
+            .expect("Failed to create progress bar template - this is a static template that should never fail");
+
+        let sub_pb = self.multi_progress.add(ProgressBar::new(total_batches));
+        sub_pb.set_style(style);
+        sub_pb.set_prefix(prefix.to_string());
+        self.sub_pb = Some(sub_pb);
+    }
+
+    /// Increment the main progress
+    pub fn inc_main(&self) {
+        self.main_pb.inc(1);
+    }
+
+    /// Increment the sub progress
+    pub fn inc_sub(&self) {
+        if let Some(pb) = &self.sub_pb {
+            pb.inc(1);
+        }
+    }
+
+    /// Set a message on the main progress
+    pub fn set_main_message(&self, msg: &str) {
+        self.main_pb.set_message(msg.to_string());
+    }
+
+    /// Set a message on the sub progress
+    pub fn set_sub_message(&self, msg: &str) {
+        if let Some(pb) = &self.sub_pb {
+            pb.set_message(msg.to_string());
+        }
+    }
+
+    /// Finish the main progress
+    pub fn finish_main(&self) {
+        self.main_pb.finish_with_message("Complete");
+    }
+
+    /// Finish the sub progress
+    pub fn finish_sub(&self) {
+        if let Some(pb) = &self.sub_pb {
+            pb.finish();
+        }
+    }
+
+    /// Finish all progress bars
+    pub fn finish(&self) {
+        self.finish_sub();
+        self.finish_main();
+    }
+}
+</file>
+
+<file path="src/lib.rs">
+// Root modules with public re-exports
+mod config;
+// All modules - make formats and registry public to support testing
+pub mod formats;
+mod loaders;
+mod readers;
+pub mod registry;
+mod schema;
+mod ui;
+
+// Re-export configuration related types
+pub use config::{
+    env::{get_batch_size, get_max_threads, should_use_family_filtering, use_parallel_loading},
+    LoaderConfig, RegisterPathConfig,
+};
+
+// Re-export core loader implementations
+pub use loaders::{ParallelLoader, SequentialLoader, StoreLoader};
+
+// Re-export reader related types
+pub use readers::{CustomPathReader, DataReader, FileReader};
+
+// Re-export UI related types
+pub use ui::{
+    console::{print_section, print_success, print_warning},
+    LoaderProgress,
+};
+
+// Re-export format utilities
+pub use formats::{load_parquet_files_parallel, read_parquet, read_parquet_with_filter};
+
+// Re-export registry loading functions
+pub use registry::{load_akm, load_bef, load_family, load_ind, load_uddf};
+
+// Re-export schema functions
+pub use schema::{akm_schema, bef_schema, family_schema, ind_schema, uddf_schema};
+
+// Re-export core types from types crate
+pub use types::{
+    error::IdsError, family::FamilyRelations, models::*,
+    storage::arrow::backend::ArrowBackend as ArrowStore, store::DataStore as UnifiedStore,
+    traits::Store,
+};
+</file>
+
+<file path="Cargo.toml">
+[package]
+name = "loader"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+schema_json = []
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+log.workspace = true
+arrow.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true
+arrow-select.workspace = true
+parquet.workspace = true
+indicatif.workspace = true
+types = { path = "../types" }
+rayon.workspace = true
+crossbeam-channel.workspace = true
+crossbeam-deque.workspace = true
+parking_lot.workspace = true
+num_cpus = "1.16.0"
+hashbrown.workspace = true
+regex = "1.10.3"
+lazy_static = { version = "1.4.0", optional = true }
+once_cell = "1.19.0"
+itertools = "0.14.0"
+
+[dev-dependencies]
+tempfile = "3.10.1"
+env_logger = "0.11.3"
+rand = "0.8.5"
+</file>
+
+</files>

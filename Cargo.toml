@@ -1,73 +1,38 @@
-[workspace]
-members = [
-    "crates/core",
-    "crates/ids",
-    "crates/covariates",
-    "crates/loader",
-    "crates/types",
-    "crates/utils",
-]
-
-# Set the resolver to version 2 as recommended
-resolver = "2"
-
-# Set workspace-wide configuration
-[workspace.package]
-version = "1.2.5"
+[package]
+name = "ids-rs"
+version = "0.1.0"
 edition = "2021"
-authors = ["Tobias Kragholm <tkragholm@gmail.com>"]
-description = "Incidence Density Sampling implementation in Rust"
+authors = ["IDS-RS Team"]
+description = "Integrated Data System for Research in Rust"
 
+[dependencies]
+# Error handling
+thiserror = "2.0.12"
 
-# Define shared development dependencies
-[workspace.dependencies]
+# Logging
 log = "0.4"
-env_logger = "0.10"
-chrono = { version = "0.4", features = ["serde"] }
-csv = "1.2"
-serde = { version = "1.0", features = ["derive"] }
-arrow = { version = "55.0.0", features = ["prettyprint"] }
-arrow-array = "55.0.0"
-arrow-schema = "55.0.0"
-arrow-select = "55.0.0"
-parquet = { version = "55.0.0", features = ["arrow"] }
-thiserror = "2.0.11"
-rayon = "1.10.0"
-indicatif = { version = "0.17.11", features = ["rayon"] }
-indicatif-log-bridge = "0.2.3"
-clap = { version = "4.5", features = ["derive"] }
-log4rs = { version = "1.2", features = ["console_appender"] }
-dashmap = "6.1.0"
-statrs = "0.18"
-rand = { version = "0.9.0", features = ["os_rng"] }           # Added os_rng feature
-rand_distr = "0.5.0"                                          # Updated to match core crate version
-smallvec = "1.13.2"
-serde_json = "1.0.139"
-colored = "3.0.0"                                             # Updated to match core crate version
-anyhow = "1.0"
-tempfile = "3.8.0"
 
-# Add all other dependencies used in at least one crate
-bit-vec = "0.8.0"
-crossbeam = "0.8.4"
-crossbeam-channel = "0.5.12"
-crossbeam-deque = "0.8.5"
-crossbeam-queue = "0.3.11"
-crossbeam-utils = "0.8.19"
-fastrand = "2.3.0"
-hashbrown = { version = "0.15.2", features = ["serde"] }
-humantime = "2.1.0"
-mimalloc = "0.1.43"
-ndarray = { version = "0.16.1", features = ["rayon"] }
-parking_lot = "0.12.3"
-plotters = "0.3.7"
-rustc-hash = "2.1.1"
+# Date handling
+chrono = "0.4"
 
-# Local crates
-utils = { path = "crates/utils" }
+# CLI
+clap = { version = "4.5.37", features = ["derive"] }
+colored = "3.0"
+indicatif = "0.17"
 
-[profile.release]
-lto = true
-codegen-units = 1
-panic = "abort"
-opt-level = 3
+# Data processing
+arrow = "55.0"
+parquet = "55.0"
+rayon = "1.8.0"
+
+# Utilities
+rand = "0.9.1"
+itertools = "0.14"
+
+[lib]
+name = "ids_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ids-rs"
+path = "src/main.rs"

@@ -1,0 +1,1452 @@
+<directory_structure>
+src/
+  utils/
+    console.rs
+  errors.rs
+  lib.rs
+  matching_quality.rs
+  sampler.rs
+  utils.rs
+Cargo.toml
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/utils/console.rs">
+use colored::{ColoredString, Colorize};
+
+/// Console output utilities for structured information display
+pub struct ConsoleOutput;
+
+impl ConsoleOutput {
+    /// Print a section header
+    pub fn section(title: &str) {
+        println!("\n{}", title.green().bold());
+        println!("{}", "═".repeat(title.len()).green());
+    }
+
+    /// Print a subsection header
+    pub fn subsection(title: &str) {
+        println!("\n{}", title.blue().bold());
+        println!("{}", "─".repeat(title.len()).blue());
+    }
+
+    /// Print a key-value pair with optional formatting
+    pub fn key_value(key: &str, value: &str) {
+        println!("{}: {}", key.bold(), value);
+    }
+
+    /// Print a key-value pair with colored value
+    pub fn key_value_colored(key: &str, value: &str, success: bool) {
+        let colored_value = if success { value.green() } else { value.red() };
+        println!("{}: {}", key.bold(), colored_value);
+    }
+
+    /// Print a success message
+    pub fn success(message: &str) {
+        println!("{} {}", "✓".green().bold(), message);
+    }
+
+    /// Print an error message
+    pub fn error(message: &str) {
+        eprintln!("{} {}", "✗".red().bold(), message);
+    }
+
+    /// Print a warning message
+    pub fn warning(message: &str) {
+        println!("{} {}", "!".yellow().bold(), message);
+    }
+
+    /// Print an info message
+    pub fn info(message: &str) {
+        println!("{} {}", "ℹ".blue().bold(), message);
+    }
+
+    /// Format a percentage with appropriate color based on value
+    #[must_use]
+    pub fn format_percentage(value: f64) -> ColoredString {
+        let percentage = format!("{:.2}%", value * 100.0);
+        if value >= 0.9 {
+            percentage.green()
+        } else if value >= 0.7 {
+            percentage.yellow()
+        } else {
+            percentage.red()
+        }
+    }
+
+    /// Format a number with appropriate units (K, M, B)
+    #[must_use]
+    pub fn format_number(num: usize) -> String {
+        if num < 1_000 {
+            num.to_string()
+        } else if num < 1_000_000 {
+            format!("{:.2}K", num as f64 / 1_000.0)
+        } else if num < 1_000_000_000 {
+            format!("{:.2}M", num as f64 / 1_000_000.0)
+        } else {
+            format!("{:.2}B", num as f64 / 1_000_000_000.0)
+        }
+    }
+
+    /// Print a progress status
+    pub fn status(step: usize, total: usize, description: &str) {
+        let progress = format!("[{step}/{total}]").blue();
+        println!("{progress} {description}");
+    }
+
+    /// Print a table with headers and rows
+    pub fn table(headers: &[&str], rows: &[Vec<String>]) {
+        // Determine column widths
+        let mut widths = headers.iter().map(|h| h.len()).collect::<Vec<_>>();
+
+        for row in rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < widths.len() {
+                    widths[i] = widths[i].max(cell.len());
+                }
+            }
+        }
+
+        // Print headers
+        print!("│ ");
+        for (i, header) in headers.iter().enumerate() {
+            let padding = " ".repeat(widths[i].saturating_sub(header.len()));
+            print!("{}{} │ ", header.bold(), padding);
+        }
+        println!();
+
+        // Print separator
+        print!("├─");
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..headers.len() {
+            print!("{}┼─", "─".repeat(widths[i] + 1));
+        }
+        println!();
+
+        // Print rows
+        for row in rows {
+            print!("│ ");
+            for (i, cell) in row.iter().enumerate() {
+                if i < widths.len() {
+                    let padding = " ".repeat(widths[i].saturating_sub(cell.len()));
+                    print!("{cell}{padding} │ ");
+                }
+            }
+            println!();
+        }
+    }
+}
+
+/// Timer formatting utilities
+#[must_use]
+pub fn format_duration_short(duration: std::time::Duration) -> String {
+    let total_secs = duration.as_secs();
+    let millis = duration.subsec_millis();
+
+    if total_secs == 0 {
+        format!("{millis}ms")
+    } else if total_secs < 60 {
+        format!("{total_secs}.{millis:03}s")
+    } else {
+        let mins = total_secs / 60;
+        let secs = total_secs % 60;
+        if mins < 60 {
+            format!("{mins}m {secs}s")
+        } else {
+            let hours = mins / 60;
+            let mins = mins % 60;
+            format!("{hours}h {mins}m")
+        }
+    }
+}
+</file>
+
+<file path="src/errors.rs">
+// Re-export from the types crate
+pub use types::error::{IdsError, LegacyErrorContext as Context, Result};
+
+// Type aliases to maintain compatibility
+pub type PlottingError = IdsError;
+pub type SamplingError = IdsError;
+
+// Simple alias for easier use within this crate
+pub type Error = IdsError;
+
+// Wrapper functions for common error types
+pub fn invalid_date<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::InvalidDate(msg.to_string())
+}
+
+pub fn sampling_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::Sampling(msg.to_string())
+}
+
+pub fn invalid_criteria<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::InvalidCriteria(msg.to_string())
+}
+
+pub fn plotting_error<T: std::fmt::Display>(msg: T) -> IdsError {
+    IdsError::Plotting(msg.to_string())
+}
+
+pub const NO_ELIGIBLE_CONTROLS: IdsError = IdsError::NoEligibleControls;
+
+// For backwards compatibility with existing code
+pub trait IntoSamplingError<T> {
+    fn into_sampling_error(self, msg: &str) -> Result<T>;
+}
+
+// Implement for any Result that can be converted to a String
+impl<T, E: std::fmt::Display + 'static> IntoSamplingError<T> for std::result::Result<T, E> {
+    fn into_sampling_error(self, msg: &str) -> Result<T> {
+        self.with_context(|| format!("Sampling error: {msg}"))
+    }
+}
+</file>
+
+<file path="src/lib.rs">
+pub mod errors;
+pub mod matching_quality;
+pub mod sampler;
+pub mod utils;
+</file>
+
+<file path="src/matching_quality.rs">
+#[derive(Debug)]
+pub struct MatchingQuality {
+    pub stats: MatchingStats,
+}
+
+#[derive(Debug)]
+pub struct MatchingStats {
+    pub total_cases: usize,
+    pub matched_cases: usize,
+    pub total_controls: usize,
+    pub avg_controls_per_case: f64,
+    pub differences: MatchingDifferences,
+    pub percentiles: MatchingPercentiles,
+    pub balance: BalanceMetrics,
+}
+
+#[derive(Debug)]
+pub struct MatchingDifferences {
+    pub birth_date: Vec<i64>,
+    pub mother_age: Vec<i64>,
+    pub father_age: Vec<i64>,
+}
+
+#[derive(Debug)]
+pub struct MatchingPercentiles {
+    pub birth_date: Vec<i64>,
+    pub mother_age: Vec<i64>,
+    pub father_age: Vec<i64>,
+}
+
+#[derive(Debug)]
+pub struct BalanceMetrics {
+    pub birth_date: f64,
+    pub parent_age: f64,
+}
+
+#[derive(Debug)]
+pub struct MatchingQualityParams {
+    pub total_cases: usize,
+    pub matched_cases: usize,
+    pub total_controls: usize,
+    pub birth_date_differences: Vec<i64>,
+    pub mother_age_differences: Vec<i64>,
+    pub father_age_differences: Vec<i64>,
+    pub birth_date_balance: f64,
+    pub parent_age_balance: f64,
+    pub birth_date_percentiles: Vec<i64>,
+    pub mother_age_percentiles: Vec<i64>,
+    pub father_age_percentiles: Vec<i64>,
+}
+
+impl MatchingQuality {
+    #[must_use]
+    pub fn new(params: MatchingQualityParams) -> Self {
+        let stats = MatchingStats {
+            total_cases: params.total_cases,
+            matched_cases: params.matched_cases,
+            total_controls: params.total_controls,
+            avg_controls_per_case: params.total_controls as f64 / params.matched_cases as f64,
+            differences: MatchingDifferences {
+                birth_date: params.birth_date_differences,
+                mother_age: params.mother_age_differences,
+                father_age: params.father_age_differences,
+            },
+            percentiles: MatchingPercentiles {
+                birth_date: params.birth_date_percentiles,
+                mother_age: params.mother_age_percentiles,
+                father_age: params.father_age_percentiles,
+            },
+            balance: BalanceMetrics {
+                birth_date: params.birth_date_balance,
+                parent_age: params.parent_age_balance,
+            },
+        };
+
+        Self { stats }
+    }
+
+    #[must_use]
+    pub fn calculate_percentiles(values: &[i64], percentiles: &[f64]) -> Vec<i64> {
+        let mut sorted_values = values.to_vec();
+        sorted_values.sort_unstable();
+
+        percentiles
+            .iter()
+            .map(|&p| {
+                let idx = (p * (sorted_values.len() - 1) as f64).round() as usize;
+                sorted_values[idx]
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn format_report(&self) -> String {
+        use crate::utils::console::ConsoleOutput;
+        use colored::Colorize;
+
+        let mut report = String::new();
+
+        // Title
+        report.push_str(&format!("\n{}\n", "Matching Quality Report".bold().green()));
+        report.push_str(&format!("{}\n", "═".repeat(22).green()));
+
+        // Matching metrics
+        let matching_rate = self.stats.matched_cases as f64 / self.stats.total_cases as f64;
+        let control_utilization = self.stats.matched_cases as f64
+            * self.stats.avg_controls_per_case
+            / self.stats.total_controls as f64;
+
+        report.push_str(&format!(
+            "│ {} {}/{} ({})\n",
+            "Matching Rate:".bold(),
+            self.stats.matched_cases.to_string().yellow(),
+            self.stats.total_cases,
+            ConsoleOutput::format_percentage(matching_rate)
+        ));
+
+        report.push_str(&format!(
+            "│ {} {}/{} ({})\n",
+            "Control Utilization:".bold(),
+            (self.stats.matched_cases * self.stats.avg_controls_per_case as usize)
+                .to_string()
+                .yellow(),
+            self.stats.total_controls,
+            ConsoleOutput::format_percentage(control_utilization)
+        ));
+
+        report.push_str(&format!(
+            "│ {} {}\n",
+            "Average Controls per Case:".bold(),
+            format!("{:.2}", self.stats.avg_controls_per_case).yellow()
+        ));
+
+        // Birth date differences
+        report.push_str(&format!("\n{}\n", "Birth Date Differences".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(21).blue()));
+        report.push_str(&format!(
+            "  25th percentile: {} days\n",
+            self.stats.percentiles.birth_date[0].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  50th percentile: {} days\n",
+            self.stats.percentiles.birth_date[1].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  75th percentile: {} days\n",
+            self.stats.percentiles.birth_date[2].to_string().yellow()
+        ));
+
+        // Mother age differences
+        report.push_str(&format!("\n{}\n", "Mother Age Differences".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(21).blue()));
+        report.push_str(&format!(
+            "  25th percentile: {} days\n",
+            self.stats.percentiles.mother_age[0].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  50th percentile: {} days\n",
+            self.stats.percentiles.mother_age[1].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  75th percentile: {} days\n",
+            self.stats.percentiles.mother_age[2].to_string().yellow()
+        ));
+
+        // Father age differences
+        report.push_str(&format!("\n{}\n", "Father Age Differences".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(21).blue()));
+        report.push_str(&format!(
+            "  25th percentile: {} days\n",
+            self.stats.percentiles.father_age[0].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  50th percentile: {} days\n",
+            self.stats.percentiles.father_age[1].to_string().yellow()
+        ));
+        report.push_str(&format!(
+            "  75th percentile: {} days\n",
+            self.stats.percentiles.father_age[2].to_string().yellow()
+        ));
+
+        // Balance metrics
+        report.push_str(&format!("\n{}\n", "Balance Metrics".blue().bold()));
+        report.push_str(&format!("{}\n", "─".repeat(14).blue()));
+
+        // Color-code the balance metrics (lower is better)
+        let birth_balance_str = format!("{:.3}", self.stats.balance.birth_date);
+        let birth_balance = if self.stats.balance.birth_date < 0.1 {
+            birth_balance_str.green()
+        } else if self.stats.balance.birth_date < 0.2 {
+            birth_balance_str.yellow()
+        } else {
+            birth_balance_str.red()
+        };
+
+        let parent_balance_str = format!("{:.3}", self.stats.balance.parent_age);
+        let parent_balance = if self.stats.balance.parent_age < 0.1 {
+            parent_balance_str.green()
+        } else if self.stats.balance.parent_age < 0.2 {
+            parent_balance_str.yellow()
+        } else {
+            parent_balance_str.red()
+        };
+
+        report.push_str(&format!("  Birth Date Balance: {birth_balance}\n"));
+        report.push_str(&format!("  Parent Age Balance: {parent_balance}\n"));
+
+        report
+    }
+}
+</file>
+
+<file path="src/sampler.rs">
+use crate::errors::SamplingError;
+use crate::utils::{DateData, MatchingCriteria};
+use chrono::NaiveDate;
+use colored::Colorize;
+use fastrand::Rng;
+use humantime::format_duration;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use rayon::prelude::*;
+use rustc_hash::{FxBuildHasher, FxHashMap};
+use serde::Deserialize;
+use smallvec::SmallVec;
+use std::sync::Arc;
+
+type ControlGroup = SmallVec<[usize; 8]>;
+type CaseControlPair = (usize, ControlGroup);
+type MatchResult = Result<Vec<CaseControlPair>, SamplingError>;
+type BirthDateIndex = Arc<FxHashMap<i64, SmallVec<[usize; 16]>>>;
+
+#[derive(Debug, Deserialize)]
+pub struct Record {
+    pub pnr: String,
+    #[serde(with = "crate::utils::date_format")]
+    pub bday: NaiveDate,
+    #[serde(with = "crate::utils::optional_date_format")]
+    pub treatment_date: Option<NaiveDate>,
+    #[serde(with = "crate::utils::optional_date_format")]
+    pub mother_bday: Option<NaiveDate>,
+    #[serde(with = "crate::utils::optional_date_format")]
+    pub father_bday: Option<NaiveDate>,
+}
+
+pub struct IncidenceDensitySampler {
+    dates: Vec<DateData>,
+    records: Arc<Vec<Record>>,
+    criteria: MatchingCriteria,
+    cases: Vec<usize>,
+    sorted_controls: Vec<usize>,
+    birth_date_index: BirthDateIndex,
+}
+
+impl IncidenceDensitySampler {
+    const BATCH_SIZE: usize = 1024;
+
+    /// Creates a new `IncidenceDensitySampler`.
+    ///
+    /// # Panics
+    /// Panics if the epoch date (1970-01-01) cannot be created.
+    ///
+    /// # Errors
+    /// Returns a `SamplingError` if the matching criteria are invalid.
+    pub fn new(records: Vec<Record>, criteria: MatchingCriteria) -> Result<Self, SamplingError> {
+        criteria.validate()?;
+        let n_records = records.len();
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+
+        // Process all records in parallel first to extract the necessary data
+        let processed_data: Vec<_> = records
+            .par_iter()
+            .enumerate()
+            .map(|(idx, record)| {
+                let birth = (record.bday - epoch).num_days();
+                let mother = record.mother_bday.map(|d| (d - epoch).num_days());
+                let father = record.father_bday.map(|d| (d - epoch).num_days());
+                let treatment = record.treatment_date.map(|d| (d - epoch).num_days());
+
+                (
+                    idx,
+                    DateData {
+                        birth,
+                        mother,
+                        father,
+                    },
+                    treatment,
+                )
+            })
+            .collect();
+
+        // Allocate all data structures with appropriate capacity
+        let mut dates = Vec::with_capacity(n_records);
+        let mut cases = Vec::with_capacity(50_000);
+        let mut controls = Vec::with_capacity(n_records - 50_000);
+
+        // Process birth date index more efficiently using parallel aggregation
+        // First collect all birth dates with their indices
+        let birth_date_entries: Vec<_> = processed_data
+            .par_iter()
+            .map(|(idx, date_data, _)| (date_data.birth, *idx))
+            .collect();
+
+        // Then build the birth date index using a thread-safe approach
+        use std::sync::Mutex;
+        let birth_date_index = {
+            let index = Mutex::new(FxHashMap::with_capacity_and_hasher(
+                n_records / 365,
+                FxBuildHasher,
+            ));
+
+            // Process in chunks to reduce lock contention
+            birth_date_entries.par_chunks(1024).for_each(|chunk| {
+                // Build a local map for this chunk
+                let mut local_map = FxHashMap::with_capacity_and_hasher(chunk.len(), FxBuildHasher);
+
+                // Add entries to the local map
+                for &(birth_date, idx) in chunk {
+                    local_map
+                        .entry(birth_date)
+                        .or_insert_with(SmallVec::<[usize; 16]>::new)
+                        .push(idx);
+                }
+
+                // Merge the local map into the global map with a single lock
+                let mut global_map = index.lock().unwrap();
+                for (birth_date, indices) in local_map {
+                    global_map
+                        .entry(birth_date)
+                        .or_insert_with(SmallVec::<[usize; 16]>::new)
+                        .extend_from_slice(&indices);
+                }
+            });
+
+            // Unwrap the mutex to get the final map
+            index.into_inner().unwrap()
+        };
+
+        // Process the remainder of the data
+        for (idx, date_data, treatment) in processed_data {
+            dates.push(date_data);
+
+            if treatment.is_some() {
+                cases.push(idx);
+            } else {
+                controls.push(idx);
+            }
+        }
+
+        // Sort controls for efficient binary search later
+        controls.par_sort_unstable();
+
+        Ok(Self {
+            dates,
+            records: Arc::new(records),
+            criteria,
+            cases,
+            sorted_controls: controls,
+            birth_date_index: Arc::new(birth_date_index),
+        })
+    }
+
+    const fn is_parent_match(
+        case_parent: Option<i64>,
+        control_parent: Option<i64>,
+        window: i64,
+    ) -> bool {
+        match (case_parent, control_parent) {
+            (None, None) => true, // Match if both are missing
+            (Some(case_date), Some(control_date)) => (case_date - control_date).abs() <= window,
+            _ => false, // Don't match if one is missing and the other isn't
+        }
+    }
+
+    fn select_random_controls(
+        rng: &mut Rng,
+        eligible: &[usize],
+        n_controls: usize,
+    ) -> SmallVec<[usize; 8]> {
+        if eligible.len() <= n_controls {
+            return SmallVec::from_vec(eligible.to_vec());
+        }
+
+        let mut selected = SmallVec::with_capacity(n_controls);
+        let mut indices = (0..eligible.len()).collect::<SmallVec<[usize; 32]>>();
+
+        for _ in 0..n_controls {
+            let idx = rng.usize(..indices.len());
+            selected.push(eligible[indices[idx]]);
+            indices.swap_remove(idx);
+        }
+
+        selected
+    }
+
+    fn print_header(text: &str) {
+        println!("\n{}", text.bold().blue());
+        println!("{}", "=".repeat(text.len()).blue());
+    }
+
+    #[allow(dead_code, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    fn format_percentage(value: f64, total: f64) -> String {
+        format!(
+            "{:.1}% ({}/{})",
+            (value / total * 100.0),
+            value as u64,
+            total as u64
+        )
+    }
+
+    #[must_use]
+    pub fn get_statistics(&self) -> String {
+        use crate::utils::console::ConsoleOutput;
+
+        let total_records = self.records.len();
+        let total_cases = self.cases.len();
+        let total_controls = self.sorted_controls.len();
+        let case_pct = total_cases as f64 / total_records as f64 * 100.0;
+        let control_pct = total_controls as f64 / total_records as f64 * 100.0;
+
+        let mut stats = String::new();
+
+        stats.push_str(&format!("\n{}\n", "Dataset Statistics".green().bold()));
+        stats.push_str(&format!("{}\n", "═".repeat(18).green()));
+
+        stats.push_str(&format!(
+            "│ {} {}\n",
+            "Total Records:".bold(),
+            ConsoleOutput::format_number(total_records).yellow()
+        ));
+
+        stats.push_str(&format!(
+            "│ {} {} ({:.1}%)\n",
+            "Cases:".bold(),
+            ConsoleOutput::format_number(total_cases).yellow(),
+            case_pct
+        ));
+
+        stats.push_str(&format!(
+            "│ {} {} ({:.1}%)\n",
+            "Controls:".bold(),
+            ConsoleOutput::format_number(total_controls).yellow(),
+            control_pct
+        ));
+
+        let ratio = total_controls as f64 / total_cases as f64;
+        let ratio_str = format!("{ratio:.2}");
+        let ratio_colored = if ratio >= 3.0 {
+            ratio_str.green()
+        } else if ratio >= 1.0 {
+            ratio_str.yellow()
+        } else {
+            ratio_str.red()
+        };
+
+        stats.push_str(&format!(
+            "│ {} {}\n",
+            "Case/Control Ratio:".bold(),
+            ratio_colored
+        ));
+
+        stats.push_str(&format!("└{}\n", "─".repeat(30)));
+
+        stats
+    }
+
+    /// Samples controls for each case according to the matching criteria.
+    ///
+    /// # Panics
+    /// Panics if the progress bar template is invalid.
+    ///
+    /// # Errors
+    /// Returns a `SamplingError` if no eligible controls are found.
+    pub fn sample_controls(&self, n_controls: usize) -> MatchResult {
+        Self::print_header("Sampling Controls");
+
+        let start_time = std::time::Instant::now();
+        let total_cases = self.cases.len();
+        let total_chunks = total_cases.div_ceil(Self::BATCH_SIZE);
+
+        println!(
+            "│ {} {}\n│ {} {}",
+            "Total Cases:".bold(),
+            total_cases.to_string().yellow(),
+            "Batch Size:".bold(),
+            Self::BATCH_SIZE.to_string().yellow()
+        );
+
+        let mp = MultiProgress::new();
+        let pb = mp.add(ProgressBar::new(total_chunks as u64));
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} chunks ({per_sec}) {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+
+        let case_control_pairs: Vec<_> = self
+            .cases
+            .par_chunks(Self::BATCH_SIZE)
+            .map(|case_chunk| {
+                let mut rng = Rng::new();
+                let mut local_pairs = Vec::with_capacity(case_chunk.len());
+                let mut eligible_buffer = SmallVec::<[usize; 32]>::new();
+
+                for &case_idx in case_chunk {
+                    let case_date = self.dates[case_idx];
+                    let window_start = case_date.birth - self.criteria.birth_date_window;
+                    let window_end = case_date.birth + self.criteria.birth_date_window;
+
+                    eligible_buffer.clear();
+
+                    // Optimize: Pre-collect all relevant potential controls from the window
+                    let date_range = window_start..=window_end;
+                    let candidate_controls: Vec<usize> = date_range
+                        .into_iter()
+                        .filter_map(|birth_date| self.birth_date_index.get(&birth_date))
+                        .flat_map(|controls| controls.iter().copied())
+                        .collect();
+
+                    // Filter candidates using binary search optimization
+                    // and check the parent matches for each candidate
+                    for control_idx in candidate_controls {
+                        if self.sorted_controls.binary_search(&control_idx).is_ok() {
+                            let control_date = self.dates[control_idx];
+
+                            // Check parent matches considering missing values
+                            let mother_match = Self::is_parent_match(
+                                case_date.mother,
+                                control_date.mother,
+                                self.criteria.parent_date_window,
+                            );
+                            let father_match = Self::is_parent_match(
+                                case_date.father,
+                                control_date.father,
+                                self.criteria.parent_date_window,
+                            );
+
+                            if mother_match && father_match {
+                                eligible_buffer.push(control_idx);
+                            }
+                        }
+                    }
+
+                    if !eligible_buffer.is_empty() {
+                        let selected =
+                            Self::select_random_controls(&mut rng, &eligible_buffer, n_controls);
+                        if !selected.is_empty() {
+                            local_pairs.push((case_idx, selected));
+                        }
+                    }
+                }
+
+                pb.inc(1);
+                pb.set_message(format!("{} matches", local_pairs.len()));
+
+                local_pairs
+            })
+            .flatten()
+            .collect();
+
+        pb.finish_with_message("Complete");
+
+        let total_elapsed = start_time.elapsed();
+        #[allow(clippy::cast_precision_loss)]
+        let speed = total_cases as f64 / total_elapsed.as_secs_f64();
+
+        println!(
+            "\n{}\n│ {} {}\n│ {} {}\n│ {} {:.2}\n└────────────────────────────",
+            "Sampling Results:".bold().green(),
+            "Time Elapsed:".bold(),
+            format_duration(total_elapsed).to_string().yellow(),
+            "Total Matches:".bold(),
+            case_control_pairs.len().to_string().yellow(),
+            "Speed:".bold(),
+            speed
+        );
+
+        if case_control_pairs.is_empty() {
+            return Err(SamplingError::NoEligibleControls);
+        }
+
+        Ok(case_control_pairs)
+    }
+
+    #[must_use]
+    pub fn evaluate_matching_quality(
+        &self,
+        case_control_pairs: &[CaseControlPair],
+    ) -> crate::matching_quality::MatchingQuality {
+        let total_cases = self.cases.len();
+        let matched_cases = case_control_pairs.len();
+        let total_controls: usize = case_control_pairs
+            .iter()
+            .map(|(_, controls)| controls.len())
+            .sum();
+
+        let mut birth_date_differences = Vec::new();
+        let mut mother_age_differences = Vec::new();
+        let mut father_age_differences = Vec::new();
+
+        for (case_idx, controls) in case_control_pairs {
+            let case_dates = self.dates[*case_idx];
+
+            for &control_idx in controls {
+                let control_dates = self.dates[control_idx];
+
+                birth_date_differences.push((case_dates.birth - control_dates.birth).abs());
+
+                if let Some(diff) = calculate_date_diff(case_dates.mother, control_dates.mother) {
+                    mother_age_differences.push(diff);
+                }
+
+                if let Some(diff) = calculate_date_diff(case_dates.father, control_dates.father) {
+                    father_age_differences.push(diff);
+                }
+            }
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        let birth_date_balance = Self::calculate_balance_metric(&birth_date_differences);
+        #[allow(clippy::cast_precision_loss)]
+        let parent_age_balance = (Self::calculate_balance_metric(&mother_age_differences)
+            + Self::calculate_balance_metric(&father_age_differences))
+            / 2.0;
+
+        let percentiles = vec![0.25, 0.50, 0.75];
+        let birth_date_percentiles =
+            crate::matching_quality::MatchingQuality::calculate_percentiles(
+                &birth_date_differences,
+                &percentiles,
+            );
+        let mother_age_percentiles =
+            crate::matching_quality::MatchingQuality::calculate_percentiles(
+                &mother_age_differences,
+                &percentiles,
+            );
+        let father_age_percentiles =
+            crate::matching_quality::MatchingQuality::calculate_percentiles(
+                &father_age_differences,
+                &percentiles,
+            );
+
+        let params = crate::matching_quality::MatchingQualityParams {
+            total_cases,
+            matched_cases,
+            total_controls,
+            birth_date_differences,
+            mother_age_differences,
+            father_age_differences,
+            birth_date_balance,
+            parent_age_balance,
+            birth_date_percentiles,
+            mother_age_percentiles,
+            father_age_percentiles,
+        };
+
+        crate::matching_quality::MatchingQuality::new(params)
+    }
+
+    fn calculate_balance_metric(diffs: &[i64]) -> f64 {
+        use rayon::prelude::*;
+
+        // Only use parallelism for large datasets where the overhead is worth it
+        if diffs.len() > 10_000 {
+            #[allow(clippy::cast_precision_loss)]
+            let sum: i64 = diffs.par_iter().sum();
+            #[allow(clippy::cast_precision_loss)]
+            let mean = sum as f64 / diffs.len() as f64;
+
+            let variance_sum: f64 = diffs
+                .par_iter()
+                .map(|&x| {
+                    #[allow(clippy::cast_precision_loss)]
+                    let diff = x as f64 - mean;
+                    diff * diff
+                })
+                .sum();
+
+            #[allow(clippy::cast_precision_loss)]
+            let variance = variance_sum / (diffs.len() - 1) as f64;
+            mean / variance.sqrt()
+        } else {
+            // Use sequential processing for smaller datasets to avoid parallelism overhead
+            #[allow(clippy::cast_precision_loss)]
+            let mean = diffs.iter().sum::<i64>() as f64 / diffs.len() as f64;
+            let variance = diffs
+                .iter()
+                .map(|&x| {
+                    #[allow(clippy::cast_precision_loss)]
+                    let diff = x as f64 - mean;
+                    diff * diff
+                })
+                .sum::<f64>()
+                / (diffs.len() - 1) as f64;
+
+            mean / variance.sqrt()
+        }
+    }
+
+    /// Saves matched case-control pairs to a CSV file.
+    ///
+    /// # Errors
+    /// Returns an error if file writing fails.
+    pub fn save_matches_to_csv(
+        &self,
+        case_control_pairs: &[CaseControlPair],
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use rayon::prelude::*;
+        use std::sync::Mutex;
+
+        log::info!("Saving matches to {filename}");
+
+        // Prepare all records in parallel before writing to file
+        // This is faster than doing file I/O inside the parallel loop
+        struct CsvRecord {
+            case_id: String,
+            case_pnr: String,
+            case_birth_date: String,
+            case_treatment_date: String,
+            control_id: String,
+            control_pnr: String,
+            control_birth_date: String,
+            birth_date_diff: String,
+            mother_diff: String,
+            father_diff: String,
+        }
+
+        // Count total number of records to pre-allocate
+        let total_pairs: usize = case_control_pairs
+            .iter()
+            .map(|(_, controls)| controls.len())
+            .sum();
+
+        // Process data in parallel and collect all records
+        let all_records = Mutex::new(Vec::with_capacity(total_pairs));
+
+        // Use parallel processing to prepare records
+        case_control_pairs
+            .par_iter()
+            .for_each(|(case_idx, controls)| {
+                let case = &self.records[*case_idx];
+                let case_dates = self.dates[*case_idx];
+
+                // Process each control for this case
+                let mut batch_records = Vec::with_capacity(controls.len());
+
+                for &control_idx in controls {
+                    let control = &self.records[control_idx];
+                    let control_dates = self.dates[control_idx];
+
+                    let mother_diff = match (case_dates.mother, control_dates.mother) {
+                        (Some(m1), Some(m2)) => (m1 - m2).abs().to_string(),
+                        _ => "NA".to_string(),
+                    };
+
+                    let father_diff = match (case_dates.father, control_dates.father) {
+                        (Some(f1), Some(f2)) => (f1 - f2).abs().to_string(),
+                        _ => "NA".to_string(),
+                    };
+
+                    batch_records.push(CsvRecord {
+                        case_id: case_idx.to_string(),
+                        case_pnr: case.pnr.clone(),
+                        case_birth_date: case.bday.to_string(),
+                        case_treatment_date: case
+                            .treatment_date
+                            .map_or("NA".to_string(), |d| d.to_string()),
+                        control_id: control_idx.to_string(),
+                        control_pnr: control.pnr.clone(),
+                        control_birth_date: control.bday.to_string(),
+                        birth_date_diff: (case_dates.birth - control_dates.birth).abs().to_string(),
+                        mother_diff,
+                        father_diff,
+                    });
+                }
+
+                // Add this batch to the main collection with a single lock
+                let mut all_records = all_records.lock().unwrap();
+                all_records.extend(batch_records);
+            });
+
+        // Write the CSV file in a single thread (disk I/O is not parallelized)
+        let mut wtr = csv::Writer::from_path(filename)?;
+
+        // Write header
+        wtr.write_record([
+            "case_id",
+            "case_pnr",
+            "case_birth_date",
+            "case_treatment_date",
+            "control_id",
+            "control_pnr",
+            "control_birth_date",
+            "birth_date_diff_days",
+            "mother_age_diff_days",
+            "father_age_diff_days",
+        ])?;
+
+        // Write all records
+        let records = all_records.into_inner().unwrap();
+        for record in records {
+            wtr.write_record(&[
+                record.case_id,
+                record.case_pnr,
+                record.case_birth_date,
+                record.case_treatment_date,
+                record.control_id,
+                record.control_pnr,
+                record.control_birth_date,
+                record.birth_date_diff,
+                record.mother_diff,
+                record.father_diff,
+            ])?;
+        }
+
+        wtr.flush()?;
+        log::info!("Successfully wrote matches to {filename}");
+
+        let total_pairs: usize = case_control_pairs
+            .iter()
+            .map(|(_, controls)| controls.len())
+            .sum();
+        log::info!("Total case-control pairs written: {total_pairs}");
+
+        #[allow(clippy::cast_precision_loss)]
+        let avg_controls = total_pairs as f64 / case_control_pairs.len() as f64;
+        log::info!("Average controls per case: {avg_controls:.2}");
+
+        Ok(())
+    }
+
+    /// Saves matching statistics to a CSV file.
+    ///
+    /// # Errors
+    /// Returns an error if file writing fails.
+    pub fn save_matching_statistics(
+        &self,
+        case_control_pairs: &[CaseControlPair],
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut wtr = csv::Writer::from_path(filename)?;
+
+        wtr.write_record([
+            "case_id",
+            "n_controls",
+            "avg_birth_diff",
+            "max_birth_diff",
+            "avg_mother_diff",
+            "avg_father_diff",
+        ])?;
+
+        for (case_idx, controls) in case_control_pairs {
+            let case_dates = self.dates[*case_idx];
+
+            let stats = controls
+                .iter()
+                .map(|&control_idx| {
+                    let control_dates = self.dates[control_idx];
+                    (
+                        (case_dates.birth - control_dates.birth).abs(),
+                        calculate_date_diff(case_dates.mother, control_dates.mother),
+                        calculate_date_diff(case_dates.father, control_dates.father),
+                    )
+                })
+                .fold((0, 0, 0, 0), |acc, (b, m, f)| {
+                    (
+                        acc.0 + b,
+                        acc.1.max(b),
+                        acc.2 + m.unwrap_or(0),
+                        acc.3 + f.unwrap_or(0),
+                    )
+                });
+
+            #[allow(clippy::cast_precision_loss)]
+            let n_controls = controls.len() as f64;
+
+            wtr.write_record(&[
+                case_idx.to_string(),
+                controls.len().to_string(),
+                (stats.0 as f64 / n_controls).to_string(),
+                stats.1.to_string(),
+                (stats.2 as f64 / n_controls).to_string(),
+                (stats.3 as f64 / n_controls).to_string(),
+            ])?;
+        }
+
+        Ok(())
+    }
+}
+
+const fn calculate_date_diff(date1: Option<i64>, date2: Option<i64>) -> Option<i64> {
+    match (date1, date2) {
+        (Some(d1), Some(d2)) => Some((d1 - d2).abs()),
+        _ => None,
+    }
+}
+</file>
+
+<file path="src/utils.rs">
+use chrono::NaiveDate;
+use log::LevelFilter;
+use std::{error::Error, sync::Once};
+
+use log4rs::{
+    append::console::ConsoleAppender,
+    config::{Appender, Config, Root},
+    encode::pattern::PatternEncoder,
+};
+
+use crate::errors::SamplingError;
+
+// Export the console submodule
+pub mod console;
+
+static INIT: Once = Once::new();
+
+/// Configures logging with optional file output.
+///
+/// # Arguments
+/// * `log_file` - Optional path to a log file. If provided, logs will be written to both console and file.
+///
+/// # Errors
+/// Returns an error if:
+/// * The log file cannot be created or written to
+/// * The logging configuration is invalid
+///
+/// # Panics
+/// This function may panic if the logging configuration cannot be built due to invalid parameters
+/// Configures logging with a specific log level
+///
+/// # Arguments
+/// * `log_file` - Optional path to a log file. If provided, logs will be written to both console and file.
+/// * `level` - The log level to set
+///
+/// # Errors
+/// Returns an error if:
+/// * The log file cannot be created or written to
+/// * The logging configuration is invalid
+pub fn configure_logging_with_level(
+    log_file: Option<&str>,
+    level: LevelFilter,
+) -> Result<(), Box<dyn Error>> {
+    INIT.call_once(|| {
+        // Helper function to create a console appender
+        let create_console_appender = || {
+            ConsoleAppender::builder()
+                .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}{n}")))
+                .build()
+        };
+
+        let mut config_builder = Config::builder();
+
+        // Add console appender
+        config_builder = config_builder
+            .appender(Appender::builder().build("console", Box::new(create_console_appender())));
+
+        // Add file appender if log file is specified
+        if let Some(file_path) = log_file {
+            if let Ok(file_appender) = log4rs::append::file::FileAppender::builder()
+                .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}{n}")))
+                .build(file_path)
+            {
+                config_builder = config_builder
+                    .appender(Appender::builder().build("file", Box::new(file_appender)));
+            }
+        }
+
+        // Build root logger
+        let mut root = Root::builder().appender("console");
+        if log_file.is_some() {
+            root = root.appender("file");
+        }
+
+        let config = config_builder.build(root.build(level)).unwrap_or_else(|_| {
+            // Create a new console appender for the fallback configuration
+            Config::builder()
+                .appender(Appender::builder().build("console", Box::new(create_console_appender())))
+                .build(Root::builder().appender("console").build(level))
+                .unwrap()
+        });
+
+        let _ = log4rs::init_config(config);
+    });
+
+    Ok(())
+}
+
+pub fn configure_logging(log_file: Option<&str>) -> Result<(), Box<dyn Error>> {
+    configure_logging_with_level(log_file, LevelFilter::Info)
+}
+
+/// Validates an optional date.
+///
+/// # Arguments
+/// * `date` - Optional `NaiveDate` to validate
+///
+/// # Errors
+/// Returns `SamplingError::InvalidDate` if the date is present but invalid
+pub fn validate_optional_date(date: &Option<NaiveDate>) -> Result<(), SamplingError> {
+    match date {
+        Some(d) => validate_date(&d.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Loads and validates records from a CSV file.
+///
+/// # Arguments
+/// * `filename` - Path to the CSV file
+///
+/// # Errors
+/// Returns an error if:
+/// * The file cannot be opened or read
+/// * The CSV format is invalid
+/// * Any date fields contain invalid dates
+/// * Record parsing fails
+pub fn load_records(filename: &str) -> Result<Vec<crate::sampler::Record>, Box<dyn Error>> {
+    let mut rdr = csv::Reader::from_path(filename)?;
+    let mut records = Vec::new();
+
+    for (idx, result) in rdr.deserialize().enumerate() {
+        match result {
+            Ok(record) => {
+                let record: crate::sampler::Record = record;
+
+                // Validate dates with detailed error messages
+                if let Err(e) = validate_date(&record.bday.to_string()) {
+                    log::error!("Invalid birth date at record {}: {}", idx + 1, e);
+                    return Err(Box::new(SamplingError::invalid_date(
+                        "Invalid birth date".to_string(),
+                    )));
+                }
+
+                if let Err(e) = validate_optional_date(&record.mother_bday) {
+                    log::error!("Invalid mother birth date at record {}: {}", idx + 1, e);
+                    return Err(Box::new(SamplingError::invalid_date(
+                        "Invalid mother birth date".to_string(),
+                    )));
+                }
+
+                if let Err(e) = validate_optional_date(&record.father_bday) {
+                    log::error!("Invalid father birth date at record {}: {}", idx + 1, e);
+                    return Err(Box::new(SamplingError::invalid_date(
+                        "Invalid father birth date".to_string(),
+                    )));
+                }
+
+                if let Some(treatment_date) = record.treatment_date {
+                    if let Err(e) = validate_date(&treatment_date.to_string()) {
+                        log::error!("Invalid treatment date at record {}: {}", idx + 1, e);
+                        return Err(Box::new(SamplingError::invalid_date(
+                            "Invalid treatment date".to_string(),
+                        )));
+                    }
+                }
+
+                records.push(record);
+            }
+            Err(e) => {
+                log::error!("Failed to parse record {} with error: {}", idx + 1, e);
+                return Err(Box::new(e));
+            }
+        }
+    }
+
+    Ok(records)
+}
+
+/// Validates the format of a CSV file.
+///
+/// # Arguments
+/// * `filename` - Path to the CSV file to validate
+///
+/// # Errors
+/// Returns an error if:
+/// * The file cannot be opened or read
+/// * Required headers are missing
+/// * The number of fields in any row is incorrect
+/// * The CSV format is invalid
+pub fn validate_csv_format(filename: &str) -> Result<(), Box<dyn Error>> {
+    let file = std::fs::File::open(filename)?;
+    let mut rdr = csv::Reader::from_reader(file);
+    let headers = rdr.headers()?;
+
+    // Check required headers
+    let required_headers = [
+        "pnr",
+        "bday",
+        "treatment_date",
+        "mother_bday",
+        "father_bday",
+    ];
+    for &header in &required_headers {
+        if !headers.iter().any(|h| h == header) {
+            return Err(format!("Missing required header: {header}").into());
+        }
+    }
+
+    // Validate each row
+    for (idx, result) in rdr.records().enumerate() {
+        match result {
+            Ok(record) => {
+                if record.len() != required_headers.len() {
+                    return Err(format!(
+                        "Invalid number of fields at line {}: expected {}, got {}",
+                        idx + 2, // +2 because idx starts at 0 and we need to account for header
+                        required_headers.len(),
+                        record.len()
+                    )
+                    .into());
+                }
+            }
+            Err(e) => {
+                return Err(format!("Error at line {}: {}", idx + 2, e).into());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates a date string.
+///
+/// # Arguments
+/// * `date_str` - Date string in "YYYY-MM-DD" format
+///
+/// # Errors
+/// Returns `SamplingError::invalid_date` if the date string cannot be parsed
+pub fn validate_date(date_str: &str) -> Result<(), SamplingError> {
+    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .map(|_| ()) // Convert success to () instead of NaiveDate
+        .map_err(|_| SamplingError::invalid_date("Invalid date format".to_string()))
+}
+
+pub mod date_format {
+    use chrono::NaiveDate;
+    use serde::{self, Deserialize, Deserializer};
+
+    /// Deserializes a date string into a `NaiveDate`.
+    ///
+    /// # Errors
+    /// Returns a deserialization error if the date string cannot be parsed
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)
+    }
+}
+
+pub mod optional_date_format {
+    use chrono::NaiveDate;
+    use serde::{self, Deserialize, Deserializer};
+
+    /// Deserializes a date string into an Option<NaiveDate>.
+    ///
+    /// # Errors
+    /// Returns a deserialization error if the date string is neither "NA" nor a valid date
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "NA" {
+            Ok(None)
+        } else {
+            NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                .map(Some)
+                .map_err(serde::de::Error::custom)
+        }
+    }
+}
+
+pub struct MatchingCriteria {
+    pub birth_date_window: i64,
+    pub parent_date_window: i64,
+}
+
+impl MatchingCriteria {
+    /// Validates the matching criteria values.
+    ///
+    /// # Errors
+    /// Returns `SamplingError::invalid_criteria` if either window value is not positive
+    pub fn validate(&self) -> Result<(), crate::errors::SamplingError> {
+        if self.birth_date_window <= 0 || self.parent_date_window <= 0 {
+            return Err(crate::errors::SamplingError::invalid_criteria(
+                "Birth or parent date window must be positive",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct DateData {
+    pub birth: i64,
+    pub mother: Option<i64>,
+    pub father: Option<i64>,
+}
+</file>
+
+<file path="Cargo.toml">
+[package]
+name = "core"
+version.workspace = true
+edition.workspace = true
+
+# Features
+[features]
+default = []
+
+[dependencies]
+chrono.workspace = true
+log.workspace = true
+log4rs.workspace = true
+csv.workspace = true
+rayon.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+types = { path = "../types" }
+
+colored.workspace = true
+dashmap.workspace = true
+fastrand.workspace = true
+hashbrown.workspace = true
+humantime.workspace = true
+indicatif.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+rustc-hash.workspace = true
+smallvec.workspace = true
+</file>
+
+</files>
