@@ -132,29 +132,23 @@ mod tests {
 
     #[test]
     fn test_parse_bool() {
-        assert_eq!(
-            StringParsingUtilsImpl::parse_bool("true", "Invalid boolean").unwrap(),
-            true
+        assert!(
+            StringParsingUtilsImpl::parse_bool("true", "Invalid boolean").unwrap()
         );
-        assert_eq!(
-            StringParsingUtilsImpl::parse_bool("yes", "Invalid boolean").unwrap(),
-            true
+        assert!(
+            StringParsingUtilsImpl::parse_bool("yes", "Invalid boolean").unwrap()
         );
-        assert_eq!(
-            StringParsingUtilsImpl::parse_bool("1", "Invalid boolean").unwrap(),
-            true
+        assert!(
+            StringParsingUtilsImpl::parse_bool("1", "Invalid boolean").unwrap()
         );
-        assert_eq!(
-            StringParsingUtilsImpl::parse_bool("false", "Invalid boolean").unwrap(),
-            false
+        assert!(
+            !StringParsingUtilsImpl::parse_bool("false", "Invalid boolean").unwrap()
         );
-        assert_eq!(
-            StringParsingUtilsImpl::parse_bool("no", "Invalid boolean").unwrap(),
-            false
+        assert!(
+            !StringParsingUtilsImpl::parse_bool("no", "Invalid boolean").unwrap()
         );
-        assert_eq!(
-            StringParsingUtilsImpl::parse_bool("0", "Invalid boolean").unwrap(),
-            false
+        assert!(
+            !StringParsingUtilsImpl::parse_bool("0", "Invalid boolean").unwrap()
         );
         assert!(StringParsingUtilsImpl::parse_bool("abc", "Invalid boolean").is_err());
     }

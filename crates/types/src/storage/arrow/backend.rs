@@ -1391,7 +1391,7 @@ impl ArrowBackend {
     /// # Returns
     /// * `HashMap<String, u128>` - Map of operation names to durations in nanoseconds
     #[cfg(test)]
-    pub fn run_performance_benchmarks(&self) -> HashMap<String, u128> {
+    #[must_use] pub fn run_performance_benchmarks(&self) -> HashMap<String, u128> {
         use std::time::{Duration, Instant};
 
         let mut results = HashMap::new();
@@ -1401,7 +1401,7 @@ impl ArrowBackend {
         let iterations = 1000;
 
         for i in 0..iterations {
-            let test_str = format!("test_string_{}", i);
+            let test_str = format!("test_string_{i}");
             let start = Instant::now();
             let _ = self.string_interner.get_or_intern(&test_str);
             total_duration += start.elapsed();
