@@ -3,7 +3,7 @@
 //! This module provides functions for sampling rows from Arrow `RecordBatches`.
 
 use crate::error::{IdsError, Result};
-use arrow::array::{Array, ArrayRef};
+use arrow::array::ArrayRef;
 use arrow::compute::take;
 use arrow::record_batch::RecordBatch;
 use rand::seq::SliceRandom;
@@ -33,7 +33,10 @@ pub fn sample_records(
     }
 
     // Count total rows
-    let total_rows: usize = batches.iter().map(arrow::array::RecordBatch::num_rows).sum();
+    let total_rows: usize = batches
+        .iter()
+        .map(arrow::array::RecordBatch::num_rows)
+        .sum();
 
     // If sample count exceeds total rows, return all records
     if sample_count >= total_rows {
