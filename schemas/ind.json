@@ -1,12 +1,10 @@
 {
   "columns": [
-    { "name": "BESKST13", "type": "Int8" },
-    { "name": "CPRTJEK", "type": "Utf8" },
-    { "name": "CPRTYPE", "type": "Utf8" },
-    { "name": "LOENMV_13", "type": "Float64" },
-    { "name": "PERINDKIALT_13", "type": "Float64" },
-    { "name": "PNR", "type": "Utf8" },
-    { "name": "PRE_SOCIO", "type": "Int8" },
-    { "name": "VERSION", "type": "Utf8" }
+    { "name": "PNR", "type": "Utf8", "nullable": false },
+    { "name": "DATE", "type": "Date32", "nullable": false },
+    { "name": "INDKOMST_PERSONLIG", "type": "Float64", "nullable": true },
+    { "name": "INDKOMST_FAMILIE", "type": "Float64", "nullable": true },
+    { "name": "FORMUE", "type": "Float64", "nullable": true },
+    { "name": "SKAT", "type": "Float64", "nullable": true }
   ]
 }

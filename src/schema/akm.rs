@@ -7,12 +7,13 @@ use std::sync::Arc;
 #[must_use] pub fn akm_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
-        Field::new("DATE", DataType::Date32, false),
-        Field::new("STILLING", DataType::Utf8, true),
-        Field::new("BRANCHE", DataType::Utf8, true),
-        Field::new("SOCIO", DataType::Utf8, true),
-        Field::new("TIMETAL", DataType::Float64, true),
-        Field::new("ERHVERVSINDKOMST", DataType::Float64, true),
+        Field::new("SOCIO", DataType::Int8, true),
+        Field::new("SOCIO02", DataType::Int8, true),
+        Field::new("SOCIO13", DataType::Int8, true),
+        Field::new("CPRTJEK", DataType::Utf8, true),
+        Field::new("CPRTYPE", DataType::Utf8, true),
+        Field::new("VERSION", DataType::Utf8, true),
+        Field::new("SENR", DataType::Utf8, true),
     ])
 }
 

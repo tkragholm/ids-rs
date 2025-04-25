@@ -5,6 +5,7 @@
 //! Available registries:
 //! - AKM (Arbejdsklassifikationsmodulet): Employment information
 //! - BEF (Befolkning): Population demographic information
+//! - IDAN (Integrated Database for Labor Market Research): Employment information
 //! - IND (Indkomst): Income and tax information
 //! - UDDF (Uddannelse): Educational information
 
@@ -24,6 +25,7 @@ pub trait RegisterLoader {
 
 pub mod akm;
 pub mod bef;
+pub mod idan;
 pub mod ind;
 pub mod uddf;
 pub mod transform;
@@ -31,6 +33,7 @@ pub mod transform;
 // Re-export registry structs for easier access
 pub use akm::AkmRegister;
 pub use bef::BefRegister;
+pub use idan::IdanRegister;
 pub use ind::IndRegister;
 pub use uddf::UddfRegister;
 
@@ -50,6 +53,7 @@ pub fn registry_from_name(name: &str) -> Result<Box<dyn RegisterLoader>> {
     match name.to_lowercase().as_str() {
         "akm" => Ok(Box::new(akm::AkmRegister)),
         "bef" => Ok(Box::new(bef::BefRegister)),
+        "idan" => Ok(Box::new(idan::IdanRegister)),
         "ind" => Ok(Box::new(ind::IndRegister)),
         "uddf" => Ok(Box::new(uddf::UddfRegister)),
         _ => Err(IdsError::Validation(format!("Unknown registry: {name}"))),
@@ -69,6 +73,8 @@ pub fn registry_from_path(path: &str) -> Result<Box<dyn RegisterLoader>> {
             return Ok(Box::new(akm::AkmRegister));
         } else if lower_name.contains("bef") {
             return Ok(Box::new(bef::BefRegister));
+        } else if lower_name.contains("idan") {
+            return Ok(Box::new(idan::IdanRegister));
         } else if lower_name.contains("ind") {
             return Ok(Box::new(ind::IndRegister));
         } else if lower_name.contains("uddf") || lower_name.contains("uddannelse") {

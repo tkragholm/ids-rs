@@ -7,11 +7,14 @@ use std::sync::Arc;
 #[must_use] pub fn uddf_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
-        Field::new("DATE", DataType::Date32, false),
-        Field::new("INSTITUTION", DataType::Utf8, true),
-        Field::new("UDDANNELSESKODE", DataType::Utf8, true),
-        Field::new("STATUS", DataType::Utf8, true),
-        Field::new("NIVEAU", DataType::Utf8, true),
+        Field::new("CPRTJEK", DataType::Utf8, true),
+        Field::new("CPRTYPE", DataType::Utf8, true),
+        Field::new("HFAUDD", DataType::Utf8, true),
+        Field::new("HF_KILDE", DataType::Utf8, true),
+        Field::new("HF_VFRA", DataType::Utf8, true),
+        Field::new("HF_VTIL", DataType::Utf8, true),
+        Field::new("INSTNR", DataType::Int8, true),
+        Field::new("VERSION", DataType::Utf8, true),
     ])
 }
 

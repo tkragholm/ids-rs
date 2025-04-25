@@ -1,12 +1,11 @@
 {
   "columns": [
-    { "name": "PNR", "type": "Utf8" },
-    { "name": "SOCIO", "type": "Int8" },
-    { "name": "SOCIO02", "type": "Int8" },
-    { "name": "SOCIO13", "type": "Int8" },
-    { "name": "CPRTJEK", "type": "Utf8" },
-    { "name": "CPRTYPE", "type": "Utf8" },
-    { "name": "VERSION", "type": "Utf8" },
-    { "name": "SENR", "type": "Utf8" }
+    { "name": "PNR", "type": "Utf8", "nullable": false },
+    { "name": "DATE", "type": "Date32", "nullable": false },
+    { "name": "STILLING", "type": "Utf8", "nullable": true },
+    { "name": "BRANCHE", "type": "Utf8", "nullable": true },
+    { "name": "SOCIO", "type": "Utf8", "nullable": true },
+    { "name": "TIMETAL", "type": "Float64", "nullable": true },
+    { "name": "ERHVERVSINDKOMST", "type": "Float64", "nullable": true }
   ]
 }

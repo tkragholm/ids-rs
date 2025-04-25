@@ -4,7 +4,13 @@
 
 pub mod akm;
 pub mod bef;
+pub mod idan;
 pub mod ind;
+pub mod lpr_adm;
+pub mod lpr_bes;
+pub mod lpr_diag;
+pub mod lpr3_diagnoser;
+pub mod lpr3_kontakter;
 pub mod uddf;
 pub mod parquet;
 
