@@ -326,49 +326,9 @@ fn calculate_summary_statistics(metrics: &[BalanceMetric]) -> BalanceSummary {
 }
 
 /// Generate a balance report in CSV format
+/// 
+/// This function has been moved to utils::reports::generate_balance_report
+/// and is re-exported here for backward compatibility.
 pub fn generate_balance_report(report_path: &str, report: &BalanceReport) -> Result<()> {
-    use std::fs::File;
-    use std::io::{Write, BufWriter};
-    
-    // Create the report file
-    let file = File::create(report_path).map_err(|e| {
-        IdsError::Io(e)
-    })?;
-    
-    let mut writer = BufWriter::new(file);
-    
-    // Write header
-    writeln!(writer, "Variable,Type,Case Mean,Control Mean,Case SD,Control SD,Standardized Difference")
-        .map_err(IdsError::Io)?;
-    
-    // Write metrics sorted by absolute standardized difference (descending)
-    let mut sorted_metrics = report.metrics.clone();
-    sorted_metrics.sort_by(|a, b| {
-        b.standardized_difference.abs().partial_cmp(&a.standardized_difference.abs()).unwrap()
-    });
-    
-    for metric in &sorted_metrics {
-        let var_type = if metric.categorical { "Categorical" } else { "Numeric" };
-        writeln!(
-            writer,
-            "{},{},{:.4},{:.4},{:.4},{:.4},{:.4}",
-            metric.name,
-            var_type,
-            metric.case_mean,
-            metric.control_mean,
-            metric.case_std,
-            metric.control_std,
-            metric.standardized_difference
-        ).map_err(IdsError::Io)?;
-    }
-    
-    // Write summary
-    writeln!(writer).map_err(IdsError::Io)?;
-    writeln!(writer, "Summary Statistics").map_err(IdsError::Io)?;
-    writeln!(writer, "Total Covariates,{}", report.summary.total_covariates).map_err(IdsError::Io)?;
-    writeln!(writer, "Imbalanced Covariates (|SMD| > 0.1),{}", report.summary.imbalanced_covariates).map_err(IdsError::Io)?;
-    writeln!(writer, "Maximum Absolute Standardized Difference,{:.4}", report.summary.max_standardized_difference).map_err(IdsError::Io)?;
-    writeln!(writer, "Mean Absolute Standardized Difference,{:.4}", report.summary.mean_absolute_standardized_difference).map_err(IdsError::Io)?;
-    
-    Ok(())
+    crate::utils::reports::generate_balance_report(report_path, report)
 }
