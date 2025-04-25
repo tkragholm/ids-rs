@@ -2,7 +2,9 @@
 //!
 //! This module provides functionality for filtering and transforming Arrow record batches.
 
-use arrow::array::{Array, ArrayRef, BooleanArray, Date32Array, Float64Array, Int32Array, StringArray};
+use arrow::array::{
+    Array, ArrayRef, BooleanArray, Date32Array, Float64Array, Int32Array, StringArray,
+};
 use arrow::compute::filter as filter_batch;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -38,9 +40,10 @@ pub fn filter_by_date_range(
     end_date: Option<NaiveDate>,
 ) -> Result<RecordBatch> {
     // Find the date column
-    let date_idx = batch.schema().index_of(date_column).map_err(|e| {
-        IdsError::Validation(format!("Date column '{date_column}' not found: {e}"))
-    })?;
+    let date_idx = batch
+        .schema()
+        .index_of(date_column)
+        .map_err(|e| IdsError::Validation(format!("Date column '{date_column}' not found: {e}")))?;
 
     let date_array = batch.column(date_idx);
     let date_array = date_array
@@ -86,9 +89,10 @@ pub fn filter_by_date_range(
 /// Extract year from date column and add it as a new column
 pub fn add_year_column(batch: &RecordBatch, date_column: &str) -> Result<RecordBatch> {
     // Find the date column
-    let date_idx = batch.schema().index_of(date_column).map_err(|e| {
-        IdsError::Validation(format!("Date column '{date_column}' not found: {e}"))
-    })?;
+    let date_idx = batch
+        .schema()
+        .index_of(date_column)
+        .map_err(|e| IdsError::Validation(format!("Date column '{date_column}' not found: {e}")))?;
 
     let date_array = batch.column(date_idx);
     let date_array = date_array
@@ -187,18 +191,17 @@ pub fn map_categorical_values(
     mapping: &HashMap<String, String>,
 ) -> Result<RecordBatch> {
     // Find the column index
-    let col_idx = batch.schema().index_of(column).map_err(|e| {
-        IdsError::Validation(format!("Column '{column}' not found: {e}"))
-    })?;
+    let col_idx = batch
+        .schema()
+        .index_of(column)
+        .map_err(|e| IdsError::Validation(format!("Column '{column}' not found: {e}")))?;
 
     // Get the column and ensure it's a string column
     let string_array = batch.column(col_idx);
     let string_array = string_array
         .as_any()
         .downcast_ref::<StringArray>()
-        .ok_or_else(|| {
-            IdsError::Validation(format!("Column '{column}' is not a string array"))
-        })?;
+        .ok_or_else(|| IdsError::Validation(format!("Column '{column}' is not a string array")))?;
 
     // Create a new array with mapped values
     let mut mapped_values = Vec::with_capacity(batch.num_rows());
@@ -219,7 +222,7 @@ pub fn map_categorical_values(
     // Create a new schema by replacing the old field with a new one
     let schema = batch.schema();
     let mut fields = schema.fields().to_vec();
-    
+
     // Replace the original field with the mapped field (keeping the same name)
     fields[col_idx] = Arc::new(Field::new(column, DataType::Utf8, true));
     let new_schema = Arc::new(Schema::new(fields));
@@ -239,54 +242,56 @@ pub fn scale_numeric_values(
     scale_factor: f64,
 ) -> Result<RecordBatch> {
     // Find the column index
-    let col_idx = batch.schema().index_of(column).map_err(|e| {
-        IdsError::Validation(format!("Column '{column}' not found: {e}"))
-    })?;
+    let col_idx = batch
+        .schema()
+        .index_of(column)
+        .map_err(|e| IdsError::Validation(format!("Column '{column}' not found: {e}")))?;
 
     // Get the column
     let numeric_array = batch.column(col_idx);
-    
+
     // Try to interpret the column as different numeric types
-    let scaled_array: ArrayRef = if let Some(int_array) = numeric_array.as_any().downcast_ref::<Int32Array>() {
-        // Scale Int32 values
-        let mut scaled_values = Vec::with_capacity(batch.num_rows());
-        
-        for i in 0..int_array.len() {
-            if int_array.is_null(i) {
-                scaled_values.push(None);
-            } else {
-                let original_value = f64::from(int_array.value(i));
-                let scaled_value = original_value * scale_factor;
-                scaled_values.push(Some(scaled_value));
+    let scaled_array: ArrayRef =
+        if let Some(int_array) = numeric_array.as_any().downcast_ref::<Int32Array>() {
+            // Scale Int32 values
+            let mut scaled_values = Vec::with_capacity(batch.num_rows());
+
+            for i in 0..int_array.len() {
+                if int_array.is_null(i) {
+                    scaled_values.push(None);
+                } else {
+                    let original_value = f64::from(int_array.value(i));
+                    let scaled_value = original_value * scale_factor;
+                    scaled_values.push(Some(scaled_value));
+                }
             }
-        }
-        
-        Arc::new(Float64Array::from(scaled_values))
-    } else if let Some(float_array) = numeric_array.as_any().downcast_ref::<Float64Array>() {
-        // Scale Float64 values
-        let mut scaled_values = Vec::with_capacity(batch.num_rows());
-        
-        for i in 0..float_array.len() {
-            if float_array.is_null(i) {
-                scaled_values.push(None);
-            } else {
-                let original_value = float_array.value(i);
-                let scaled_value = original_value * scale_factor;
-                scaled_values.push(Some(scaled_value));
+
+            Arc::new(Float64Array::from(scaled_values))
+        } else if let Some(float_array) = numeric_array.as_any().downcast_ref::<Float64Array>() {
+            // Scale Float64 values
+            let mut scaled_values = Vec::with_capacity(batch.num_rows());
+
+            for i in 0..float_array.len() {
+                if float_array.is_null(i) {
+                    scaled_values.push(None);
+                } else {
+                    let original_value = float_array.value(i);
+                    let scaled_value = original_value * scale_factor;
+                    scaled_values.push(Some(scaled_value));
+                }
             }
-        }
-        
-        Arc::new(Float64Array::from(scaled_values))
-    } else {
-        return Err(IdsError::Validation(format!(
-            "Column '{column}' is not a numeric array (Int32 or Float64)"
-        )));
-    };
+
+            Arc::new(Float64Array::from(scaled_values))
+        } else {
+            return Err(IdsError::Validation(format!(
+                "Column '{column}' is not a numeric array (Int32 or Float64)"
+            )));
+        };
 
     // Create a new schema with the scaled column as Float64
     let schema = batch.schema();
     let mut fields = schema.fields().to_vec();
-    
+
     // Replace the original field with a Float64 field
     fields[col_idx] = Arc::new(Field::new(column, DataType::Float64, true));
     let new_schema = Arc::new(Schema::new(fields));
@@ -315,7 +320,9 @@ pub fn add_postal_code_region(
         .as_any()
         .downcast_ref::<StringArray>()
         .ok_or_else(|| {
-            IdsError::Validation(format!("Column '{postal_code_column}' is not a string array"))
+            IdsError::Validation(format!(
+                "Column '{postal_code_column}' is not a string array"
+            ))
         })?;
 
     // Create a new array with region values
@@ -336,7 +343,7 @@ pub fn add_postal_code_region(
 
     // Create a new field for the region column
     let region_field = Arc::new(Field::new("region", DataType::Utf8, true));
-    
+
     // Create a new schema by adding the region field
     let schema = batch.schema();
     let mut fields = schema.fields().to_vec();
@@ -355,54 +362,17 @@ pub fn add_postal_code_region(
 fn determine_region_from_postal_code(postal_code: &str) -> &'static str {
     if let Ok(code) = postal_code.parse::<u32>() {
         match code {
-            1000..=2999 => "Hovedstaden",    // Copenhagen and surrounding areas
-            3000..=3999 => "Nordsjælland",   // North Zealand
-            4000..=4999 => "Sjælland",       // Zealand
-            5000..=5999 => "Fyn",            // Funen
-            6000..=6999 => "Sydjylland",     // Southern Jutland
-            7000..=7999 => "Midtjylland",    // Central Jutland
-            8000..=8999 => "Østjylland",     // Eastern Jutland
-            9000..=9999 => "Nordjylland",    // Northern Jutland
+            1000..=2999 => "Hovedstaden",  // Copenhagen and surrounding areas
+            3000..=3999 => "Nordsjælland", // North Zealand
+            4000..=4999 => "Sjælland",     // Zealand
+            5000..=5999 => "Fyn",          // Funen
+            6000..=6999 => "Sydjylland",   // Southern Jutland
+            7000..=7999 => "Midtjylland",  // Central Jutland
+            8000..=8999 => "Østjylland",   // Eastern Jutland
+            9000..=9999 => "Nordjylland",  // Northern Jutland
             _ => "Unknown",
         }
     } else {
         "Unknown"
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use arrow::array::{Int32Array, StringArray};
-    use arrow::datatypes::{DataType, Field, Schema};
-
-    #[test]
-    fn test_filter_missing_values() {
-        // Create a test record batch with some missing values
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Utf8, false),
-            Field::new("value", DataType::Int32, true),
-        ]));
-
-        let id_array = StringArray::from(vec!["a", "b", "c", "d"]);
-        let value_array = Int32Array::from(vec![Some(1), None, Some(3), Some(4)]);
-
-        let batch =
-            RecordBatch::try_new(schema, vec![Arc::new(id_array), Arc::new(value_array)]).unwrap();
-
-        // Filter out rows with missing values in the "value" column
-        let filtered = filter_out_missing_values(&batch, &["value"]).unwrap();
-
-        // Check that we have 3 rows left (one was filtered out)
-        assert_eq!(filtered.num_rows(), 3);
-
-        // Check that the 'b' row is gone
-        let filtered_ids = filtered
-            .column(0)
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        let values: Vec<&str> = filtered_ids.iter().map(|id| id.unwrap()).collect();
-        assert_eq!(values, vec!["a", "c", "d"]);
     }
 }

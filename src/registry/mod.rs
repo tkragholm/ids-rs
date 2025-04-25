@@ -27,6 +27,7 @@ pub mod akm;
 pub mod bef;
 pub mod idan;
 pub mod ind;
+pub mod mfr;
 pub mod uddf;
 pub mod transform;
 
@@ -35,6 +36,7 @@ pub use akm::AkmRegister;
 pub use bef::BefRegister;
 pub use idan::IdanRegister;
 pub use ind::IndRegister;
+pub use mfr::MfrRegister;
 pub use uddf::UddfRegister;
 
 // Re-export transform functions
@@ -55,6 +57,7 @@ pub fn registry_from_name(name: &str) -> Result<Box<dyn RegisterLoader>> {
         "bef" => Ok(Box::new(bef::BefRegister)),
         "idan" => Ok(Box::new(idan::IdanRegister)),
         "ind" => Ok(Box::new(ind::IndRegister)),
+        "mfr" => Ok(Box::new(mfr::MfrRegister)),
         "uddf" => Ok(Box::new(uddf::UddfRegister)),
         _ => Err(IdsError::Validation(format!("Unknown registry: {name}"))),
     }
@@ -77,6 +80,8 @@ pub fn registry_from_path(path: &str) -> Result<Box<dyn RegisterLoader>> {
             return Ok(Box::new(idan::IdanRegister));
         } else if lower_name.contains("ind") {
             return Ok(Box::new(ind::IndRegister));
+        } else if lower_name.contains("mfr") || lower_name.contains("foedselsregister") {
+            return Ok(Box::new(mfr::MfrRegister));
         } else if lower_name.contains("uddf") || lower_name.contains("uddannelse") {
             return Ok(Box::new(uddf::UddfRegister));
         }

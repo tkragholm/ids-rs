@@ -41,28 +41,39 @@ pub fn read_parquet(
 
     // Set the projection if schema is provided
     let reader = if let Some(schema) = schema {
-        // Convert schema to projection indices
-        let projection: Vec<usize> = schema
-            .fields()
-            .iter()
-            .map(|f| {
-                let field_name = f.name();
-                reader_builder.schema().index_of(field_name).map_err(|e| {
-                    IdsError::Data(format!("Field {field_name} not found in schema: {e}"))
-                })
-            })
-            .collect::<Result<_>>()?;
-
-        // Create projection mask and build reader
-        let projection_mask = ProjectionMask::leaves(reader_builder.parquet_schema(), projection);
-        reader_builder
-            .with_projection(projection_mask)
-            .build()
-            .map_err(|e| {
-                IdsError::Data(format!(
-                    "Failed to build parquet reader with projection: {e}"
-                ))
-            })?
+        // Convert schema to projection indices, skipping fields that don't exist
+        let mut projection = Vec::new();
+        let file_schema = reader_builder.schema();
+        
+        for f in schema.fields() {
+            let field_name = f.name();
+            match file_schema.index_of(field_name) {
+                Ok(idx) => projection.push(idx),
+                Err(_) => {
+                    // Skip fields that don't exist in the file
+                    log::warn!("Field {} not found in parquet file, skipping", field_name);
+                }
+            }
+        }
+        
+        // If no fields matched, just read all columns
+        if projection.is_empty() {
+            log::warn!("No matching fields found in schema projection, reading all columns");
+            reader_builder
+                .build()
+                .map_err(|e| IdsError::Data(format!("Failed to build parquet reader: {e}")))?
+        } else {
+            // Create projection mask and build reader
+            let projection_mask = ProjectionMask::leaves(reader_builder.parquet_schema(), projection);
+            reader_builder
+                .with_projection(projection_mask)
+                .build()
+                .map_err(|e| {
+                    IdsError::Data(format!(
+                        "Failed to build parquet reader with projection: {e}"
+                    ))
+                })?
+        }
     } else {
         // No projection, read all columns
         reader_builder

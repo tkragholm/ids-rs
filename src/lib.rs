@@ -17,6 +17,6 @@ pub mod store;
 pub mod utils;
 
 // Re-export commonly used items
-pub use core::date::DateExtensions;
+pub use utils::date_utils::DateExtensions;
 pub use core::string::StringExtensions;
 pub use model::pnr::Pnr;

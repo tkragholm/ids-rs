@@ -13,6 +13,7 @@ pub mod lpr_bes;
 pub mod lpr_diag;
 pub mod lpr3_diagnoser;
 pub mod lpr3_kontakter;
+pub mod mfr;
 pub mod uddf;
 pub mod parquet;
 

@@ -1,12 +1,11 @@
 //! Population generation algorithms for combining BEF and MFR data
 
-use arrow::array::BooleanArray;
 use arrow::array::{Array, Date32Array, StringArray};
-use arrow::compute::filter;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
+use crate::utils::date_utils;
 
 use crate::error::{IdsError, Result};
 use crate::model::pnr::Pnr;
@@ -83,35 +82,11 @@ pub fn filter_by_birth_year(
         .column_by_name(date_column)
         .ok_or_else(|| IdsError::Data(format!("Missing {date_column} column")))?;
 
-    // Extract year from date
-    let date_array = date_col
-        .as_any()
-        .downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data(format!("{date_column} column is not a date array")))?;
-
-    // Create a filter for birth year range
-    let mut mask = vec![false; batch.num_rows()];
-
-    for (i, maybe_date) in date_array.iter().enumerate() {
-        if let Some(date_i32) = maybe_date {
-            // Convert the i32 date value to a NaiveDateTime using arrow's temporal conversions
-            // date32_to_datetime returns a chrono::NaiveDateTime
-            let datetime = arrow::temporal_conversions::date32_to_datetime(date_i32).unwrap();
-            // Extract year using chrono::Datelike trait
-            let year = datetime.date().year();
-            mask[i] = year >= start_year && year <= end_year;
-        }
-    }
-
-    let mask_array = BooleanArray::from(mask);
+    // Use our flexible date filtering function to handle various date types
+    let mask_array = date_utils::filter_by_year_range(date_col, start_year, end_year)?;
 
     // Apply the filter to each column and create a new batch
-    let mut filtered_columns = Vec::with_capacity(batch.num_columns());
-    for col in batch.columns() {
-        let filtered_col = filter(col, &mask_array)
-            .map_err(|e| IdsError::Data(format!("Error filtering column: {e}")))?;
-        filtered_columns.push(filtered_col);
-    }
+    let filtered_columns = date_utils::filter_arrays(batch.columns(), &mask_array)?;
 
     // Create a new RecordBatch with the filtered columns
     let filtered_batch = RecordBatch::try_new(batch.schema(), filtered_columns)
@@ -125,6 +100,14 @@ pub fn extract_bef_children(
     bef_data: &RecordBatch,
     config: &PopulationConfig,
 ) -> Result<RecordBatch> {
+    // Log before filtering
+    log::info!(
+        "BEF data before filtering: {} rows, year range: {} to {}", 
+        bef_data.num_rows(),
+        config.birth_inclusion_start_year,
+        config.birth_inclusion_end_year
+    );
+    
     // Apply birth year filter
     let filtered_batch = filter_by_birth_year(
         bef_data,
@@ -132,6 +115,16 @@ pub fn extract_bef_children(
         config.birth_inclusion_start_year,
         config.birth_inclusion_end_year,
     )?;
+    
+    // Log after filtering
+    log::info!("BEF data after filtering: {} rows", filtered_batch.num_rows());
+    
+    // Check for schema issues
+    for field in ["PNR", "FOED_DAG", "FAR_ID", "MOR_ID", "FAMILIE_ID"].iter() {
+        if filtered_batch.column_by_name(field).is_none() {
+            log::warn!("Missing field {} in BEF data after filtering", field);
+        }
+    }
 
     // Return the filtered batch (already has standard column names)
     Ok(filtered_batch)
@@ -142,13 +135,32 @@ pub fn extract_mfr_children(
     mfr_data: &RecordBatch,
     config: &PopulationConfig,
 ) -> Result<RecordBatch> {
+    // Log before filtering
+    log::info!(
+        "MFR data before filtering: {} rows, year range: {} to {}", 
+        mfr_data.num_rows(),
+        config.birth_inclusion_start_year,
+        config.birth_inclusion_end_year
+    );
+    
+    // Check for required columns
+    let mfr_columns = ["CPR_BARN", "FOEDSELSDATO", "CPR_MODER", "CPR_FADER"];
+    for field in &mfr_columns {
+        if mfr_data.column_by_name(field).is_none() {
+            log::warn!("Missing field {} in MFR data before filtering", field);
+        }
+    }
+    
     // Apply birth year filter
     let filtered_batch = filter_by_birth_year(
         mfr_data,
-        "FOEDSELSDATO",
+        "FOEDSELSDATO",  // Column name from MFR schema
         config.birth_inclusion_start_year,
         config.birth_inclusion_end_year,
     )?;
+    
+    // Log after filtering
+    log::info!("MFR data after filtering: {} rows", filtered_batch.num_rows());
 
     // Need to standardize column names
     let mut columns = Vec::with_capacity(5);
@@ -169,7 +181,11 @@ pub fn extract_mfr_children(
     let birth_date_idx = schema
         .index_of("FOEDSELSDATO")
         .map_err(|e| IdsError::Data(format!("Column FOEDSELSDATO not found: {e}")))?;
-    columns.push(mfr_columns[birth_date_idx].clone());
+    
+    // Convert the birth date column to Date32Array for consistency
+    let birth_date_col = &mfr_columns[birth_date_idx];
+    let date32_array = date_utils::convert_to_date32_array(birth_date_col.as_ref())?;
+    columns.push(std::sync::Arc::new(date32_array));
     fields.push(Field::new("FOED_DAG", DataType::Date32, true));
 
     // FAR_ID (from CPR_FADER)
@@ -207,6 +223,9 @@ pub fn combine_children_data(
     bef_children: &RecordBatch,
     mfr_children: &RecordBatch,
 ) -> Result<(RecordBatch, PopulationSummary)> {
+    // Log initial data before combining
+    log::info!("Combining data: {} BEF records, {} MFR records", 
+        bef_children.num_rows(), mfr_children.num_rows());
     // Calculate summary statistics before merge
     let summary_before = PopulationSummary {
         total_bef_records: bef_children.num_rows(),
@@ -265,11 +284,17 @@ pub fn combine_children_data(
         .iter()
         .filter(|pnr| !bef_pnrs.contains(*pnr))
         .count();
+        
+    // Log PNR set sizes
+    log::info!("PNR set sizes: BEF={}, MFR={}", bef_pnrs.len(), mfr_pnrs.len());
+    log::info!("Records only in BEF: {}, only in MFR: {}", records_only_in_bef, records_only_in_mfr);
 
     // Combine all unique PNRs
     let mut all_pnrs = bef_pnrs;
     all_pnrs.extend(mfr_pnrs);
     let total_combined_records = all_pnrs.len();
+    
+    log::info!("Total unique PNRs after combining: {}", total_combined_records);
 
     // Process each unique PNR to combine data
     let mut combined_pnrs = Vec::with_capacity(total_combined_records);
@@ -385,6 +410,8 @@ pub fn combine_children_data(
 
 /// Process parent data from BEF data
 pub fn process_parents(bef_data: &RecordBatch) -> Result<HashMap<Pnr, NaiveDate>> {
+    log::info!("Processing parent data from {} BEF records", bef_data.num_rows());
+    
     let pnr_col = bef_data
         .column_by_name("PNR")
         .ok_or_else(|| IdsError::Data("Missing PNR column in parent data".to_string()))?;
@@ -396,15 +423,13 @@ pub fn process_parents(bef_data: &RecordBatch) -> Result<HashMap<Pnr, NaiveDate>
         .as_any()
         .downcast_ref::<StringArray>()
         .ok_or_else(|| IdsError::Data("PNR column is not a string array".to_string()))?;
-    let date_array = date_col
-        .as_any()
-        .downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data("FOED_DAG column is not a date array".to_string()))?;
-
+    
     let mut parent_map = HashMap::new();
+    let mut valid_dates = 0;
+    let mut missing_dates = 0;
 
     for i in 0..pnr_array.len() {
-        if pnr_array.is_null(i) || date_array.is_null(i) {
+        if pnr_array.is_null(i) {
             continue;
         }
 
@@ -413,12 +438,20 @@ pub fn process_parents(bef_data: &RecordBatch) -> Result<HashMap<Pnr, NaiveDate>
             continue;
         }
 
-        let pnr = Pnr::from(pnr_str);
-        if let Some(date) = date_array.value_as_date(i) {
+        // Use our flexible date extraction function
+        if let Some(date) = date_utils::extract_date_from_array(date_col.as_ref(), i) {
+            let pnr = Pnr::from(pnr_str);
             // Only insert if PNR not already in map or if this is the first occurrence
             parent_map.entry(pnr).or_insert(date);
+            valid_dates += 1;
+        } else {
+            missing_dates += 1;
         }
     }
+    
+    log::info!("Processed {} parent records, {} with valid dates, {} with missing dates", 
+        pnr_array.len(), valid_dates, missing_dates);
+    log::info!("Parent map size: {} unique parents", parent_map.len());
 
     Ok(parent_map)
 }
@@ -428,17 +461,33 @@ pub fn create_family_data(
     children: &RecordBatch,
     parent_data: &HashMap<Pnr, NaiveDate>,
 ) -> Result<RecordBatch> {
+    log::info!("Creating family data from {} children records and {} parent records", 
+        children.num_rows(), parent_data.len());
+    
     // Extract data from children batch
     let mut child_population = Vec::new();
+    let mut error_count = 0;
+    
     for i in 0..children.num_rows() {
         match Population::from_record_batch(children, i) {
             Ok(person) => child_population.push(person),
-            Err(_) => continue, // Skip invalid records
+            Err(e) => {
+                error_count += 1;
+                if error_count <= 5 {
+                    // Log first few errors for debugging
+                    log::warn!("Error processing child record {}: {}", i, e);
+                }
+                continue; // Skip invalid records
+            }
         }
     }
+    
+    log::info!("Processed {} valid children records, {} had errors", 
+        child_population.len(), error_count);
 
     // Create family data by linking parent information
     let family_data = FamilyData::create_family_data(&child_population, parent_data);
+    log::info!("Created family data with {} records", family_data.len());
 
     // Convert to RecordBatch
     FamilyData::to_record_batch(&family_data)
@@ -470,16 +519,8 @@ fn get_date_value(
         .column_by_name(column_name)
         .ok_or_else(|| IdsError::Data(format!("Missing {column_name} column")))?;
 
-    let date_array = col
-        .as_any()
-        .downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data(format!("{column_name} column is not a date array")))?;
-
-    if date_array.is_null(row_index) {
-        Ok(None)
-    } else {
-        Ok(date_array.value_as_date(row_index))
-    }
+    // Use our flexible date extraction function
+    Ok(date_utils::extract_date_from_array(col.as_ref(), row_index))
 }
 
 /// Get a string value from a `RecordBatch`
