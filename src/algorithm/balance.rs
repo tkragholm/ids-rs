@@ -327,7 +327,7 @@ fn calculate_summary_statistics(metrics: &[BalanceMetric]) -> BalanceSummary {
 
 /// Generate a balance report in CSV format
 /// 
-/// This function has been moved to utils::reports::generate_balance_report
+/// This function has been moved to `utils::reports::generate_balance_report`
 /// and is re-exported here for backward compatibility.
 pub fn generate_balance_report(report_path: &str, report: &BalanceReport) -> Result<()> {
     crate::utils::reports::generate_balance_report(report_path, report)

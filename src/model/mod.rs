@@ -5,3 +5,4 @@
 pub mod pnr;
 pub mod family;
 pub mod covariate;
+pub mod population;

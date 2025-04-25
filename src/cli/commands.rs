@@ -1,6 +1,7 @@
 use crate::cli::console::Console;
 use crate::error::Result;
 use clap::{Parser, Subcommand, Args};
+use std::path::PathBuf;
 
 /// Command handler trait
 pub trait CommandHandler {
@@ -95,6 +96,49 @@ impl CommandHandler for BalanceCommand {
     }
 }
 
+/// Population command handler
+pub struct PopulationCommand {
+    /// BEF data path
+    pub bef_path: PathBuf,
+    
+    /// MFR data path
+    pub mfr_path: PathBuf,
+    
+    /// Output directory
+    pub output_dir: PathBuf,
+    
+    /// Start year for birth inclusion
+    pub birth_start_year: i32,
+    
+    /// End year for birth inclusion
+    pub birth_end_year: i32,
+}
+
+impl CommandHandler for PopulationCommand {
+    fn execute(&self) -> Result<()> {
+        Console::print_header("Generating Population Data");
+        Console::print_key_value("BEF Data", &self.bef_path.display().to_string());
+        Console::print_key_value("MFR Data", &self.mfr_path.display().to_string());
+        Console::print_key_value("Output Directory", &self.output_dir.display().to_string());
+        Console::print_key_value("Birth Year Range", &format!("{} - {}", self.birth_start_year, self.birth_end_year));
+        
+        // Create config from CLI arguments
+        let config = crate::commands::population::PopulationCommandConfig {
+            bef_path: self.bef_path.clone(),
+            mfr_path: self.mfr_path.clone(),
+            output_dir: self.output_dir.clone(),
+            birth_inclusion_start_year: self.birth_start_year,
+            birth_inclusion_end_year: self.birth_end_year,
+        };
+        
+        // Execute the population generation
+        crate::commands::population::handle_population_command(&config)?;
+        
+        Console::print_success("Population generation completed");
+        Ok(())
+    }
+}
+
 /// CLI Parser for the IDS-RS application
 #[derive(Parser)]
 #[clap(version, about = "Integrated Data System for Research in Rust")]
@@ -111,6 +155,9 @@ enum Commands {
     
     /// Check balance between case and control groups
     Balance(BalanceArgs),
+    
+    /// Generate population data by combining BEF and MFR registers
+    Population(PopulationArgs),
 }
 
 /// Arguments for the sample command
@@ -145,6 +192,30 @@ struct BalanceArgs {
     report: String,
 }
 
+/// Arguments for the population command
+#[derive(Args)]
+struct PopulationArgs {
+    /// BEF data path (supports glob patterns like "*.parquet")
+    #[clap(short, long)]
+    bef: PathBuf,
+    
+    /// MFR data path (supports glob patterns like "*.parquet")
+    #[clap(short, long)]
+    mfr: PathBuf,
+    
+    /// Output directory for population data and reports
+    #[clap(short, long)]
+    output: PathBuf,
+    
+    /// Start year for filtering births (inclusive)
+    #[clap(long, default_value = "1995")]
+    start_year: i32,
+    
+    /// End year for filtering births (inclusive)
+    #[clap(long, default_value = "2020")]
+    end_year: i32,
+}
+
 impl Cli {
     /// Parse command-line arguments and execute the appropriate command
     pub fn run() -> Result<()> {
@@ -164,6 +235,16 @@ impl Cli {
                     case_path: args.cases,
                     control_path: args.controls,
                     report_path: args.report,
+                };
+                command.execute()
+            }
+            Commands::Population(args) => {
+                let command = PopulationCommand {
+                    bef_path: args.bef,
+                    mfr_path: args.mfr,
+                    output_dir: args.output,
+                    birth_start_year: args.start_year,
+                    birth_end_year: args.end_year,
                 };
                 command.execute()
             }

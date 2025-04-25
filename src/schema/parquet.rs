@@ -14,6 +14,8 @@ use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::schema::filter_expr::{self, Expr};
+
 /// Read a parquet file into Arrow record batches
 pub fn read_parquet(
     path: &Path,
@@ -136,6 +138,40 @@ fn filter_batch_by_pnr(batch: &RecordBatch, pnr_filter: &HashSet<String>) -> Res
         .map_err(|e| IdsError::Data(format!("Failed to create filtered batch: {e}")))
 }
 
+/// Reads parquet file with advanced filtering capabilities
+///
+/// This function applies a filter expression to a parquet file and returns
+/// the filtered Arrow record batches with optional column projection.
+///
+/// # Arguments
+/// * `path` - Path to the parquet file
+/// * `expr` - Filter expression to apply
+/// * `columns` - Columns to include in the result (if None, all columns will be included)
+///
+/// # Returns
+/// A vector of filtered record batches
+///
+/// # Errors
+/// Returns an error if file reading fails or the expression cannot be evaluated
+pub fn read_parquet_with_filter(
+    path: &Path,
+    expr: &Expr,
+    columns: Option<&[String]>,
+) -> Result<Vec<RecordBatch>> {
+    // Convert to string path for the filter_expr implementation
+    let path_str = path.to_string_lossy();
+    
+    // Convert Option<&[String]> to empty Vec for the filter_expr implementation
+    let additional_columns = match columns {
+        Some(cols) => cols.to_vec(),
+        None => Vec::new(),
+    };
+    
+    // Use the filter_expr implementation to read and filter
+    filter_expr::read_and_filter_parquet(&path_str, expr, &additional_columns)
+        .map_err(|e| IdsError::Data(format!("Error filtering parquet file: {e}")))
+}
+
 /// Load all parquet files from a directory in parallel
 pub fn load_parquet_files_parallel(
     dir: &Path,
@@ -189,6 +225,79 @@ pub fn load_parquet_files_parallel(
             let pnr_filter_ref = pnr_filter_arc.as_ref().map(std::convert::AsRef::as_ref);
 
             read_parquet(path, schema_ref, pnr_filter_ref)
+        })
+        .collect();
+
+    // Combine all the results, propagating any errors
+    let mut combined_batches = Vec::new();
+    for result in all_batches {
+        let batches = result?;
+        combined_batches.extend(batches);
+    }
+
+    Ok(combined_batches)
+}
+
+/// Load all parquet files from a directory in parallel with advanced filtering
+///
+/// This function processes all parquet files in a directory, applying the
+/// same filter expression to each file and combining the results.
+///
+/// # Arguments
+/// * `dir` - Path to the directory containing parquet files
+/// * `expr` - Filter expression to apply
+/// * `columns` - Columns to include in the result (if None, all columns will be included)
+///
+/// # Returns
+/// A vector of filtered record batches from all matching files
+///
+/// # Errors
+/// Returns an error if directory reading fails or the expression cannot be evaluated
+pub fn load_parquet_files_parallel_with_filter(
+    dir: &Path,
+    expr: &Expr,
+    columns: Option<&[String]>,
+) -> Result<Vec<RecordBatch>> {
+    // Check if the directory exists
+    if !dir.exists() || !dir.is_dir() {
+        return Err(IdsError::Io(io::Error::new(
+            ErrorKind::NotFound,
+            format!("Directory does not exist: {}", dir.display()),
+        )));
+    }
+
+    // Find all parquet files in the directory
+    let mut parquet_files = Vec::<PathBuf>::new();
+    for entry_result in fs::read_dir(dir).map_err(|e| {
+        IdsError::Io(io::Error::new(
+            ErrorKind::PermissionDenied,
+            format!("Failed to read directory {}: {}", dir.display(), e),
+        ))
+    })? {
+        let entry = entry_result.map_err(|e| {
+            IdsError::Io(io::Error::new(
+                ErrorKind::Other,
+                format!("Failed to read directory entry: {e}"),
+            ))
+        })?;
+
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
+            parquet_files.push(path);
+        }
+    }
+
+    // If no files found, return empty result
+    if parquet_files.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Process files in parallel using rayon
+    let all_batches: Vec<Result<Vec<RecordBatch>>> = parquet_files
+        .par_iter()
+        .map(|path| {
+            // Apply the filter to each file
+            read_parquet_with_filter(path, expr, columns)
         })
         .collect();
 

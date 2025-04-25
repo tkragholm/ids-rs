@@ -4,6 +4,8 @@
 
 pub mod akm;
 pub mod bef;
+pub mod examples;
+pub mod filter_expr;
 pub mod idan;
 pub mod ind;
 pub mod lpr_adm;
@@ -15,4 +17,9 @@ pub mod uddf;
 pub mod parquet;
 
 // Re-export parquet utilities
-pub use parquet::{read_parquet, load_parquet_files_parallel};
+pub use parquet::{
+    read_parquet, 
+    load_parquet_files_parallel,
+    read_parquet_with_filter,
+    load_parquet_files_parallel_with_filter
+};

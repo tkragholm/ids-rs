@@ -2,7 +2,7 @@
 name = "ids-rs"
 version = "0.1.0"
 edition = "2021"
-authors = ["IDS-RS Team"]
+authors = ["Tobias Kragholm"]
 description = "Integrated Data System for Research in Rust"
 
 [dependencies]
@@ -21,7 +21,7 @@ colored = "3.0"
 indicatif = "0.17"
 
 # Data processing
-arrow = "55.0"
+arrow = { version = "55.0", features = ["chrono-tz"] }
 parquet = "55.0"
 rayon = "1.8.0"
 
