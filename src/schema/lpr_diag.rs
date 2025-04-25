@@ -1,9 +1,9 @@
-//! LPR_DIAG schema definitions
+//! `LPR_DIAG` schema definitions
 
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 
-/// Get the Arrow schema for LPR_DIAG data
+/// Get the Arrow schema for `LPR_DIAG` data
 #[must_use] pub fn lpr_diag_schema() -> Schema {
     Schema::new(vec![
         Field::new("C_DIAG", DataType::Utf8, true),
@@ -15,7 +15,7 @@ use std::sync::Arc;
     ])
 }
 
-/// Get the Arrow schema for LPR_DIAG data as an Arc
+/// Get the Arrow schema for `LPR_DIAG` data as an Arc
 #[must_use] pub fn lpr_diag_schema_arc() -> Arc<Schema> {
     Arc::new(lpr_diag_schema())
 }

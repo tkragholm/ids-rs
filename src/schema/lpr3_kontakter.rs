@@ -1,9 +1,9 @@
-//! LPR3_KONTAKTER schema definitions
+//! `LPR3_KONTAKTER` schema definitions
 
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 
-/// Get the Arrow schema for LPR3_KONTAKTER data
+/// Get the Arrow schema for `LPR3_KONTAKTER` data
 #[must_use] pub fn lpr3_kontakter_schema() -> Schema {
     Schema::new(vec![
         Field::new("SORENHED_IND", DataType::Utf8, true),
@@ -29,7 +29,7 @@ use std::sync::Arc;
     ])
 }
 
-/// Get the Arrow schema for LPR3_KONTAKTER data as an Arc
+/// Get the Arrow schema for `LPR3_KONTAKTER` data as an Arc
 #[must_use] pub fn lpr3_kontakter_schema_arc() -> Arc<Schema> {
     Arc::new(lpr3_kontakter_schema())
 }

@@ -1,9 +1,9 @@
-//! LPR3_DIAGNOSER schema definitions
+//! `LPR3_DIAGNOSER` schema definitions
 
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 
-/// Get the Arrow schema for LPR3_DIAGNOSER data
+/// Get the Arrow schema for `LPR3_DIAGNOSER` data
 #[must_use] pub fn lpr3_diagnoser_schema() -> Schema {
     Schema::new(vec![
         Field::new("DW_EK_KONTAKT", DataType::Utf8, true),
@@ -16,7 +16,7 @@ use std::sync::Arc;
     ])
 }
 
-/// Get the Arrow schema for LPR3_DIAGNOSER data as an Arc
+/// Get the Arrow schema for `LPR3_DIAGNOSER` data as an Arc
 #[must_use] pub fn lpr3_diagnoser_schema_arc() -> Arc<Schema> {
     Arc::new(lpr3_diagnoser_schema())
 }

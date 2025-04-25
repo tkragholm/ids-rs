@@ -1,9 +1,9 @@
-//! LPR_ADM schema definitions
+//! `LPR_ADM` schema definitions
 
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 
-/// Get the Arrow schema for LPR_ADM data
+/// Get the Arrow schema for `LPR_ADM` data
 #[must_use] pub fn lpr_adm_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
@@ -36,7 +36,7 @@ use std::sync::Arc;
     ])
 }
 
-/// Get the Arrow schema for LPR_ADM data as an Arc
+/// Get the Arrow schema for `LPR_ADM` data as an Arc
 #[must_use] pub fn lpr_adm_schema_arc() -> Arc<Schema> {
     Arc::new(lpr_adm_schema())
 }

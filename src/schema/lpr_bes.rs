@@ -1,9 +1,9 @@
-//! LPR_BES schema definitions
+//! `LPR_BES` schema definitions
 
 use arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 
-/// Get the Arrow schema for LPR_BES data
+/// Get the Arrow schema for `LPR_BES` data
 #[must_use] pub fn lpr_bes_schema() -> Schema {
     Schema::new(vec![
         Field::new("D_AMBDTO", DataType::Date32, true),
@@ -13,7 +13,7 @@ use std::sync::Arc;
     ])
 }
 
-/// Get the Arrow schema for LPR_BES data as an Arc
+/// Get the Arrow schema for `LPR_BES` data as an Arc
 #[must_use] pub fn lpr_bes_schema_arc() -> Arc<Schema> {
     Arc::new(lpr_bes_schema())
 }
