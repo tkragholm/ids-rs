@@ -73,14 +73,14 @@ pub fn generate_balance_report(report_path: &str, report: &BalanceReport) -> Res
 /// * `Result<()>` - Success or error
 pub fn write_csv_report(path: &Path, rows: &[Vec<String>]) -> Result<()> {
     let file = File::create(path)
-        .map_err(|e| IdsError::Io(e))?;
+        .map_err(IdsError::Io)?;
     
     let mut writer = BufWriter::new(file);
     
     for row in rows {
         let line = row.join(",");
         writeln!(writer, "{}", line)
-            .map_err(|e| IdsError::Io(e))?;
+            .map_err(IdsError::Io)?;
     }
     
     Ok(())

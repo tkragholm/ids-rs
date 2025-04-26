@@ -441,7 +441,7 @@ impl Cli {
         // Initialize logger with verbosity from CLI
         let log_level = cli.verbose.log_level_filter();
         env_logger::Builder::new()
-            .filter_level(log_level.clone())
+            .filter_level(log_level)
             .init();
 
         log::debug!("Log level set to: {}", log_level);

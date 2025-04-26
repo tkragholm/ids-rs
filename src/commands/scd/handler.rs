@@ -24,7 +24,7 @@ use super::config::ScdCommandConfig;
 pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     // Create output directory if it doesn't exist
     if !config.output_path.exists() {
-        fs::create_dir_all(&config.output_path).map_err(|e| IdsError::Io(e))?;
+        fs::create_dir_all(&config.output_path).map_err(IdsError::Io)?;
     }
 
     // Step 1: Find LPR files
@@ -231,7 +231,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
 
 /// Save RecordBatch as a Parquet file
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    let file = fs::File::create(path).map_err(|e| IdsError::Io(e))?;
+    let file = fs::File::create(path).map_err(IdsError::Io)?;
 
     let props = WriterProperties::builder().build();
     let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))

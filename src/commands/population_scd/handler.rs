@@ -26,7 +26,7 @@ use super::config::PopulationScdCommandConfig;
 pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Result<()> {
     // Create output directory if it doesn't exist
     if !config.output_dir.exists() {
-        fs::create_dir_all(&config.output_dir).map_err(|e| IdsError::Io(e))?;
+        fs::create_dir_all(&config.output_dir).map_err(IdsError::Io)?;
     }
 
     // Step 1: Load population data
@@ -255,7 +255,7 @@ fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
 /// Save RecordBatch as a Parquet file
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
     // Use existing helpers if possible, otherwise create a simple implementation
-    let file = std::fs::File::create(path).map_err(|e| IdsError::Io(e))?;
+    let file = std::fs::File::create(path).map_err(IdsError::Io)?;
 
     let writer_props = ArrowWriter::try_new(file, batch.schema(), None)
         .map_err(|e| IdsError::Data(format!("Failed to create writer: {e}")))?;

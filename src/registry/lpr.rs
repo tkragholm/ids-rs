@@ -210,15 +210,15 @@ fn visit_dirs(dir: &Path, paths: &mut LprPaths) -> Result<()> {
                     
                     let file_name_lower = file_name.to_lowercase();
                     
-                    if file_name_lower.contains("lpr_adm") && path.extension().map_or(false, |ext| ext == "parquet") {
+                    if file_name_lower.contains("lpr_adm") && path.extension().is_some_and(|ext| ext == "parquet") {
                         paths.lpr_adm = Some(path.to_path_buf());
-                    } else if file_name_lower.contains("lpr_diag") && path.extension().map_or(false, |ext| ext == "parquet") {
+                    } else if file_name_lower.contains("lpr_diag") && path.extension().is_some_and(|ext| ext == "parquet") {
                         paths.lpr_diag = Some(path.to_path_buf());
-                    } else if file_name_lower.contains("lpr_bes") && path.extension().map_or(false, |ext| ext == "parquet") {
+                    } else if file_name_lower.contains("lpr_bes") && path.extension().is_some_and(|ext| ext == "parquet") {
                         paths.lpr_bes = Some(path.to_path_buf());
-                    } else if file_name_lower.contains("lpr3_kontakter") && path.extension().map_or(false, |ext| ext == "parquet") {
+                    } else if file_name_lower.contains("lpr3_kontakter") && path.extension().is_some_and(|ext| ext == "parquet") {
                         paths.lpr3_kontakter = Some(path.to_path_buf());
-                    } else if file_name_lower.contains("lpr3_diagnoser") && path.extension().map_or(false, |ext| ext == "parquet") {
+                    } else if file_name_lower.contains("lpr3_diagnoser") && path.extension().is_some_and(|ext| ext == "parquet") {
                         paths.lpr3_diagnoser = Some(path.to_path_buf());
                     }
                 }

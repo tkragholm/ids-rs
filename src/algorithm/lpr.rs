@@ -813,8 +813,8 @@ pub fn filter_by_date_range(
         let date_i32 = date_array.value(i);
         let date = NaiveDate::from_num_days_from_ce_opt(date_i32 + 719163).unwrap_or_default();
 
-        let passes_start = start_date.map_or(true, |start| date >= start);
-        let passes_end = end_date.map_or(true, |end| date <= end);
+        let passes_start = start_date.is_none_or(|start| date >= start);
+        let passes_end = end_date.is_none_or(|end| date <= end);
 
         mask.push(passes_start && passes_end);
     }
