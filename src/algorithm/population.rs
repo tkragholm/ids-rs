@@ -120,9 +120,9 @@ pub fn extract_bef_children(
     log::info!("BEF data after filtering: {} rows", filtered_batch.num_rows());
     
     // Check for schema issues
-    for field in ["PNR", "FOED_DAG", "FAR_ID", "MOR_ID", "FAMILIE_ID"].iter() {
+    for field in &["PNR", "FOED_DAG", "FAR_ID", "MOR_ID", "FAMILIE_ID"] {
         if filtered_batch.column_by_name(field).is_none() {
-            log::warn!("Missing field {} in BEF data after filtering", field);
+            log::warn!("Missing field {field} in BEF data after filtering");
         }
     }
 
@@ -147,7 +147,7 @@ pub fn extract_mfr_children(
     let mfr_columns = ["CPR_BARN", "FOEDSELSDATO", "CPR_MODER", "CPR_FADER"];
     for field in &mfr_columns {
         if mfr_data.column_by_name(field).is_none() {
-            log::warn!("Missing field {} in MFR data before filtering", field);
+            log::warn!("Missing field {field} in MFR data before filtering");
         }
     }
     
@@ -287,14 +287,14 @@ pub fn combine_children_data(
         
     // Log PNR set sizes
     log::info!("PNR set sizes: BEF={}, MFR={}", bef_pnrs.len(), mfr_pnrs.len());
-    log::info!("Records only in BEF: {}, only in MFR: {}", records_only_in_bef, records_only_in_mfr);
+    log::info!("Records only in BEF: {records_only_in_bef}, only in MFR: {records_only_in_mfr}");
 
     // Combine all unique PNRs
     let mut all_pnrs = bef_pnrs;
     all_pnrs.extend(mfr_pnrs);
     let total_combined_records = all_pnrs.len();
     
-    log::info!("Total unique PNRs after combining: {}", total_combined_records);
+    log::info!("Total unique PNRs after combining: {total_combined_records}");
 
     // Process each unique PNR to combine data
     let mut combined_pnrs = Vec::with_capacity(total_combined_records);
@@ -475,7 +475,7 @@ pub fn create_family_data(
                 error_count += 1;
                 if error_count <= 5 {
                     // Log first few errors for debugging
-                    log::warn!("Error processing child record {}: {}", i, e);
+                    log::warn!("Error processing child record {i}: {e}");
                 }
                 continue; // Skip invalid records
             }

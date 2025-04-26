@@ -36,7 +36,7 @@ impl Default for LprConfig {
     }
 }
 
-/// Integrate LPR2 components (LPR_ADM, LPR_DIAG, and optionally LPR_BES)
+/// Integrate LPR2 components (`LPR_ADM`, `LPR_DIAG`, and optionally `LPR_BES`)
 pub fn integrate_lpr2_components(
     lpr_adm: &[RecordBatch],
     lpr_diag: &[RecordBatch],
@@ -418,7 +418,7 @@ pub fn integrate_lpr2_components(
     Ok(integrated_batch)
 }
 
-/// Integrate LPR3 components (LPR3_KONTAKTER and LPR3_DIAGNOSER)
+/// Integrate LPR3 components (`LPR3_KONTAKTER` and `LPR3_DIAGNOSER`)
 pub fn integrate_lpr3_components(
     lpr3_kontakter: &[RecordBatch],
     lpr3_diagnoser: &[RecordBatch],

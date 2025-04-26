@@ -15,7 +15,7 @@ use crate::schema::lpr_bes::lpr_bes_schema_arc;
 use crate::schema::lpr3_kontakter::lpr3_kontakter_schema_arc;
 use crate::schema::lpr3_diagnoser::lpr3_diagnoser_schema_arc;
 
-/// Loader for LPR2 Admissions data (LPR_ADM)
+/// Loader for LPR2 Admissions data (`LPR_ADM`)
 pub struct LprAdmRegister;
 
 impl RegisterLoader for LprAdmRegister {
@@ -37,7 +37,7 @@ impl RegisterLoader for LprAdmRegister {
     }
 }
 
-/// Loader for LPR2 Diagnoses data (LPR_DIAG)
+/// Loader for LPR2 Diagnoses data (`LPR_DIAG`)
 pub struct LprDiagRegister;
 
 impl RegisterLoader for LprDiagRegister {
@@ -62,7 +62,7 @@ impl RegisterLoader for LprDiagRegister {
     }
 }
 
-/// Loader for LPR2 Treatments data (LPR_BES)
+/// Loader for LPR2 Treatments data (`LPR_BES`)
 pub struct LprBesRegister;
 
 impl RegisterLoader for LprBesRegister {
@@ -87,7 +87,7 @@ impl RegisterLoader for LprBesRegister {
     }
 }
 
-/// Loader for LPR3 Contacts data (LPR3_KONTAKTER)
+/// Loader for LPR3 Contacts data (`LPR3_KONTAKTER`)
 pub struct Lpr3KontakterRegister;
 
 impl RegisterLoader for Lpr3KontakterRegister {
@@ -109,7 +109,7 @@ impl RegisterLoader for Lpr3KontakterRegister {
     }
 }
 
-/// Loader for LPR3 Diagnoses data (LPR3_DIAGNOSER)
+/// Loader for LPR3 Diagnoses data (`LPR3_DIAGNOSER`)
 pub struct Lpr3DiagnoserRegister;
 
 impl RegisterLoader for Lpr3DiagnoserRegister {
@@ -139,7 +139,7 @@ pub fn find_lpr_files(base_dir: &str) -> Result<LprPaths> {
     let base_path = Path::new(base_dir);
     
     if !base_path.exists() {
-        return Err(IdsError::Validation(format!("Base path does not exist: {}", base_dir)));
+        return Err(IdsError::Validation(format!("Base path does not exist: {base_dir}")));
     }
     
     let mut lpr_paths = LprPaths::default();
@@ -150,7 +150,7 @@ pub fn find_lpr_files(base_dir: &str) -> Result<LprPaths> {
     // Validate that we found at least some files
     if lpr_paths.lpr_adm.is_none() && lpr_paths.lpr3_kontakter.is_none() {
         return Err(IdsError::Validation(format!(
-            "No LPR files found in directory: {}", base_dir
+            "No LPR files found in directory: {base_dir}"
         )));
     }
     
@@ -160,15 +160,15 @@ pub fn find_lpr_files(base_dir: &str) -> Result<LprPaths> {
 /// Data structure to hold paths to different LPR files
 #[derive(Default)]
 pub struct LprPaths {
-    /// Path to LPR_ADM files
+    /// Path to `LPR_ADM` files
     pub lpr_adm: Option<PathBuf>,
-    /// Path to LPR_DIAG files
+    /// Path to `LPR_DIAG` files
     pub lpr_diag: Option<PathBuf>,
-    /// Path to LPR_BES files
+    /// Path to `LPR_BES` files
     pub lpr_bes: Option<PathBuf>,
-    /// Path to LPR3_KONTAKTER files
+    /// Path to `LPR3_KONTAKTER` files
     pub lpr3_kontakter: Option<PathBuf>,
-    /// Path to LPR3_DIAGNOSER files
+    /// Path to `LPR3_DIAGNOSER` files
     pub lpr3_diagnoser: Option<PathBuf>,
 }
 
@@ -211,15 +211,15 @@ fn visit_dirs(dir: &Path, paths: &mut LprPaths) -> Result<()> {
                     let file_name_lower = file_name.to_lowercase();
                     
                     if file_name_lower.contains("lpr_adm") && path.extension().is_some_and(|ext| ext == "parquet") {
-                        paths.lpr_adm = Some(path.to_path_buf());
+                        paths.lpr_adm = Some(path.clone());
                     } else if file_name_lower.contains("lpr_diag") && path.extension().is_some_and(|ext| ext == "parquet") {
-                        paths.lpr_diag = Some(path.to_path_buf());
+                        paths.lpr_diag = Some(path.clone());
                     } else if file_name_lower.contains("lpr_bes") && path.extension().is_some_and(|ext| ext == "parquet") {
-                        paths.lpr_bes = Some(path.to_path_buf());
+                        paths.lpr_bes = Some(path.clone());
                     } else if file_name_lower.contains("lpr3_kontakter") && path.extension().is_some_and(|ext| ext == "parquet") {
-                        paths.lpr3_kontakter = Some(path.to_path_buf());
+                        paths.lpr3_kontakter = Some(path.clone());
                     } else if file_name_lower.contains("lpr3_diagnoser") && path.extension().is_some_and(|ext| ext == "parquet") {
-                        paths.lpr3_diagnoser = Some(path.to_path_buf());
+                        paths.lpr3_diagnoser = Some(path.clone());
                     }
                 }
             }

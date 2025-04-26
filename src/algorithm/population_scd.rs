@@ -94,8 +94,7 @@ pub fn identify_scd_in_population(
         .index_of(&config.population_pnr_column)
         .map_err(|e| {
             IdsError::Data(format!(
-                "PNR column not found in population data: {}",
-                e
+                "PNR column not found in population data: {e}"
             ))
         })?;
 
@@ -202,7 +201,7 @@ pub fn identify_scd_in_population(
     
     // Add category fields
     for category in &all_categories {
-        let field_name = format!("scd_category_{}", category);
+        let field_name = format!("scd_category_{category}");
         fields.push(Arc::new(Field::new(&field_name, DataType::Boolean, true)));
     }
     

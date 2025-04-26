@@ -444,7 +444,7 @@ impl Cli {
             .filter_level(log_level)
             .init();
 
-        log::debug!("Log level set to: {}", log_level);
+        log::debug!("Log level set to: {log_level}");
 
         match cli.command {
             Commands::Sample(args) => {
@@ -477,12 +477,12 @@ impl Cli {
                 // Parse start and end dates if provided
                 let start_date = args.start_date.map(|date_str| {
                     chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {}", date_str))
+                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}"))
                 });
                 
                 let end_date = args.end_date.map(|date_str| {
                     chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {}", date_str))
+                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}"))
                 });
                 
                 let command = ScdCommand {
@@ -499,12 +499,12 @@ impl Cli {
                 // Parse start and end dates if provided
                 let start_date = args.start_date.map(|date_str| {
                     chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {}", date_str))
+                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}"))
                 });
                 
                 let end_date = args.end_date.map(|date_str| {
                     chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {}", date_str))
+                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}"))
                 });
                 
                 let command = PopulationScdCommand {

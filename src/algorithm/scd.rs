@@ -19,7 +19,7 @@ pub struct ScdDiseaseCodes {
 }
 
 impl ScdDiseaseCodes {
-    /// Create a new ScdDiseaseCodes instance with predefined disease categories and codes
+    /// Create a new `ScdDiseaseCodes` instance with predefined disease categories and codes
     #[must_use] pub fn new() -> Self {
         let mut codes = HashMap::new();
         
@@ -28,54 +28,54 @@ impl ScdDiseaseCodes {
             "D55", "D56", "D57", "D58", "D59", "D60", "D61",
             "D64", "D65", "D66", "D67", "D68", "D69", "D70", "D71", "D72", "D73",
             "D76"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Immune System Disorders
         codes.insert("immune_system".to_string(), [
             "D80", "D81", "D82", "D83", "D84", "D86", "D89"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Endocrine Disorders
         codes.insert("endocrine".to_string(), [
             "E22", "E23", "E24", "E25", "E26", "E27", "E31", "E34",
             "E70", "E71", "E72", "E73", "E74", "E75", "E76", "E77", 
             "E78", "E79", "E80", "E83", "E84", "E85", "E88"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Neurological Disorders
         codes.insert("neurological".to_string(), [
             "F84", "G11", "G12", "G13", "G23", "G24", "G25", "G31", 
             "G40", "G41", "G70", "G71", "G72", "G80", "G81", "G82"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Cardiovascular Disorders
         codes.insert("cardiovascular".to_string(), [
             "I27", "I42", "I43", "I50", "I81", "I82", "I83"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Respiratory Disorders
         codes.insert("respiratory".to_string(), [
             "J41", "J42", "J43", "J44", "J45", "J47", "J60", "J61", "J62", 
             "J63", "J64", "J65", "J66", "J67", "J68", "J69", "J70", "J84", "J96"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Gastrointestinal Disorders
         codes.insert("gastrointestinal".to_string(), [
             "K50", "K51", "K73", "K74", "K86", "K87", "K90"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Musculoskeletal Disorders
         codes.insert("musculoskeletal".to_string(), [
             "M05", "M06", "M07", "M08", "M09", "M30", "M31", "M32", "M33",
             "M34", "M35", "M40", "M41", "M42", "M43", "M45", "M46"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Renal Disorders
         codes.insert("renal".to_string(), [
             "N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08", 
             "N11", "N12", "N13", "N14", "N15", "N16", "N18", "N19", 
             "N20", "N21", "N22", "N23", "N24", "N25", "N26", "N27", "N28", "N29"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         // Congenital Disorders
         codes.insert("congenital".to_string(), [
@@ -85,7 +85,7 @@ impl ScdDiseaseCodes {
             "Q38", "Q39", "Q40", "Q41", "Q42", "Q43", "Q44", "Q45", 
             "Q60", "Q61", "Q62", "Q63", "Q64", "Q77", "Q78", "Q79", 
             "Q80", "Q81", "Q82", "Q83", "Q84", "Q85", "Q86", "Q87", "Q89"
-        ].iter().map(|s| s.to_string()).collect());
+        ].iter().map(|s| (*s).to_string()).collect());
         
         Self { codes }
     }
@@ -228,7 +228,7 @@ pub fn apply_scd_algorithm(
         if let Ok(idx) = health_data.schema().index_of(diag_col) {
             diag_indices.push(idx);
         } else {
-            log::warn!("Diagnosis column not found: {}", diag_col);
+            log::warn!("Diagnosis column not found: {diag_col}");
         }
     }
     
@@ -250,12 +250,9 @@ pub fn apply_scd_algorithm(
         // Check each diagnosis column
         for &diag_idx in &diag_indices {
             let diag_array = health_data.column(diag_idx);
-            let diag_array = match diag_array.as_any().downcast_ref::<StringArray>() {
-                Some(array) => array,
-                None => {
-                    log::warn!("Diagnosis column is not a string array");
-                    continue;
-                }
+            let diag_array = if let Some(array) = diag_array.as_any().downcast_ref::<StringArray>() { array } else {
+                log::warn!("Diagnosis column is not a string array");
+                continue;
             };
             
             // Skip if diagnosis is null
@@ -327,7 +324,7 @@ pub fn apply_scd_algorithm(
             }
         }
         
-        let first_scd_date = patient_first_date.get(&patient_id).cloned();
+        let first_scd_date = patient_first_date.get(&patient_id).copied();
         
         results.push(ScdResult {
             patient_id,
@@ -430,7 +427,7 @@ pub fn scd_results_to_record_batch(results: &[ScdResult]) -> Result<RecordBatch>
     
     // Add category fields
     for category in &categories {
-        let field_name = format!("category_{}", category);
+        let field_name = format!("category_{category}");
         fields.push(Field::new(field_name, DataType::Boolean, true));
     }
     

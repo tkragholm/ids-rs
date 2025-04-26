@@ -110,13 +110,13 @@ impl DateExtensions for NaiveDate {
     }
 }
 
-/// Extracts a NaiveDate from an Arrow array element
+/// Extracts a `NaiveDate` from an Arrow array element
 /// 
 /// This function tries to handle multiple Arrow date types:
-/// - Date32Array (days since epoch)
-/// - Date64Array (milliseconds since epoch)
-/// - StringArray (with date strings that can be parsed)
-/// - Int32Array (assuming YYYYMMDD format)
+/// - `Date32Array` (days since epoch)
+/// - `Date64Array` (milliseconds since epoch)
+/// - `StringArray` (with date strings that can be parsed)
+/// - `Int32Array` (assuming YYYYMMDD format)
 ///
 /// Returns Some(NaiveDate) if a date could be extracted, None otherwise
 #[must_use] pub fn extract_date_from_array(array: &dyn Array, row_index: usize) -> Option<NaiveDate> {
@@ -158,10 +158,10 @@ impl DateExtensions for NaiveDate {
 /// Extracts years from an Arrow array that contains date information
 /// 
 /// This function tries to handle multiple Arrow date types:
-/// - Date32Array (days since epoch)
-/// - Date64Array (milliseconds since epoch)
-/// - StringArray (with date strings that can be parsed)
-/// - Int32Array (assuming YYYYMMDD format)
+/// - `Date32Array` (days since epoch)
+/// - `Date64Array` (milliseconds since epoch)
+/// - `StringArray` (with date strings that can be parsed)
+/// - `Int32Array` (assuming YYYYMMDD format)
 ///
 /// Returns a boolean mask indicating which rows have years in the specified range
 pub fn filter_by_year_range(array: &ArrayRef, start_year: i32, end_year: i32) -> Result<BooleanArray> {
@@ -235,15 +235,15 @@ pub fn filter_arrays(arrays: &[ArrayRef], mask: &BooleanArray) -> Result<Vec<Arr
     Ok(filtered_arrays)
 }
 
-/// Converts an Arrow array with date information to a Date32Array (days since epoch)
+/// Converts an Arrow array with date information to a `Date32Array` (days since epoch)
 ///
 /// This function handles various date formats:
-/// - Date32Array (returned as is)
-/// - Date64Array (milliseconds to days conversion)
-/// - StringArray (parsed and converted to days)
-/// - Int32Array (assuming YYYYMMDD format)
+/// - `Date32Array` (returned as is)
+/// - `Date64Array` (milliseconds to days conversion)
+/// - `StringArray` (parsed and converted to days)
+/// - `Int32Array` (assuming YYYYMMDD format)
 ///
-/// Returns a Date32Array representing days since Unix epoch (January 1, 1970)
+/// Returns a `Date32Array` representing days since Unix epoch (January 1, 1970)
 pub fn convert_to_date32_array(array: &dyn Array) -> Result<Date32Array> {
     let rows = array.len();
     let mut date_values: Vec<Option<i32>> = Vec::with_capacity(rows);

@@ -51,7 +51,7 @@ pub fn read_parquet(
                 Ok(idx) => projection.push(idx),
                 Err(_) => {
                     // Skip fields that don't exist in the file
-                    log::warn!("Field {} not found in parquet file, skipping", field_name);
+                    log::warn!("Field {field_name} not found in parquet file, skipping");
                 }
             }
         }

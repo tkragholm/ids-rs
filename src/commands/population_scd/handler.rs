@@ -76,7 +76,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             let adm_data = adm_loader.load(path.to_str().unwrap(), None)?;
             let adm_batch_count = adm_data.len();
             lpr2_adm = Some(adm_data);
-            info!("Loaded {} LPR_ADM batches", adm_batch_count);
+            info!("Loaded {adm_batch_count} LPR_ADM batches");
         }
 
         if let Some(path) = &lpr_paths.lpr_diag {
@@ -85,7 +85,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             let diag_data = diag_loader.load(path.to_str().unwrap(), None)?;
             let diag_batch_count = diag_data.len();
             lpr2_diag = Some(diag_data);
-            info!("Loaded {} LPR_DIAG batches", diag_batch_count);
+            info!("Loaded {diag_batch_count} LPR_DIAG batches");
         }
 
         if let Some(path) = &lpr_paths.lpr_bes {
@@ -94,7 +94,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             let bes_data = bes_loader.load(path.to_str().unwrap(), None)?;
             let bes_batch_count = bes_data.len();
             lpr2_bes = Some(bes_data);
-            info!("Loaded {} LPR_BES batches", bes_batch_count);
+            info!("Loaded {bes_batch_count} LPR_BES batches");
         }
     }
 
@@ -109,7 +109,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             let kontakter_data = kontakter_loader.load(path.to_str().unwrap(), None)?;
             let kontakter_batch_count = kontakter_data.len();
             lpr3_kontakter = Some(kontakter_data);
-            info!("Loaded {} LPR3_KONTAKTER batches", kontakter_batch_count);
+            info!("Loaded {kontakter_batch_count} LPR3_KONTAKTER batches");
         }
 
         if let Some(path) = &lpr_paths.lpr3_diagnoser {
@@ -118,7 +118,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             let diagnoser_data = diagnoser_loader.load(path.to_str().unwrap(), None)?;
             let diagnoser_batch_count = diagnoser_data.len();
             lpr3_diagnoser = Some(diagnoser_data);
-            info!("Loaded {} LPR3_DIAGNOSER batches", diagnoser_batch_count);
+            info!("Loaded {diagnoser_batch_count} LPR3_DIAGNOSER batches");
         }
     }
 
@@ -166,7 +166,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
         } else {
             0.0
         };
-        info!("  {}: {} ({:.2}%)", category, count, percentage);
+        info!("  {category}: {count} ({percentage:.2}%)");
     }
 
     // Step 6: Extract SCD children
@@ -233,7 +233,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
     Ok(())
 }
 
-/// Load a Parquet file as a RecordBatch
+/// Load a Parquet file as a `RecordBatch`
 fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
     // Use the existing read_parquet function
     let batches = parquet_utils::read_parquet(path, None, None)?;
@@ -252,7 +252,7 @@ fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
     }
 }
 
-/// Save RecordBatch as a Parquet file
+/// Save `RecordBatch` as a Parquet file
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
     // Use existing helpers if possible, otherwise create a simple implementation
     let file = std::fs::File::create(path).map_err(IdsError::Io)?;

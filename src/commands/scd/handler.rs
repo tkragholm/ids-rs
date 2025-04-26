@@ -66,7 +66,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
             let adm_data = adm_loader.load(path.to_str().unwrap(), None)?;
             let adm_batch_count = adm_data.len();
             lpr2_adm = Some(adm_data);
-            log::info!("Loaded {} LPR_ADM batches", adm_batch_count);
+            log::info!("Loaded {adm_batch_count} LPR_ADM batches");
         }
 
         if let Some(path) = &lpr_paths.lpr_diag {
@@ -75,7 +75,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
             let diag_data = diag_loader.load(path.to_str().unwrap(), None)?;
             let diag_batch_count = diag_data.len();
             lpr2_diag = Some(diag_data);
-            log::info!("Loaded {} LPR_DIAG batches", diag_batch_count);
+            log::info!("Loaded {diag_batch_count} LPR_DIAG batches");
         }
 
         if let Some(path) = &lpr_paths.lpr_bes {
@@ -84,7 +84,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
             let bes_data = bes_loader.load(path.to_str().unwrap(), None)?;
             let bes_batch_count = bes_data.len();
             lpr2_bes = Some(bes_data);
-            log::info!("Loaded {} LPR_BES batches", bes_batch_count);
+            log::info!("Loaded {bes_batch_count} LPR_BES batches");
         }
     }
 
@@ -99,7 +99,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
             let kontakter_data = kontakter_loader.load(path.to_str().unwrap(), None)?;
             let kontakter_batch_count = kontakter_data.len();
             lpr3_kontakter = Some(kontakter_data);
-            log::info!("Loaded {} LPR3_KONTAKTER batches", kontakter_batch_count);
+            log::info!("Loaded {kontakter_batch_count} LPR3_KONTAKTER batches");
         }
 
         if let Some(path) = &lpr_paths.lpr3_diagnoser {
@@ -108,7 +108,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
             let diagnoser_data = diagnoser_loader.load(path.to_str().unwrap(), None)?;
             let diagnoser_batch_count = diagnoser_data.len();
             lpr3_diagnoser = Some(diagnoser_data);
-            log::info!("Loaded {} LPR3_DIAGNOSER batches", diagnoser_batch_count);
+            log::info!("Loaded {diagnoser_batch_count} LPR3_DIAGNOSER batches");
         }
     }
 
@@ -161,11 +161,9 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     };
 
     log::info!("SCD Summary:");
-    log::info!("  Total patients: {}", total_patients);
+    log::info!("  Total patients: {total_patients}");
     log::info!(
-        "  Patients with SCD: {} ({:.2}%)",
-        scd_patients,
-        scd_percentage
+        "  Patients with SCD: {scd_patients} ({scd_percentage:.2}%)"
     );
 
     // Count by disease category
@@ -181,11 +179,11 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     log::info!("Disease categories:");
     for (category, count) in &category_counts {
         let percentage = if total_patients > 0 {
-            (*count as f64 / total_patients as f64) * 100.0
+            (f64::from(*count) / total_patients as f64) * 100.0
         } else {
             0.0
         };
-        log::info!("  {}: {} ({:.2}%)", category, count, percentage);
+        log::info!("  {category}: {count} ({percentage:.2}%)");
     }
 
     // Step 5: Save results
@@ -212,7 +210,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     // Add category breakdowns
     for (category, count) in &category_counts {
         let percentage = if total_patients > 0 {
-            (*count as f64 / total_patients as f64) * 100.0
+            (f64::from(*count) / total_patients as f64) * 100.0
         } else {
             0.0
         };
@@ -229,7 +227,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     Ok(())
 }
 
-/// Save RecordBatch as a Parquet file
+/// Save `RecordBatch` as a Parquet file
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
     let file = fs::File::create(path).map_err(IdsError::Io)?;
 

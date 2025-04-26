@@ -79,7 +79,7 @@ pub fn write_csv_report(path: &Path, rows: &[Vec<String>]) -> Result<()> {
     
     for row in rows {
         let line = row.join(",");
-        writeln!(writer, "{}", line)
+        writeln!(writer, "{line}")
             .map_err(IdsError::Io)?;
     }
     

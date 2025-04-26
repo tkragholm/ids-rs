@@ -125,8 +125,8 @@ pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()>
 
 /// Combines multiple record batches into a single batch
 ///
-/// This function takes a vector of Arrow RecordBatches with the same schema
-/// and combines them into a single RecordBatch containing all rows.
+/// This function takes a vector of Arrow `RecordBatches` with the same schema
+/// and combines them into a single `RecordBatch` containing all rows.
 fn combine_record_batches(batches: &[RecordBatch]) -> Result<RecordBatch> {
     // If empty, return an error
     if batches.is_empty() {
@@ -154,14 +154,14 @@ fn combine_record_batches(batches: &[RecordBatch]) -> Result<RecordBatch> {
 
         // Use arrow's concat to combine the arrays
         let concatenated = arrow::compute::kernels::concat::concat(&arrays)
-            .map_err(|e| IdsError::Data(format!("Failed to concatenate arrays: {}", e)))?;
+            .map_err(|e| IdsError::Data(format!("Failed to concatenate arrays: {e}")))?;
 
         combined_columns.push(concatenated);
     }
 
     // Create a new RecordBatch with the combined columns
     RecordBatch::try_new(schema, combined_columns)
-        .map_err(|e| IdsError::Data(format!("Failed to create combined record batch: {}", e)))
+        .map_err(|e| IdsError::Data(format!("Failed to create combined record batch: {e}")))
 }
 
 /// Debug function to analyze birth years in a dataset
@@ -176,8 +176,7 @@ fn debug_birth_years(batch: &RecordBatch, dataset_name: &str) -> Result<()> {
     // Get the date column
     let date_col = batch.column_by_name(date_column).ok_or_else(|| {
         IdsError::Data(format!(
-            "Missing {} column in {}",
-            date_column, dataset_name
+            "Missing {date_column} column in {dataset_name}"
         ))
     })?;
 
@@ -205,13 +204,13 @@ fn debug_birth_years(batch: &RecordBatch, dataset_name: &str) -> Result<()> {
     years.sort();
 
     // Log summary
-    info!("{} birth year distribution:", dataset_name);
+    info!("{dataset_name} birth year distribution:");
     for year in years {
         let count = year_counts[year];
-        info!(" - {}: {} records", year, count);
+        info!(" - {year}: {count} records");
     }
-    info!("{} null date values: {}", dataset_name, null_count);
-    info!("{} invalid date values: {}", dataset_name, invalid_count);
+    info!("{dataset_name} null date values: {null_count}");
+    info!("{dataset_name} invalid date values: {invalid_count}");
 
     // Check if PNR column exists
     if let Some(pnr_col) = batch.column_by_name("PNR").or_else(|| {
