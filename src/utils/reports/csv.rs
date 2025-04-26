@@ -6,6 +6,7 @@ use crate::algorithm::balance::BalanceReport;
 use crate::error::{IdsError, Result};
 use std::fs::File;
 use std::io::{Write, BufWriter};
+use std::path::Path;
 
 /// Generate a balance report in CSV format
 ///
@@ -58,6 +59,29 @@ pub fn generate_balance_report(report_path: &str, report: &BalanceReport) -> Res
     writeln!(writer, "Imbalanced Covariates (|SMD| > 0.1),{}", report.summary.imbalanced_covariates).map_err(IdsError::Io)?;
     writeln!(writer, "Maximum Absolute Standardized Difference,{:.4}", report.summary.max_standardized_difference).map_err(IdsError::Io)?;
     writeln!(writer, "Mean Absolute Standardized Difference,{:.4}", report.summary.mean_absolute_standardized_difference).map_err(IdsError::Io)?;
+    
+    Ok(())
+}
+
+/// Write a generic CSV report to a file
+///
+/// # Arguments
+/// * `path` - The path to save the CSV report to
+/// * `rows` - A slice of string vectors, each representing a row in the CSV
+///
+/// # Returns
+/// * `Result<()>` - Success or error
+pub fn write_csv_report(path: &Path, rows: &[Vec<String>]) -> Result<()> {
+    let file = File::create(path)
+        .map_err(|e| IdsError::Io(e))?;
+    
+    let mut writer = BufWriter::new(file);
+    
+    for row in rows {
+        let line = row.join(",");
+        writeln!(writer, "{}", line)
+            .map_err(|e| IdsError::Io(e))?;
+    }
     
     Ok(())
 }

@@ -7,6 +7,8 @@
 //! - BEF (Befolkning): Population demographic information
 //! - IDAN (Integrated Database for Labor Market Research): Employment information
 //! - IND (Indkomst): Income and tax information
+//! - LPR (Landspatientregistret): National Patient Registry (versions 2 and 3)
+//! - MFR (Medical Birth Registry): Birth information
 //! - UDDF (Uddannelse): Educational information
 
 use crate::error::{IdsError, Result};
@@ -27,6 +29,7 @@ pub mod akm;
 pub mod bef;
 pub mod idan;
 pub mod ind;
+pub mod lpr;
 pub mod mfr;
 pub mod uddf;
 pub mod transform;
@@ -38,6 +41,15 @@ pub use idan::IdanRegister;
 pub use ind::IndRegister;
 pub use mfr::MfrRegister;
 pub use uddf::UddfRegister;
+pub use lpr::{
+    LprAdmRegister, 
+    LprDiagRegister, 
+    LprBesRegister,
+    Lpr3KontakterRegister,
+    Lpr3DiagnoserRegister,
+    find_lpr_files,
+    LprPaths,
+};
 
 // Re-export transform functions
 pub use transform::{
@@ -59,6 +71,11 @@ pub fn registry_from_name(name: &str) -> Result<Box<dyn RegisterLoader>> {
         "ind" => Ok(Box::new(ind::IndRegister)),
         "mfr" => Ok(Box::new(mfr::MfrRegister)),
         "uddf" => Ok(Box::new(uddf::UddfRegister)),
+        "lpr_adm" => Ok(Box::new(lpr::LprAdmRegister)),
+        "lpr_diag" => Ok(Box::new(lpr::LprDiagRegister)),
+        "lpr_bes" => Ok(Box::new(lpr::LprBesRegister)),
+        "lpr3_kontakter" => Ok(Box::new(lpr::Lpr3KontakterRegister)),
+        "lpr3_diagnoser" => Ok(Box::new(lpr::Lpr3DiagnoserRegister)),
         _ => Err(IdsError::Validation(format!("Unknown registry: {name}"))),
     }
 }
@@ -84,6 +101,16 @@ pub fn registry_from_path(path: &str) -> Result<Box<dyn RegisterLoader>> {
             return Ok(Box::new(mfr::MfrRegister));
         } else if lower_name.contains("uddf") || lower_name.contains("uddannelse") {
             return Ok(Box::new(uddf::UddfRegister));
+        } else if lower_name.contains("lpr_adm") {
+            return Ok(Box::new(lpr::LprAdmRegister));
+        } else if lower_name.contains("lpr_diag") {
+            return Ok(Box::new(lpr::LprDiagRegister));
+        } else if lower_name.contains("lpr_bes") {
+            return Ok(Box::new(lpr::LprBesRegister));
+        } else if lower_name.contains("lpr3_kontakter") {
+            return Ok(Box::new(lpr::Lpr3KontakterRegister));
+        } else if lower_name.contains("lpr3_diagnoser") {
+            return Ok(Box::new(lpr::Lpr3DiagnoserRegister));
         }
     }
     

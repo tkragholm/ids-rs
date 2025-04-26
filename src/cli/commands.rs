@@ -165,6 +165,127 @@ impl CommandHandler for PopulationCommand {
     }
 }
 
+/// SCD command handler
+pub struct ScdCommand {
+    /// LPR data path
+    pub lpr_path: PathBuf,
+
+    /// Output directory
+    pub output_path: PathBuf,
+
+    /// Include LPR2 data
+    pub include_lpr2: bool,
+
+    /// Include LPR3 data
+    pub include_lpr3: bool,
+
+    /// Start date for filtering
+    pub start_date: Option<chrono::NaiveDate>,
+
+    /// End date for filtering
+    pub end_date: Option<chrono::NaiveDate>,
+}
+
+impl CommandHandler for ScdCommand {
+    fn execute(&self) -> Result<()> {
+        Console::print_header("Analyzing LPR Data for Severe Chronic Disease");
+        Console::print_key_value("LPR Data", &self.lpr_path.display().to_string());
+        Console::print_key_value("Output Directory", &self.output_path.display().to_string());
+        Console::print_key_value("Include LPR2", &self.include_lpr2.to_string());
+        Console::print_key_value("Include LPR3", &self.include_lpr3.to_string());
+        
+        if let Some(date) = self.start_date {
+            Console::print_key_value("Start Date", &date.to_string());
+        }
+        
+        if let Some(date) = self.end_date {
+            Console::print_key_value("End Date", &date.to_string());
+        }
+
+        // Create config from CLI arguments
+        let config = crate::commands::scd::ScdCommandConfig {
+            lpr_data_path: self.lpr_path.clone(),
+            output_path: self.output_path.clone(),
+            include_lpr2: self.include_lpr2,
+            include_lpr3: self.include_lpr3,
+            start_date: self.start_date,
+            end_date: self.end_date,
+            diagnosis_columns: vec![
+                "primary_diagnosis".to_string(),
+                "secondary_diagnosis".to_string(),
+            ],
+            patient_id_column: "patient_id".to_string(),
+            date_column: "admission_date".to_string(),
+        };
+
+        // Execute the SCD analysis
+        crate::commands::scd::handle_scd_command(&config)?;
+
+        Console::print_success("SCD analysis completed");
+        Ok(())
+    }
+}
+
+/// Population SCD command handler
+pub struct PopulationScdCommand {
+    /// Population data path
+    pub population_path: PathBuf,
+    
+    /// LPR data path
+    pub lpr_path: PathBuf,
+
+    /// Output directory
+    pub output_dir: PathBuf,
+
+    /// Include LPR2 data
+    pub include_lpr2: bool,
+
+    /// Include LPR3 data
+    pub include_lpr3: bool,
+
+    /// Start date for filtering
+    pub start_date: Option<chrono::NaiveDate>,
+
+    /// End date for filtering
+    pub end_date: Option<chrono::NaiveDate>,
+}
+
+impl CommandHandler for PopulationScdCommand {
+    fn execute(&self) -> Result<()> {
+        Console::print_header("Identifying Children with Severe Chronic Disease in Population");
+        Console::print_key_value("Population Data", &self.population_path.display().to_string());
+        Console::print_key_value("LPR Data", &self.lpr_path.display().to_string());
+        Console::print_key_value("Output Directory", &self.output_dir.display().to_string());
+        Console::print_key_value("Include LPR2", &self.include_lpr2.to_string());
+        Console::print_key_value("Include LPR3", &self.include_lpr3.to_string());
+        
+        if let Some(date) = self.start_date {
+            Console::print_key_value("Start Date", &date.to_string());
+        }
+        
+        if let Some(date) = self.end_date {
+            Console::print_key_value("End Date", &date.to_string());
+        }
+
+        // Create config from CLI arguments
+        let config = crate::commands::population_scd::PopulationScdCommandConfig {
+            population_path: self.population_path.clone(),
+            lpr_data_path: self.lpr_path.clone(),
+            output_dir: self.output_dir.clone(),
+            include_lpr2: self.include_lpr2,
+            include_lpr3: self.include_lpr3,
+            start_date: self.start_date,
+            end_date: self.end_date,
+        };
+
+        // Execute the Population SCD analysis
+        crate::commands::population_scd::handle_population_scd_command(&config)?;
+
+        Console::print_success("Population SCD analysis completed");
+        Ok(())
+    }
+}
+
 /// CLI Parser for the IDS-RS application
 #[derive(Parser)]
 #[clap(version, about = "Integrated Data System for Research in Rust")]
@@ -188,6 +309,12 @@ enum Commands {
 
     /// Generate population data by combining BEF and MFR registers
     Population(PopulationArgs),
+    
+    /// Analyze LPR data for Severe Chronic Disease (SCD)
+    Scd(ScdArgs),
+    
+    /// Identify children in a population with Severe Chronic Disease (SCD)
+    PopulationScd(PopulationScdArgs),
 }
 
 /// Arguments for the sample command
@@ -246,6 +373,66 @@ struct PopulationArgs {
     end_year: i32,
 }
 
+/// Arguments for the SCD command
+#[derive(Args)]
+struct ScdArgs {
+    /// LPR data directory (should contain LPR2 and/or LPR3 data)
+    #[clap(short, long)]
+    lpr: PathBuf,
+
+    /// Output directory for SCD results and reports
+    #[clap(short, long)]
+    output: PathBuf,
+
+    /// Include LPR2 data
+    #[clap(long, default_value = "true")]
+    include_lpr2: bool,
+
+    /// Include LPR3 data
+    #[clap(long, default_value = "true")]
+    include_lpr3: bool,
+
+    /// Start date for filtering LPR data (format: YYYY-MM-DD)
+    #[clap(long)]
+    start_date: Option<String>,
+
+    /// End date for filtering LPR data (format: YYYY-MM-DD)
+    #[clap(long)]
+    end_date: Option<String>,
+}
+
+/// Arguments for the Population SCD command
+#[derive(Args)]
+struct PopulationScdArgs {
+    /// Path to the population data file (generated with the 'population' command)
+    #[clap(short, long)]
+    population: PathBuf,
+    
+    /// LPR data directory (should contain LPR2 and/or LPR3 data)
+    #[clap(short, long)]
+    lpr: PathBuf,
+
+    /// Output directory for population SCD results and reports
+    #[clap(short, long)]
+    output: PathBuf,
+
+    /// Include LPR2 data
+    #[clap(long, default_value = "true")]
+    include_lpr2: bool,
+
+    /// Include LPR3 data
+    #[clap(long, default_value = "true")]
+    include_lpr3: bool,
+
+    /// Start date for filtering LPR data (format: YYYY-MM-DD)
+    #[clap(long)]
+    start_date: Option<String>,
+
+    /// End date for filtering LPR data (format: YYYY-MM-DD)
+    #[clap(long)]
+    end_date: Option<String>,
+}
+
 impl Cli {
     /// Parse command-line arguments and execute the appropriate command
     pub fn run() -> Result<()> {
@@ -283,6 +470,51 @@ impl Cli {
                     output_dir: args.output,
                     birth_start_year: args.start_year,
                     birth_end_year: args.end_year,
+                };
+                command.execute()
+            }
+            Commands::Scd(args) => {
+                // Parse start and end dates if provided
+                let start_date = args.start_date.map(|date_str| {
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {}", date_str))
+                });
+                
+                let end_date = args.end_date.map(|date_str| {
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {}", date_str))
+                });
+                
+                let command = ScdCommand {
+                    lpr_path: args.lpr,
+                    output_path: args.output,
+                    include_lpr2: args.include_lpr2,
+                    include_lpr3: args.include_lpr3,
+                    start_date,
+                    end_date,
+                };
+                command.execute()
+            }
+            Commands::PopulationScd(args) => {
+                // Parse start and end dates if provided
+                let start_date = args.start_date.map(|date_str| {
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {}", date_str))
+                });
+                
+                let end_date = args.end_date.map(|date_str| {
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {}", date_str))
+                });
+                
+                let command = PopulationScdCommand {
+                    population_path: args.population,
+                    lpr_path: args.lpr,
+                    output_dir: args.output,
+                    include_lpr2: args.include_lpr2,
+                    include_lpr3: args.include_lpr3,
+                    start_date,
+                    end_date,
                 };
                 command.execute()
             }

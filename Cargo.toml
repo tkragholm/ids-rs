@@ -24,7 +24,7 @@ indicatif = "0.17"
 
 # Data processing
 arrow = { version = "55.0", features = ["chrono-tz"] }
-parquet = "55.0"
+parquet = { version = "55.0", features = ["arrow"] }
 rayon = "1.8.0"
 
 # Utilities

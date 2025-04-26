@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::schema::idan::idan_schema_arc;
-use crate::schema::parquet::load_parquet_files_parallel;
+use crate::schema::parquet_utils::load_parquet_files_parallel;
 use arrow::record_batch::RecordBatch;
 use std::collections::HashSet;
 use std::path::Path;

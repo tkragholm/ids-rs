@@ -15,10 +15,10 @@ pub mod lpr3_diagnoser;
 pub mod lpr3_kontakter;
 pub mod mfr;
 pub mod uddf;
-pub mod parquet;
+pub mod parquet_utils;
 
 // Re-export parquet utilities
-pub use parquet::{
+pub use parquet_utils::{
     read_parquet, 
     load_parquet_files_parallel,
     read_parquet_with_filter,

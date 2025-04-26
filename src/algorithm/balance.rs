@@ -71,9 +71,9 @@ pub fn load_records(path: &str) -> Result<Vec<RecordBatch>> {
     
     // Check if path is directory or file
     if path.is_dir() {
-        crate::schema::parquet::load_parquet_files_parallel(path, None, None)
+        crate::schema::parquet_utils::load_parquet_files_parallel(path, None, None)
     } else {
-        crate::schema::parquet::read_parquet(path, None, None)
+        crate::schema::parquet_utils::read_parquet(path, None, None)
     }
 }
 
