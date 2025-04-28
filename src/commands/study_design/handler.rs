@@ -434,7 +434,7 @@ fn perform_matching(
 
     // Process cases in chunks for better cache locality and progress reporting
     const CHUNK_SIZE: usize = 1000;
-    let total_chunks = (case_pairs.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    let total_chunks = case_pairs.len().div_ceil(CHUNK_SIZE);
 
     for chunk_idx in 0..total_chunks {
         let start_idx = chunk_idx * CHUNK_SIZE;
@@ -846,7 +846,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
 
     // Process cases in chunks for better cache locality and progress reporting
     const CHUNK_SIZE: usize = 1000;
-    let total_chunks = (case_pairs.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    let total_chunks = case_pairs.len().div_ceil(CHUNK_SIZE);
 
     for chunk_idx in 0..total_chunks {
         let start_idx = chunk_idx * CHUNK_SIZE;
