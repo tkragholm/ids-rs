@@ -537,7 +537,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     // Create population output directory
     tokio::fs::create_dir_all(&population_config.output_dir)
         .await
-        .map_err(|e| IdsError::Io(e))?;
+        .map_err(IdsError::Io)?;
 
     // Generate population data (still synchronous)
     handle_population_command(&population_config)?;
@@ -560,7 +560,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     // Create SCD output directory
     tokio::fs::create_dir_all(&population_scd_config.output_dir)
         .await
-        .map_err(|e| IdsError::Io(e))?;
+        .map_err(IdsError::Io)?;
 
     // Process SCD (still synchronous)
     handle_population_scd_command(&population_scd_config)?;
@@ -597,7 +597,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     let matching_output_dir = config.output_dir.join("03_matching");
     tokio::fs::create_dir_all(&matching_output_dir)
         .await
-        .map_err(|e| IdsError::Io(e))?;
+        .map_err(IdsError::Io)?;
 
     // Matching process is the same but uses async file operations
     // Extract case and control pairs
@@ -685,7 +685,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     let balance_dir = config.output_dir.join("04_balance");
     tokio::fs::create_dir_all(&balance_dir)
         .await
-        .map_err(|e| IdsError::Io(e))?;
+        .map_err(IdsError::Io)?;
 
     let balance_report = calculate_balance(&[matched_cases_batch], &[matched_controls_batch])?;
 
