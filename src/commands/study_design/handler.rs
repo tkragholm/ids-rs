@@ -11,10 +11,9 @@ use chrono::NaiveDate;
 use log::info;
 use rand::seq::IteratorRandom;
 use std::path::Path;
-use std::sync::Arc;
 
 use crate::algorithm::balance::{calculate_balance, generate_balance_report};
-use crate::algorithm::matching::{MatchedPair, Matcher, MatchingCriteria};
+use crate::algorithm::matching::{Matcher, MatchingCriteria};
 use crate::commands::population::config::PopulationCommandConfig;
 use crate::commands::population::handler::handle_population_command;
 use crate::commands::population_scd::config::PopulationScdCommandConfig;
@@ -401,7 +400,7 @@ fn combine_record_batches(batches: &[RecordBatch]) -> Result<RecordBatch> {
 
 /// Save `RecordBatch` as a Parquet file
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    let file = std::fs::File::create(path).map_err(|e| IdsError::Io(e))?;
+    let file = std::fs::File::create(path).map_err(IdsError::Io)?;
 
     let writer_props = parquet::arrow::ArrowWriter::try_new(file, batch.schema(), None)
         .map_err(|e| IdsError::Data(format!("Failed to create writer: {e}")))?;
