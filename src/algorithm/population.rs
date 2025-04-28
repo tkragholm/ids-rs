@@ -449,7 +449,7 @@ pub fn process_parents(bef_data: &RecordBatch) -> Result<HashMap<Pnr, NaiveDate>
     
     // Process in chunks to improve cache locality
     const CHUNK_SIZE: usize = 10000;
-    let total_chunks = (pnr_array.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    let total_chunks = pnr_array.len().div_ceil(CHUNK_SIZE);
     
     for chunk_idx in 0..total_chunks {
         let start = chunk_idx * CHUNK_SIZE;

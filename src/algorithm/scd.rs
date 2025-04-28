@@ -266,7 +266,7 @@ pub fn apply_scd_algorithm(
     
     // Process in chunks for better cache efficiency
     const CHUNK_SIZE: usize = 10000;
-    let total_chunks = (total_rows + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    let total_chunks = total_rows.div_ceil(CHUNK_SIZE);
     
     for chunk_index in 0..total_chunks {
         let start_idx = chunk_index * CHUNK_SIZE;
