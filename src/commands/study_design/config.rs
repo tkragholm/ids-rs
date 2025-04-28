@@ -49,6 +49,12 @@ pub struct StudyDesignCommandConfig {
     
     /// End year for filtering births (inclusive)
     pub birth_inclusion_end_year: i32,
+    
+    /// Whether to use async IO for better performance with slow storage
+    pub use_async_io: bool,
+    
+    /// Batch size for parquet reading (None means use default)
+    pub batch_size: Option<usize>,
 }
 
 impl Default for StudyDesignCommandConfig {
@@ -69,6 +75,8 @@ impl Default for StudyDesignCommandConfig {
             output_dir: PathBuf::new(),
             birth_inclusion_start_year: 1995,
             birth_inclusion_end_year: 2018,
+            use_async_io: false,
+            batch_size: None,
         }
     }
 }

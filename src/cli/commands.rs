@@ -193,11 +193,11 @@ impl CommandHandler for ScdCommand {
         Console::print_key_value("Output Directory", &self.output_path.display().to_string());
         Console::print_key_value("Include LPR2", &self.include_lpr2.to_string());
         Console::print_key_value("Include LPR3", &self.include_lpr3.to_string());
-        
+
         if let Some(date) = self.start_date {
             Console::print_key_value("Start Date", &date.to_string());
         }
-        
+
         if let Some(date) = self.end_date {
             Console::print_key_value("End Date", &date.to_string());
         }
@@ -230,7 +230,7 @@ impl CommandHandler for ScdCommand {
 pub struct PopulationScdCommand {
     /// Population data path
     pub population_path: PathBuf,
-    
+
     /// LPR data path
     pub lpr_path: PathBuf,
 
@@ -253,16 +253,19 @@ pub struct PopulationScdCommand {
 impl CommandHandler for PopulationScdCommand {
     fn execute(&self) -> Result<()> {
         Console::print_header("Identifying Children with Severe Chronic Disease in Population");
-        Console::print_key_value("Population Data", &self.population_path.display().to_string());
+        Console::print_key_value(
+            "Population Data",
+            &self.population_path.display().to_string(),
+        );
         Console::print_key_value("LPR Data", &self.lpr_path.display().to_string());
         Console::print_key_value("Output Directory", &self.output_dir.display().to_string());
         Console::print_key_value("Include LPR2", &self.include_lpr2.to_string());
         Console::print_key_value("Include LPR3", &self.include_lpr3.to_string());
-        
+
         if let Some(date) = self.start_date {
             Console::print_key_value("Start Date", &date.to_string());
         }
-        
+
         if let Some(date) = self.end_date {
             Console::print_key_value("End Date", &date.to_string());
         }
@@ -290,48 +293,54 @@ impl CommandHandler for PopulationScdCommand {
 pub struct StudyDesignCommand {
     /// BEF data path
     pub bef_path: PathBuf,
-    
+
     /// MFR data path
     pub mfr_path: PathBuf,
-    
+
     /// LPR data path
     pub lpr_path: PathBuf,
-    
+
     /// Output directory
     pub output_dir: PathBuf,
-    
+
     /// Include LPR2 data
     pub include_lpr2: bool,
-    
+
     /// Include LPR3 data
     pub include_lpr3: bool,
-    
+
     /// Start date for filtering
     pub start_date: Option<chrono::NaiveDate>,
-    
+
     /// End date for filtering
     pub end_date: Option<chrono::NaiveDate>,
-    
+
     /// Matching ratio (e.g., 1:4 matching would be 4)
     pub matching_ratio: usize,
-    
+
     /// Maximum difference in days between birth dates
     pub birth_date_window_days: i64,
-    
+
     /// Maximum difference in days between parent birth dates
     pub parent_birth_date_window_days: i64,
-    
+
     /// Whether both parents are required
     pub require_both_parents: bool,
-    
+
     /// Whether the same gender is required
     pub require_same_gender: bool,
-    
+
     /// Start year for filtering births (inclusive)
     pub birth_inclusion_start_year: i32,
-    
+
     /// End year for filtering births (inclusive)
     pub birth_inclusion_end_year: i32,
+
+    /// Whether to use asynchronous I/O
+    pub use_async_io: bool,
+
+    /// Batch size for processing
+    pub batch_size: usize,
 }
 
 impl CommandHandler for StudyDesignCommand {
@@ -344,16 +353,25 @@ impl CommandHandler for StudyDesignCommand {
         Console::print_key_value("Include LPR2", &self.include_lpr2.to_string());
         Console::print_key_value("Include LPR3", &self.include_lpr3.to_string());
         Console::print_key_value("Matching Ratio", &format!("1:{}", self.matching_ratio));
-        Console::print_key_value("Birth Date Window (days)", &self.birth_date_window_days.to_string());
+        Console::print_key_value(
+            "Birth Date Window (days)",
+            &self.birth_date_window_days.to_string(),
+        );
         Console::print_key_value("Require Same Gender", &self.require_same_gender.to_string());
-        Console::print_key_value("Birth Year Range", &format!("{} - {}", 
-                                  self.birth_inclusion_start_year, 
-                                  self.birth_inclusion_end_year));
-        
+        Console::print_key_value(
+            "Birth Year Range",
+            &format!(
+                "{} - {}",
+                self.birth_inclusion_start_year, self.birth_inclusion_end_year
+            ),
+        );
+        Console::print_key_value("Async: ", &self.use_async_io.to_string());
+        Console::print_key_value("Batch Size: ", &self.batch_size.to_string());
+
         if let Some(date) = self.start_date {
             Console::print_key_value("Start Date", &date.to_string());
         }
-        
+
         if let Some(date) = self.end_date {
             Console::print_key_value("End Date", &date.to_string());
         }
@@ -375,6 +393,8 @@ impl CommandHandler for StudyDesignCommand {
             require_same_gender: self.require_same_gender,
             birth_inclusion_start_year: self.birth_inclusion_start_year,
             birth_inclusion_end_year: self.birth_inclusion_end_year,
+            use_async_io: self.use_async_io,
+            batch_size: Some(self.batch_size),
         };
 
         // Execute the Study Design pipeline
@@ -408,13 +428,13 @@ enum Commands {
 
     /// Generate population data by combining BEF and MFR registers
     Population(PopulationArgs),
-    
+
     /// Analyze LPR data for Severe Chronic Disease (SCD)
     Scd(ScdArgs),
-    
+
     /// Identify children in a population with Severe Chronic Disease (SCD)
     PopulationScd(PopulationScdArgs),
-    
+
     /// Run the full study design pipeline (population, SCD, matching, balance)
     StudyDesign(StudyDesignArgs),
 }
@@ -509,7 +529,7 @@ struct PopulationScdArgs {
     /// Path to the population data file (generated with the 'population' command)
     #[clap(short, long)]
     population: PathBuf,
-    
+
     /// LPR data directory (should contain LPR2 and/or LPR3 data)
     #[clap(short, long)]
     lpr: PathBuf,
@@ -541,11 +561,11 @@ struct StudyDesignArgs {
     /// BEF data path (supports glob patterns like "*.parquet")
     #[clap(short, long)]
     bef: PathBuf,
-    
+
     /// MFR data path (supports glob patterns like "*.parquet")
     #[clap(short, long)]
     mfr: PathBuf,
-    
+
     /// LPR data directory (should contain LPR2 and/or LPR3 data)
     #[clap(short, long)]
     lpr: PathBuf,
@@ -569,27 +589,27 @@ struct StudyDesignArgs {
     /// End date for filtering LPR data (format: YYYY-MM-DD)
     #[clap(long)]
     end_date: Option<String>,
-    
+
     /// Matching ratio (e.g., 1:4 matching would be 4)
     #[clap(long, default_value = "4")]
     matching_ratio: usize,
-    
+
     /// Maximum difference in days between birth dates
     #[clap(long, default_value = "30")]
     birth_window: i64,
-    
+
     /// Maximum difference in days between parent birth dates
     #[clap(long, default_value = "365")]
     parent_birth_window: i64,
-    
+
     /// Whether both parents are required
     #[clap(long, default_value = "false")]
     require_both_parents: bool,
-    
+
     /// Whether the same gender is required
     #[clap(long, default_value = "true")]
     require_same_gender: bool,
-    
+
     /// Start year for filtering births (inclusive)
     #[clap(long, default_value = "1995")]
     start_year: i32,
@@ -597,6 +617,14 @@ struct StudyDesignArgs {
     /// End year for filtering births (inclusive)
     #[clap(long, default_value = "2018")]
     end_year: i32,
+
+    /// Whether to use asynchronous I/O
+    #[clap(long, default_value = "false")]
+    use_async_io: bool,
+
+    /// Batch size for processing
+    #[clap(long, default_value = "1000")]
+    batch_size: usize,
 }
 
 impl Cli {
@@ -606,9 +634,7 @@ impl Cli {
 
         // Initialize logger with verbosity from CLI
         let log_level = cli.verbose.log_level_filter();
-        env_logger::Builder::new()
-            .filter_level(log_level)
-            .init();
+        env_logger::Builder::new().filter_level(log_level).init();
 
         log::debug!("Log level set to: {log_level}");
 
@@ -642,15 +668,17 @@ impl Cli {
             Commands::Scd(args) => {
                 // Parse start and end dates if provided
                 let start_date = args.start_date.map(|date_str| {
-                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}"))
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
+                        panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}")
+                    })
                 });
-                
+
                 let end_date = args.end_date.map(|date_str| {
-                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}"))
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
+                        panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}")
+                    })
                 });
-                
+
                 let command = ScdCommand {
                     lpr_path: args.lpr,
                     output_path: args.output,
@@ -664,15 +692,17 @@ impl Cli {
             Commands::PopulationScd(args) => {
                 // Parse start and end dates if provided
                 let start_date = args.start_date.map(|date_str| {
-                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}"))
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
+                        panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}")
+                    })
                 });
-                
+
                 let end_date = args.end_date.map(|date_str| {
-                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}"))
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
+                        panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}")
+                    })
                 });
-                
+
                 let command = PopulationScdCommand {
                     population_path: args.population,
                     lpr_path: args.lpr,
@@ -683,19 +713,21 @@ impl Cli {
                     end_date,
                 };
                 command.execute()
-            },
+            }
             Commands::StudyDesign(args) => {
                 // Parse start and end dates if provided
                 let start_date = args.start_date.map(|date_str| {
-                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}"))
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
+                        panic!("Invalid start date format. Expected YYYY-MM-DD, got {date_str}")
+                    })
                 });
-                
+
                 let end_date = args.end_date.map(|date_str| {
-                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                        .unwrap_or_else(|_| panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}"))
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
+                        panic!("Invalid end date format. Expected YYYY-MM-DD, got {date_str}")
+                    })
                 });
-                
+
                 let command = StudyDesignCommand {
                     bef_path: args.bef,
                     mfr_path: args.mfr,
@@ -712,6 +744,8 @@ impl Cli {
                     require_same_gender: args.require_same_gender,
                     birth_inclusion_start_year: args.start_year,
                     birth_inclusion_end_year: args.end_year,
+                    use_async_io: args.use_async_io,
+                    batch_size: args.batch_size,
                 };
                 command.execute()
             }
