@@ -7,10 +7,10 @@ use rand::seq::IndexedRandom;
 #[derive(Debug, Clone)]
 pub struct MatchingCriteria {
     /// Maximum difference in days between birth dates
-    pub birth_date_window_days: i64,
+    pub birth_date_window_days: i32,
 
     /// Maximum difference in days between parent birth dates
-    pub parent_birth_date_window_days: i64,
+    pub parent_birth_date_window_days: i32,
 
     /// Whether both parents are required
     pub require_both_parents: bool,
@@ -57,7 +57,8 @@ pub struct Matcher {
 
 impl Matcher {
     /// Create a new matcher with the given criteria
-    #[must_use] pub fn new(criteria: MatchingCriteria) -> Self {
+    #[must_use]
+    pub fn new(criteria: MatchingCriteria) -> Self {
         Self { criteria }
     }
 

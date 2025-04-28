@@ -7,7 +7,7 @@
 use arrow::array::{Array, BooleanArray, StringArray};
 use arrow::compute;
 use arrow::record_batch::RecordBatch;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use log::info;
 use rand::seq::IteratorRandom;
 use std::path::Path;
@@ -355,15 +355,67 @@ fn perform_matching(
     matching_ratio: usize,
     output_dir: &Path,
 ) -> Result<(RecordBatch, RecordBatch)> {
+    // Pre-extract PNR column indexes for faster access later
+    let pnr_idx_cases = cases
+        .schema()
+        .index_of("PNR")
+        .map_err(|e| IdsError::Data(format!("PNR column not found in cases: {e}")))?;
+
+    let pnr_idx_controls = controls
+        .schema()
+        .index_of("PNR")
+        .map_err(|e| IdsError::Data(format!("PNR column not found in controls: {e}")))?;
+
     // Convert cases and controls to the format needed for matching
     let case_pairs = extract_pnr_and_birth_date(cases)?;
-    let control_pairs = extract_pnr_and_birth_date(controls)?;
+    let mut control_pairs = extract_pnr_and_birth_date(controls)?;
 
-    // Create matcher with the given criteria
-    let _matcher = Matcher::new(criteria.clone());
+    // Create reference to cases PNR column for quick lookups
+    let cases_pnr_col = cases.column(pnr_idx_cases);
+    let cases_pnr_array = cases_pnr_col
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| IdsError::Data("PNR column in cases is not a string array".to_string()))?;
 
-    // Set match date to today (unused for now but will be needed in future)
-    let _match_date = chrono::Local::now().naive_local().date();
+    // Create reference to controls PNR column for quick lookups
+    let controls_pnr_col = controls.column(pnr_idx_controls);
+    let controls_pnr_array = controls_pnr_col
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| {
+            IdsError::Data("PNR column in controls is not a string array".to_string())
+        })?;
+
+    // Build index maps for fast PNR lookups (O(1) instead of O(n))
+    let mut case_pnr_to_idx = std::collections::HashMap::with_capacity(cases.num_rows());
+    for i in 0..cases_pnr_array.len() {
+        if !cases_pnr_array.is_null(i) {
+            case_pnr_to_idx.insert(cases_pnr_array.value(i).to_string(), i);
+        }
+    }
+
+    let mut control_pnr_to_idx = std::collections::HashMap::with_capacity(controls.num_rows());
+    for i in 0..controls_pnr_array.len() {
+        if !controls_pnr_array.is_null(i) {
+            control_pnr_to_idx.insert(controls_pnr_array.value(i).to_string(), i);
+        }
+    }
+
+    // Create a birth_date index for controls to speed up matching
+    // Group controls by birth date window buckets (30-day periods)
+    let window_days = criteria.birth_date_window_days;
+    let mut birth_date_index: std::collections::HashMap<i64, Vec<usize>> =
+        std::collections::HashMap::new();
+
+    for (idx, (_, birth_date)) in control_pairs.iter().enumerate() {
+        // Use integer division to create buckets of days
+        let bucket = birth_date.num_days_from_ce() / window_days;
+        birth_date_index.entry(bucket).or_default().push(idx);
+
+        // Also add to adjacent buckets to handle boundary cases
+        birth_date_index.entry(bucket - 1).or_default().push(idx);
+        birth_date_index.entry(bucket + 1).or_default().push(idx);
+    }
 
     info!(
         "Matching {} cases with {} controls (ratio 1:{})",
@@ -372,59 +424,172 @@ fn perform_matching(
         matching_ratio
     );
 
-    // For each case, find multiple controls
-    let mut matched_cases = Vec::new();
-    let mut matched_controls = Vec::new();
+    // Preallocate memory for the result (estimate based on matching ratio)
+    let estimated_matches = case_pairs.len() * matching_ratio;
+    let mut matched_case_indices = Vec::with_capacity(case_pairs.len());
+    let mut matched_control_indices = Vec::with_capacity(estimated_matches);
 
-    for (case_idx, (case_pnr, case_birth_date)) in case_pairs.iter().enumerate() {
-        // Find eligible controls
-        let eligible_control_indices =
-            find_eligible_controls(case_pnr, *case_birth_date, &control_pairs, criteria)?;
+    // Used to track controls that have been used
+    let mut used_control_indices = std::collections::HashSet::with_capacity(estimated_matches);
 
-        if eligible_control_indices.is_empty() {
-            info!(
-                "No eligible controls found for case {} ({}/{})",
-                case_pnr.value(),
-                case_idx + 1,
-                case_pairs.len()
-            );
-            continue;
+    // Process cases in chunks for better cache locality and progress reporting
+    const CHUNK_SIZE: usize = 1000;
+    let total_chunks = (case_pairs.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+
+    for chunk_idx in 0..total_chunks {
+        let start_idx = chunk_idx * CHUNK_SIZE;
+        let end_idx = std::cmp::min(start_idx + CHUNK_SIZE, case_pairs.len());
+
+        // Process each case in this chunk
+        for case_idx in start_idx..end_idx {
+            let (case_pnr, case_birth_date) = &case_pairs[case_idx];
+
+            // Use birth date index to find potential controls more efficiently
+            let bucket = case_birth_date.num_days_from_ce() / window_days;
+            let potential_controls = birth_date_index.get(&bucket).unwrap_or(&vec![]);
+
+            // Find eligible controls from the potential ones
+            let mut eligible_control_indices = Vec::new();
+            for &ctrl_idx in potential_controls {
+                // Skip if already used
+                if used_control_indices.contains(&ctrl_idx) {
+                    continue;
+                }
+
+                let (control_pnr, control_birth_date) = &control_pairs[ctrl_idx];
+
+                // Skip if case and control are the same person
+                if case_pnr.value() == control_pnr.value() {
+                    continue;
+                }
+
+                // Check birth date window
+                let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                if diff > criteria.birth_date_window_days {
+                    continue;
+                }
+
+                // Additional criteria checks can be added here
+                // (gender, parents, etc.)
+
+                eligible_control_indices.push(ctrl_idx);
+            }
+
+            if eligible_control_indices.is_empty() {
+                // If no quick matches found, do a more thorough search
+                // as a fallback (less efficient but ensures we don't miss matches)
+                for (ctrl_idx, (control_pnr, control_birth_date)) in
+                    control_pairs.iter().enumerate()
+                {
+                    // Skip if already used
+                    if used_control_indices.contains(&ctrl_idx) {
+                        continue;
+                    }
+
+                    // Skip if case and control are the same person
+                    if case_pnr.value() == control_pnr.value() {
+                        continue;
+                    }
+
+                    // Check birth date window
+                    let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                    if diff > criteria.birth_date_window_days {
+                        continue;
+                    }
+
+                    eligible_control_indices.push(ctrl_idx);
+                }
+            }
+
+            if eligible_control_indices.is_empty() {
+                log::debug!(
+                    "No eligible controls found for case {} ({}/{})",
+                    case_pnr.value(),
+                    case_idx + 1,
+                    case_pairs.len()
+                );
+                continue;
+            }
+
+            // Select up to matching_ratio controls randomly
+            let mut rng = rand::rng();
+            let num_to_select = std::cmp::min(matching_ratio, eligible_control_indices.len());
+            let selected_indices: Vec<_> = eligible_control_indices
+                .into_iter()
+                .choose_multiple(&mut rng, num_to_select);
+
+            // Add this case to the matched cases
+            matched_case_indices.push(*case_pnr_to_idx.get(case_pnr.value()).ok_or_else(|| {
+                IdsError::Data(format!("Case PNR {} not found in index", case_pnr.value()))
+            })?);
+
+            // Add selected controls and mark them as used
+            for ctrl_idx in selected_indices {
+                let control_pnr = &control_pairs[ctrl_idx].0;
+                matched_control_indices.push(
+                    *control_pnr_to_idx.get(control_pnr.value()).ok_or_else(|| {
+                        IdsError::Data(format!(
+                            "Control PNR {} not found in index",
+                            control_pnr.value()
+                        ))
+                    })?,
+                );
+                used_control_indices.insert(ctrl_idx);
+            }
         }
 
-        // Select up to matching_ratio controls randomly
-        let mut rng = rand::rng();
-        let num_to_select = std::cmp::min(matching_ratio, eligible_control_indices.len());
-        let selected_indices: Vec<_> = eligible_control_indices
-            .iter()
-            .choose_multiple(&mut rng, num_to_select);
-
-        // Add the case to the matched cases
-        let case_record = find_record_by_pnr(cases, case_pnr)?;
-        matched_cases.push(case_record);
-
-        // Add the selected controls to the matched controls
-        for &idx in &selected_indices {
-            let control_pnr = &control_pairs[*idx].0;
-            let control_record = find_record_by_pnr(controls, control_pnr)?;
-            matched_controls.push(control_record);
-        }
-
-        if (case_idx + 1) % 100 == 0 || case_idx + 1 == case_pairs.len() {
-            info!("Matched {}/{} cases", case_idx + 1, case_pairs.len());
-        }
+        // Log progress after each chunk or at the end
+        info!(
+            "Matched {}/{} cases ({:.1}%)",
+            end_idx,
+            case_pairs.len(),
+            end_idx as f64 * 100.0 / case_pairs.len() as f64
+        );
     }
 
-    if matched_cases.is_empty() {
+    if matched_case_indices.is_empty() {
         return Err(IdsError::Validation(
             "No matches found for any cases".to_string(),
         ));
     }
 
-    // Combine matched cases into a single RecordBatch
-    let matched_cases_batch = combine_record_batches(&matched_cases)?;
+    // Create masks for the matched cases and controls
+    let mut case_mask = vec![false; cases.num_rows()];
+    for idx in &matched_case_indices {
+        case_mask[*idx] = true;
+    }
 
-    // Combine matched controls into a single RecordBatch
-    let matched_controls_batch = combine_record_batches(&matched_controls)?;
+    let mut control_mask = vec![false; controls.num_rows()];
+    for idx in &matched_control_indices {
+        control_mask[*idx] = true;
+    }
+
+    // Apply the masks to get the matched batches (much more efficient than individual filters)
+    let case_bool_array = BooleanArray::from(case_mask);
+    let control_bool_array = BooleanArray::from(control_mask);
+
+    // Apply case mask to all case columns
+    let mut filtered_case_columns = Vec::with_capacity(cases.num_columns());
+    for col in cases.columns() {
+        let filtered_col = compute::filter(col, &case_bool_array)
+            .map_err(|e| IdsError::Data(format!("Failed to filter case column: {e}")))?;
+        filtered_case_columns.push(filtered_col);
+    }
+
+    // Apply control mask to all control columns
+    let mut filtered_control_columns = Vec::with_capacity(controls.num_columns());
+    for col in controls.columns() {
+        let filtered_col = compute::filter(col, &control_bool_array)
+            .map_err(|e| IdsError::Data(format!("Failed to filter control column: {e}")))?;
+        filtered_control_columns.push(filtered_col);
+    }
+
+    // Create final batches
+    let matched_cases_batch = RecordBatch::try_new(cases.schema(), filtered_case_columns)
+        .map_err(|e| IdsError::Data(format!("Failed to create matched cases batch: {e}")))?;
+
+    let matched_controls_batch = RecordBatch::try_new(controls.schema(), filtered_control_columns)
+        .map_err(|e| IdsError::Data(format!("Failed to create matched controls batch: {e}")))?;
 
     info!(
         "Final matched dataset: {} cases and {} controls",
@@ -611,56 +776,238 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     let mut matched_cases = Vec::new();
     let mut matched_controls = Vec::new();
 
-    // Matching loop is the same, just using async I/O where possible
-    for (case_idx, (case_pnr, case_birth_date)) in case_pairs.iter().enumerate() {
-        // Find eligible controls
-        let eligible_control_indices =
-            find_eligible_controls(case_pnr, *case_birth_date, &control_pairs, &criteria)?;
+    // Use our optimized matching implementation from the synchronous version
+    // Pre-extract PNR column indexes for faster access later
+    let pnr_idx_cases = scd_children
+        .schema()
+        .index_of("PNR")
+        .map_err(|e| IdsError::Data(format!("PNR column not found in cases: {e}")))?;
 
-        if eligible_control_indices.is_empty() {
-            info!(
-                "No eligible controls found for case {} ({}/{})",
-                case_pnr.value(),
-                case_idx + 1,
-                case_pairs.len()
-            );
-            continue;
-        }
+    let pnr_idx_controls = controls
+        .schema()
+        .index_of("PNR")
+        .map_err(|e| IdsError::Data(format!("PNR column not found in controls: {e}")))?;
 
-        // Select up to matching_ratio controls randomly
-        let mut rng = rand::rng();
-        let num_to_select = std::cmp::min(config.matching_ratio, eligible_control_indices.len());
-        let selected_indices: Vec<_> = eligible_control_indices
-            .iter()
-            .choose_multiple(&mut rng, num_to_select);
+    // Create reference to cases PNR column for quick lookups
+    let cases_pnr_col = scd_children.column(pnr_idx_cases);
+    let cases_pnr_array = cases_pnr_col
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| IdsError::Data("PNR column in cases is not a string array".to_string()))?;
 
-        // Add the case to the matched cases
-        let case_record = find_record_by_pnr(&scd_children, case_pnr)?;
-        matched_cases.push(case_record);
+    // Create reference to controls PNR column for quick lookups
+    let controls_pnr_col = controls.column(pnr_idx_controls);
+    let controls_pnr_array = controls_pnr_col
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| {
+            IdsError::Data("PNR column in controls is not a string array".to_string())
+        })?;
 
-        // Add the selected controls to the matched controls
-        for &idx in &selected_indices {
-            let control_pnr = &control_pairs[*idx].0;
-            let control_record = find_record_by_pnr(&controls, control_pnr)?;
-            matched_controls.push(control_record);
-        }
-
-        if (case_idx + 1) % 100 == 0 || case_idx + 1 == case_pairs.len() {
-            info!("Matched {}/{} cases", case_idx + 1, case_pairs.len());
+    // Build index maps for fast PNR lookups (O(1) instead of O(n))
+    let mut case_pnr_to_idx = std::collections::HashMap::with_capacity(scd_children.num_rows());
+    for i in 0..cases_pnr_array.len() {
+        if !cases_pnr_array.is_null(i) {
+            case_pnr_to_idx.insert(cases_pnr_array.value(i).to_string(), i);
         }
     }
 
-    if matched_cases.is_empty() {
+    let mut control_pnr_to_idx = std::collections::HashMap::with_capacity(controls.num_rows());
+    for i in 0..controls_pnr_array.len() {
+        if !controls_pnr_array.is_null(i) {
+            control_pnr_to_idx.insert(controls_pnr_array.value(i).to_string(), i);
+        }
+    }
+
+    // Create a birth_date index for controls to speed up matching
+    // Group controls by birth date window buckets (30-day periods)
+    let window_days = criteria.birth_date_window_days;
+    let mut birth_date_index: std::collections::HashMap<i64, Vec<usize>> =
+        std::collections::HashMap::new();
+
+    for (idx, (_, birth_date)) in control_pairs.iter().enumerate() {
+        // Use integer division to create buckets of days
+        let bucket = birth_date.num_days_from_ce() / window_days;
+        birth_date_index.entry(bucket).or_default().push(idx);
+
+        // Also add to adjacent buckets to handle boundary cases
+        birth_date_index.entry(bucket - 1).or_default().push(idx);
+        birth_date_index.entry(bucket + 1).or_default().push(idx);
+    }
+
+    // Preallocate memory for the result (estimate based on matching ratio)
+    let estimated_matches = case_pairs.len() * config.matching_ratio;
+    let mut matched_case_indices = Vec::with_capacity(case_pairs.len());
+    let mut matched_control_indices = Vec::with_capacity(estimated_matches);
+
+    // Used to track controls that have been used
+    let mut used_control_indices = std::collections::HashSet::with_capacity(estimated_matches);
+
+    // Process cases in chunks for better cache locality and progress reporting
+    const CHUNK_SIZE: usize = 1000;
+    let total_chunks = (case_pairs.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+
+    for chunk_idx in 0..total_chunks {
+        let start_idx = chunk_idx * CHUNK_SIZE;
+        let end_idx = std::cmp::min(start_idx + CHUNK_SIZE, case_pairs.len());
+
+        // Process each case in this chunk
+        for case_idx in start_idx..end_idx {
+            let (case_pnr, case_birth_date) = &case_pairs[case_idx];
+
+            // Use birth date index to find potential controls more efficiently
+            let bucket = case_birth_date.num_days_from_ce() / window_days;
+            let potential_controls = birth_date_index.get(&bucket).unwrap_or(&vec![]);
+
+            // Find eligible controls from the potential ones
+            let mut eligible_control_indices = Vec::new();
+            for &ctrl_idx in potential_controls {
+                // Skip if already used
+                if used_control_indices.contains(&ctrl_idx) {
+                    continue;
+                }
+
+                let (control_pnr, control_birth_date) = &control_pairs[ctrl_idx];
+
+                // Skip if case and control are the same person
+                if case_pnr.value() == control_pnr.value() {
+                    continue;
+                }
+
+                // Check birth date window
+                let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                if diff > criteria.birth_date_window_days {
+                    continue;
+                }
+
+                // Additional criteria checks can be added here
+                // (gender, parents, etc.)
+
+                eligible_control_indices.push(ctrl_idx);
+            }
+
+            if eligible_control_indices.is_empty() {
+                // If no quick matches found, do a more thorough search
+                // as a fallback (less efficient but ensures we don't miss matches)
+                for (ctrl_idx, (control_pnr, control_birth_date)) in
+                    control_pairs.iter().enumerate()
+                {
+                    // Skip if already used
+                    if used_control_indices.contains(&ctrl_idx) {
+                        continue;
+                    }
+
+                    // Skip if case and control are the same person
+                    if case_pnr.value() == control_pnr.value() {
+                        continue;
+                    }
+
+                    // Check birth date window
+                    let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                    if diff > criteria.birth_date_window_days {
+                        continue;
+                    }
+
+                    eligible_control_indices.push(ctrl_idx);
+                }
+            }
+
+            if eligible_control_indices.is_empty() {
+                log::debug!(
+                    "No eligible controls found for case {} ({}/{})",
+                    case_pnr.value(),
+                    case_idx + 1,
+                    case_pairs.len()
+                );
+                continue;
+            }
+
+            // Select up to matching_ratio controls randomly
+            let mut rng = rand::rng();
+            let num_to_select =
+                std::cmp::min(config.matching_ratio, eligible_control_indices.len());
+            let selected_indices: Vec<_> = eligible_control_indices
+                .into_iter()
+                .choose_multiple(&mut rng, num_to_select);
+
+            // Add this case to the matched cases
+            matched_case_indices.push(*case_pnr_to_idx.get(case_pnr.value()).ok_or_else(|| {
+                IdsError::Data(format!("Case PNR {} not found in index", case_pnr.value()))
+            })?);
+
+            // Add selected controls and mark them as used
+            for ctrl_idx in selected_indices {
+                let control_pnr = &control_pairs[ctrl_idx].0;
+                matched_control_indices.push(
+                    *control_pnr_to_idx.get(control_pnr.value()).ok_or_else(|| {
+                        IdsError::Data(format!(
+                            "Control PNR {} not found in index",
+                            control_pnr.value()
+                        ))
+                    })?,
+                );
+                used_control_indices.insert(ctrl_idx);
+            }
+        }
+
+        // Log progress after each chunk or at the end
+        info!(
+            "Matched {}/{} cases ({:.1}%)",
+            end_idx,
+            case_pairs.len(),
+            end_idx as f64 * 100.0 / case_pairs.len() as f64
+        );
+    }
+
+    if matched_case_indices.is_empty() {
         return Err(IdsError::Validation(
             "No matches found for any cases".to_string(),
         ));
     }
 
-    // Combine matched cases into a single RecordBatch
-    let matched_cases_batch = combine_record_batches(&matched_cases)?;
+    // Create masks for the matched cases and controls
+    let mut case_mask = vec![false; scd_children.num_rows()];
+    for idx in &matched_case_indices {
+        case_mask[*idx] = true;
+    }
 
-    // Combine matched controls into a single RecordBatch
-    let matched_controls_batch = combine_record_batches(&matched_controls)?;
+    let mut control_mask = vec![false; controls.num_rows()];
+    for idx in &matched_control_indices {
+        control_mask[*idx] = true;
+    }
+
+    // Apply the masks to get the matched batches (much more efficient than individual filters)
+    let case_bool_array = BooleanArray::from(case_mask);
+    let control_bool_array = BooleanArray::from(control_mask);
+
+    // Apply case mask to all case columns
+    let mut filtered_case_columns = Vec::with_capacity(scd_children.num_columns());
+    for col in scd_children.columns() {
+        let filtered_col = compute::filter(col, &case_bool_array)
+            .map_err(|e| IdsError::Data(format!("Failed to filter case column: {e}")))?;
+        filtered_case_columns.push(filtered_col);
+    }
+
+    // Apply control mask to all control columns
+    let mut filtered_control_columns = Vec::with_capacity(controls.num_columns());
+    for col in controls.columns() {
+        let filtered_col = compute::filter(col, &control_bool_array)
+            .map_err(|e| IdsError::Data(format!("Failed to filter control column: {e}")))?;
+        filtered_control_columns.push(filtered_col);
+    }
+
+    // Create final batches
+    let matched_cases_batch = RecordBatch::try_new(scd_children.schema(), filtered_case_columns)
+        .map_err(|e| IdsError::Data(format!("Failed to create matched cases batch: {e}")))?;
+
+    let matched_controls_batch = RecordBatch::try_new(controls.schema(), filtered_control_columns)
+        .map_err(|e| IdsError::Data(format!("Failed to create matched controls batch: {e}")))?;
+
+    if matched_cases_batch.num_rows() == 0 {
+        return Err(IdsError::Validation(
+            "No matches found for any cases".to_string(),
+        ));
+    }
 
     info!(
         "Final matched dataset: {} cases and {} controls",

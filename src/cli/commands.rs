@@ -319,10 +319,10 @@ pub struct StudyDesignCommand {
     pub matching_ratio: usize,
 
     /// Maximum difference in days between birth dates
-    pub birth_date_window_days: i64,
+    pub birth_date_window_days: i32,
 
     /// Maximum difference in days between parent birth dates
-    pub parent_birth_date_window_days: i64,
+    pub parent_birth_date_window_days: i32,
 
     /// Whether both parents are required
     pub require_both_parents: bool,
