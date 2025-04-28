@@ -162,9 +162,9 @@ pub fn filter_out_missing_values(
         let column = batch.column(col_idx);
 
         // Update the mask
-        for i in 0..num_rows {
+        for (i, has_value) in has_all_values.iter_mut().enumerate().take(num_rows) {
             if column.is_null(i) {
-                has_all_values[i] = false;
+                *has_value = false;
             }
         }
     }

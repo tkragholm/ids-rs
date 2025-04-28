@@ -360,10 +360,10 @@ fn perform_matching(
     let control_pairs = extract_pnr_and_birth_date(controls)?;
 
     // Create matcher with the given criteria
-    let matcher = Matcher::new(criteria.clone());
+    let _matcher = Matcher::new(criteria.clone());
 
-    // Set match date to today
-    let match_date = chrono::Local::now().naive_local().date();
+    // Set match date to today (unused for now but will be needed in future)
+    let _match_date = chrono::Local::now().naive_local().date();
 
     info!(
         "Matching {} cases with {} controls (ratio 1:{})",
@@ -605,7 +605,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     let control_pairs = extract_pnr_and_birth_date(&controls)?;
 
     // Create matcher with the given criteria
-    let matcher = Matcher::new(criteria.clone());
+    let _matcher = Matcher::new(criteria.clone());
 
     // For each case, find multiple controls
     let mut matched_cases = Vec::new();

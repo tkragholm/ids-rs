@@ -268,10 +268,7 @@ pub fn int_mask_from_filter(
     // Special handling for date columns - check if this column is a DATE type
     let binding = batch.schema();
     let field = binding.field(index);
-    let is_date = match field.data_type() {
-        arrow::datatypes::DataType::Date32 | arrow::datatypes::DataType::Date64 => true,
-        _ => false,
-    };
+    let is_date = matches!(field.data_type(), arrow::datatypes::DataType::Date32 | arrow::datatypes::DataType::Date64);
 
     // For date columns, we'll directly use the Int32Array since in Arrow,
     // dates are internally stored as days since epoch as i32 values

@@ -89,30 +89,30 @@ pub fn filter_by_year_range(array: &ArrayRef, start_year: i32, end_year: i32) ->
         }
     } else if let Some(string_array) = array.as_any().downcast_ref::<StringArray>() {
         // Handle StringArray by trying to parse as dates
-        for i in 0..string_array.len() {
+        for (i, mask_item) in mask.iter_mut().enumerate().take(string_array.len()) {
             if !string_array.is_null(i) {
                 let date_str = string_array.value(i);
                 if let Ok(date) = parse_flexible(date_str) {
                     let year = date.year();
-                    mask[i] = year >= start_year && year <= end_year;
+                    *mask_item = year >= start_year && year <= end_year;
                 }
             }
         }
     } else if let Some(int_array) = array.as_any().downcast_ref::<Int32Array>() {
         // Handle Int32Array assuming YYYYMMDD format
-        for i in 0..int_array.len() {
+        for (i, mask_item) in mask.iter_mut().enumerate().take(int_array.len()) {
             if !int_array.is_null(i) {
                 let date_int = int_array.value(i);
                 let year = date_int / 10000; // Extract year from YYYYMMDD
-                mask[i] = year >= start_year && year <= end_year;
+                *mask_item = year >= start_year && year <= end_year;
             }
         }
     } else {
         // Unsupported array type
         warn!("Unsupported array type for date filtering. Allowing all rows.");
         // Default to keeping all rows
-        for i in 0..rows {
-            mask[i] = true;
+        for mask_item in mask.iter_mut().take(rows) {
+            *mask_item = true;
         }
     }
     
