@@ -596,11 +596,11 @@ struct StudyDesignArgs {
 
     /// Maximum difference in days between birth dates
     #[clap(long, default_value = "30")]
-    birth_window: i64,
+    birth_window: i32,
 
     /// Maximum difference in days between parent birth dates
     #[clap(long, default_value = "365")]
-    parent_birth_window: i64,
+    parent_birth_window: i32,
 
     /// Whether both parents are required
     #[clap(long, default_value = "false")]

@@ -110,7 +110,7 @@ impl Matcher {
         controls: &[(Pnr, NaiveDate)],
     ) -> Result<Vec<usize>> {
         let mut eligible_indices = Vec::new();
-        let _window = Duration::days(self.criteria.birth_date_window_days);
+        let _window = Duration::days(self.criteria.birth_date_window_days as i64);
 
         for (idx, (control_pnr, control_birth_date)) in controls.iter().enumerate() {
             // Skip if case and control are the same person
@@ -119,7 +119,7 @@ impl Matcher {
             }
 
             // Check birth date window
-            let diff = (*control_birth_date - case_birth_date).num_days().abs();
+            let diff = (*control_birth_date - case_birth_date).num_days().abs() as i32;
             if diff > self.criteria.birth_date_window_days {
                 continue;
             }

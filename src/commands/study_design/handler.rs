@@ -285,7 +285,7 @@ fn find_eligible_controls(
         }
 
         // Check birth date window
-        let diff = (*control_birth_date - case_birth_date).num_days().abs();
+        let diff = (*control_birth_date - case_birth_date).num_days().abs() as i32;
         if diff > criteria.birth_date_window_days {
             continue;
         }
@@ -368,7 +368,7 @@ fn perform_matching(
 
     // Convert cases and controls to the format needed for matching
     let case_pairs = extract_pnr_and_birth_date(cases)?;
-    let mut control_pairs = extract_pnr_and_birth_date(controls)?;
+    let control_pairs = extract_pnr_and_birth_date(controls)?;
 
     // Create reference to cases PNR column for quick lookups
     let cases_pnr_col = cases.column(pnr_idx_cases);
@@ -404,7 +404,7 @@ fn perform_matching(
     // Create a birth_date index for controls to speed up matching
     // Group controls by birth date window buckets (30-day periods)
     let window_days = criteria.birth_date_window_days;
-    let mut birth_date_index: std::collections::HashMap<i64, Vec<usize>> =
+    let mut birth_date_index: std::collections::HashMap<i32, Vec<usize>> =
         std::collections::HashMap::new();
 
     for (idx, (_, birth_date)) in control_pairs.iter().enumerate() {
@@ -446,7 +446,8 @@ fn perform_matching(
 
             // Use birth date index to find potential controls more efficiently
             let bucket = case_birth_date.num_days_from_ce() / window_days;
-            let potential_controls = birth_date_index.get(&bucket).unwrap_or(&vec![]);
+            let empty_vec: Vec<usize> = Vec::new();
+            let potential_controls = birth_date_index.get(&bucket).unwrap_or(&empty_vec);
 
             // Find eligible controls from the potential ones
             let mut eligible_control_indices = Vec::new();
@@ -464,7 +465,7 @@ fn perform_matching(
                 }
 
                 // Check birth date window
-                let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                let diff = (*control_birth_date - *case_birth_date).num_days().abs() as i32;
                 if diff > criteria.birth_date_window_days {
                     continue;
                 }
@@ -492,7 +493,7 @@ fn perform_matching(
                     }
 
                     // Check birth date window
-                    let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                    let diff = (*control_birth_date - *case_birth_date).num_days().abs() as i32;
                     if diff > criteria.birth_date_window_days {
                         continue;
                     }
@@ -773,8 +774,8 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     let _matcher = Matcher::new(criteria.clone());
 
     // For each case, find multiple controls
-    let mut matched_cases = Vec::new();
-    let mut matched_controls = Vec::new();
+    let matched_cases: Vec<usize> = Vec::new();
+    let matched_controls: Vec<usize> = Vec::new();
 
     // Use our optimized matching implementation from the synchronous version
     // Pre-extract PNR column indexes for faster access later
@@ -822,7 +823,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     // Create a birth_date index for controls to speed up matching
     // Group controls by birth date window buckets (30-day periods)
     let window_days = criteria.birth_date_window_days;
-    let mut birth_date_index: std::collections::HashMap<i64, Vec<usize>> =
+    let mut birth_date_index: std::collections::HashMap<i32, Vec<usize>> =
         std::collections::HashMap::new();
 
     for (idx, (_, birth_date)) in control_pairs.iter().enumerate() {
@@ -857,7 +858,8 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
 
             // Use birth date index to find potential controls more efficiently
             let bucket = case_birth_date.num_days_from_ce() / window_days;
-            let potential_controls = birth_date_index.get(&bucket).unwrap_or(&vec![]);
+            let empty_vec: Vec<usize> = Vec::new();
+            let potential_controls = birth_date_index.get(&bucket).unwrap_or(&empty_vec);
 
             // Find eligible controls from the potential ones
             let mut eligible_control_indices = Vec::new();
@@ -875,7 +877,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
                 }
 
                 // Check birth date window
-                let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                let diff = (*control_birth_date - *case_birth_date).num_days().abs() as i32;
                 if diff > criteria.birth_date_window_days {
                     continue;
                 }
@@ -903,7 +905,7 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
                     }
 
                     // Check birth date window
-                    let diff = (*control_birth_date - *case_birth_date).num_days().abs();
+                    let diff = (*control_birth_date - *case_birth_date).num_days().abs() as i32;
                     if diff > criteria.birth_date_window_days {
                         continue;
                     }
