@@ -296,7 +296,26 @@ pub fn combine_children_data(
     
     log::info!("Total unique PNRs after combining: {total_combined_records}");
 
-    // Process each unique PNR to combine data
+    // Create indexes for faster lookups (instead of linear search)
+    log::debug!("Creating indexes for faster PNR lookup");
+    let mut bef_index: HashMap<String, usize> = HashMap::with_capacity(bef_pnr_array.len());
+    for i in 0..bef_pnr_array.len() {
+        if !bef_pnr_array.is_null(i) {
+            bef_index.insert(bef_pnr_array.value(i).to_string(), i);
+        }
+    }
+
+    let mut mfr_index: HashMap<String, usize> = HashMap::with_capacity(mfr_pnr_array.len());
+    for i in 0..mfr_pnr_array.len() {
+        if !mfr_pnr_array.is_null(i) {
+            mfr_index.insert(mfr_pnr_array.value(i).to_string(), i);
+        }
+    }
+    log::debug!("Created indexes: BEF index size: {}, MFR index size: {}", 
+                bef_index.len(), mfr_index.len());
+                
+    // Process each unique PNR to combine data (using efficient indexing)
+    log::debug!("Processing {} unique PNRs", all_pnrs.len());
     let mut combined_pnrs = Vec::with_capacity(total_combined_records);
     let mut combined_birth_dates = Vec::with_capacity(total_combined_records);
     let mut combined_father_ids = Vec::with_capacity(total_combined_records);
@@ -309,34 +328,28 @@ pub fn combine_children_data(
         let mut mother_id = None;
         let mut family_id = None;
 
-        // Check if in BEF data
-        for i in 0..bef_pnr_array.len() {
-            if !bef_pnr_array.is_null(i) && bef_pnr_array.value(i) == pnr {
-                // Get BEF values
-                birth_date = get_date_value(bef_children, "FOED_DAG", i)?;
-                father_id = get_string_value(bef_children, "FAR_ID", i)?;
-                mother_id = get_string_value(bef_children, "MOR_ID", i)?;
-                family_id = get_string_value(bef_children, "FAMILIE_ID", i)?;
-                break;
-            }
+        // Check if in BEF data using the index (O(1) lookup)
+        if let Some(&i) = bef_index.get(&pnr) {
+            // Get BEF values
+            birth_date = get_date_value(bef_children, "FOED_DAG", i)?;
+            father_id = get_string_value(bef_children, "FAR_ID", i)?;
+            mother_id = get_string_value(bef_children, "MOR_ID", i)?;
+            family_id = get_string_value(bef_children, "FAMILIE_ID", i)?;
         }
 
-        // Check if in MFR data and fill in missing values
-        for i in 0..mfr_pnr_array.len() {
-            if !mfr_pnr_array.is_null(i) && mfr_pnr_array.value(i) == pnr {
-                // Fill in from MFR if missing in BEF
-                if birth_date.is_none() {
-                    birth_date = get_date_value(mfr_children, "FOED_DAG", i)?;
-                }
-                if father_id.is_none() {
-                    father_id = get_string_value(mfr_children, "FAR_ID", i)?;
-                }
-                if mother_id.is_none() {
-                    mother_id = get_string_value(mfr_children, "MOR_ID", i)?;
-                }
-                // Note: MFR doesn't have FAMILIE_ID, so no need to check
-                break;
+        // Check if in MFR data using the index (O(1) lookup)
+        if let Some(&i) = mfr_index.get(&pnr) {
+            // Fill in from MFR if missing in BEF
+            if birth_date.is_none() {
+                birth_date = get_date_value(mfr_children, "FOED_DAG", i)?;
             }
+            if father_id.is_none() {
+                father_id = get_string_value(mfr_children, "FAR_ID", i)?;
+            }
+            if mother_id.is_none() {
+                mother_id = get_string_value(mfr_children, "MOR_ID", i)?;
+            }
+            // Note: MFR doesn't have FAMILIE_ID, so no need to check
         }
 
         // Add to combined arrays
@@ -424,33 +437,57 @@ pub fn process_parents(bef_data: &RecordBatch) -> Result<HashMap<Pnr, NaiveDate>
         .downcast_ref::<StringArray>()
         .ok_or_else(|| IdsError::Data("PNR column is not a string array".to_string()))?;
     
-    let mut parent_map = HashMap::new();
+    // Pre-allocate with estimated capacity to avoid rehashing
+    let estimated_capacity = pnr_array.len() / 2; // Assuming roughly half are valid entries
+    let mut parent_map = HashMap::with_capacity(estimated_capacity);
     let mut valid_dates = 0;
     let mut missing_dates = 0;
+    let mut empty_pnrs = 0;
+    let mut null_pnrs = 0;
 
-    for i in 0..pnr_array.len() {
-        if pnr_array.is_null(i) {
-            continue;
+    log::debug!("Building parent map for {} records", pnr_array.len());
+    
+    // Process in chunks to improve cache locality
+    const CHUNK_SIZE: usize = 10000;
+    let total_chunks = (pnr_array.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    
+    for chunk_idx in 0..total_chunks {
+        let start = chunk_idx * CHUNK_SIZE;
+        let end = std::cmp::min(start + CHUNK_SIZE, pnr_array.len());
+        
+        for i in start..end {
+            if pnr_array.is_null(i) {
+                null_pnrs += 1;
+                continue;
+            }
+
+            let pnr_str = pnr_array.value(i);
+            if pnr_str.is_empty() {
+                empty_pnrs += 1;
+                continue;
+            }
+
+            // Use our flexible date extraction function
+            if let Some(date) = date_utils::extract_date_from_array(date_col.as_ref(), i) {
+                let pnr = Pnr::from(pnr_str);
+                // Only insert if PNR not already in map or if this is the first occurrence
+                parent_map.entry(pnr).or_insert(date);
+                valid_dates += 1;
+            } else {
+                missing_dates += 1;
+            }
         }
-
-        let pnr_str = pnr_array.value(i);
-        if pnr_str.is_empty() {
-            continue;
-        }
-
-        // Use our flexible date extraction function
-        if let Some(date) = date_utils::extract_date_from_array(date_col.as_ref(), i) {
-            let pnr = Pnr::from(pnr_str);
-            // Only insert if PNR not already in map or if this is the first occurrence
-            parent_map.entry(pnr).or_insert(date);
-            valid_dates += 1;
-        } else {
-            missing_dates += 1;
+        
+        // Log progress for large datasets
+        if total_chunks > 10 && (chunk_idx + 1) % (total_chunks / 10) == 0 {
+            log::debug!("Processed parent data: {:.1}% complete ({}/{} chunks)", 
+                     (chunk_idx + 1) as f64 * 100.0 / total_chunks as f64,
+                     chunk_idx + 1, total_chunks);
         }
     }
     
-    log::info!("Processed {} parent records, {} with valid dates, {} with missing dates", 
-        pnr_array.len(), valid_dates, missing_dates);
+    log::info!("Processed {} parent records: {} with valid dates, {} with missing dates, {} empty PNRs, {} null PNRs", 
+        pnr_array.len(), valid_dates, missing_dates, empty_pnrs, null_pnrs);
     log::info!("Parent map size: {} unique parents", parent_map.len());
 
     Ok(parent_map)

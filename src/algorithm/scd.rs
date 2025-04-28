@@ -16,130 +16,144 @@ use crate::error::{IdsError, Result};
 pub struct ScdDiseaseCodes {
     // Map of disease category to set of ICD-10 code prefixes
     codes: HashMap<String, HashSet<String>>,
+    // Cached flat set of all codes for quick lookup
+    all_codes_cache: HashSet<String>,
 }
 
 impl ScdDiseaseCodes {
     /// Create a new `ScdDiseaseCodes` instance with predefined disease categories and codes
     #[must_use] pub fn new() -> Self {
-        let mut codes = HashMap::new();
+        let mut codes = HashMap::with_capacity(10); // Pre-allocate for the 10 categories
+        let mut all_codes_cache = HashSet::with_capacity(150); // Approximate total codes
+        
+        // Helper function to add a category and its codes
+        let mut add_category = |name: &str, code_list: &[&str]| {
+            let code_set: HashSet<String> = code_list.iter().map(|s| (*s).to_string()).collect();
+            all_codes_cache.extend(code_set.iter().cloned());
+            codes.insert(name.to_string(), code_set);
+        };
         
         // Blood Disorders
-        codes.insert("blood_disorders".to_string(), [
+        add_category("blood_disorders", &[
             "D55", "D56", "D57", "D58", "D59", "D60", "D61",
             "D64", "D65", "D66", "D67", "D68", "D69", "D70", "D71", "D72", "D73",
             "D76"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Immune System Disorders
-        codes.insert("immune_system".to_string(), [
+        add_category("immune_system", &[
             "D80", "D81", "D82", "D83", "D84", "D86", "D89"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Endocrine Disorders
-        codes.insert("endocrine".to_string(), [
+        add_category("endocrine", &[
             "E22", "E23", "E24", "E25", "E26", "E27", "E31", "E34",
             "E70", "E71", "E72", "E73", "E74", "E75", "E76", "E77", 
             "E78", "E79", "E80", "E83", "E84", "E85", "E88"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Neurological Disorders
-        codes.insert("neurological".to_string(), [
+        add_category("neurological", &[
             "F84", "G11", "G12", "G13", "G23", "G24", "G25", "G31", 
             "G40", "G41", "G70", "G71", "G72", "G80", "G81", "G82"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Cardiovascular Disorders
-        codes.insert("cardiovascular".to_string(), [
+        add_category("cardiovascular", &[
             "I27", "I42", "I43", "I50", "I81", "I82", "I83"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Respiratory Disorders
-        codes.insert("respiratory".to_string(), [
+        add_category("respiratory", &[
             "J41", "J42", "J43", "J44", "J45", "J47", "J60", "J61", "J62", 
             "J63", "J64", "J65", "J66", "J67", "J68", "J69", "J70", "J84", "J96"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Gastrointestinal Disorders
-        codes.insert("gastrointestinal".to_string(), [
+        add_category("gastrointestinal", &[
             "K50", "K51", "K73", "K74", "K86", "K87", "K90"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Musculoskeletal Disorders
-        codes.insert("musculoskeletal".to_string(), [
+        add_category("musculoskeletal", &[
             "M05", "M06", "M07", "M08", "M09", "M30", "M31", "M32", "M33",
             "M34", "M35", "M40", "M41", "M42", "M43", "M45", "M46"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Renal Disorders
-        codes.insert("renal".to_string(), [
+        add_category("renal", &[
             "N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08", 
             "N11", "N12", "N13", "N14", "N15", "N16", "N18", "N19", 
             "N20", "N21", "N22", "N23", "N24", "N25", "N26", "N27", "N28", "N29"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
         // Congenital Disorders
-        codes.insert("congenital".to_string(), [
+        add_category("congenital", &[
             "P27", "Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", 
             "Q20", "Q21", "Q22", "Q23", "Q24", "Q25", "Q26", "Q27", "Q28",
             "Q30", "Q31", "Q32", "Q33", "Q34", "Q35", "Q36", "Q37", 
             "Q38", "Q39", "Q40", "Q41", "Q42", "Q43", "Q44", "Q45", 
             "Q60", "Q61", "Q62", "Q63", "Q64", "Q77", "Q78", "Q79", 
             "Q80", "Q81", "Q82", "Q83", "Q84", "Q85", "Q86", "Q87", "Q89"
-        ].iter().map(|s| (*s).to_string()).collect());
+        ]);
         
-        Self { codes }
+        Self { codes, all_codes_cache }
     }
     
-    /// Get all SCD codes as a flat set
-    #[must_use] pub fn all_codes(&self) -> HashSet<String> {
-        let mut all_codes = HashSet::new();
-        for codes in self.codes.values() {
-            all_codes.extend(codes.iter().cloned());
+    /// Get all SCD codes as a flat set (returns a reference to pre-computed set)
+    #[must_use] pub fn all_codes(&self) -> &HashSet<String> {
+        &self.all_codes_cache
+    }
+    
+    /// Helper method to extract normalized prefix from a diagnosis code
+    fn extract_prefix(&self, diagnosis: &str) -> Option<String> {
+        let diagnosis = diagnosis.trim();
+        if diagnosis.is_empty() || diagnosis.len() < 3 {
+            return None;
         }
-        all_codes
+        
+        // Fast path for ASCII strings (most common case)
+        if diagnosis.is_ascii() {
+            let mut prefix = String::with_capacity(3);
+            for c in diagnosis[..3].chars() {
+                prefix.push(c.to_ascii_uppercase());
+            }
+            return Some(prefix);
+        }
+        
+        // Fallback for non-ASCII (rare case)
+        let prefix_chars: Vec<char> = diagnosis[..3].chars().collect();
+        if prefix_chars.len() < 3 {
+            return None;
+        }
+        
+        let mut prefix = String::with_capacity(3);
+        for c in prefix_chars {
+            prefix.push(c.to_ascii_uppercase());
+        }
+        
+        Some(prefix)
     }
-    
+
     /// Check if a diagnosis code is a SCD code
     #[must_use] pub fn is_scd_code(&self, diagnosis: &str) -> bool {
-        let diagnosis = diagnosis.trim();
-        if diagnosis.is_empty() {
-            return false;
+        if let Some(prefix) = self.extract_prefix(diagnosis) {
+            // Check if it's in the SCD codes set - use exact match for O(1) lookup
+            self.all_codes_cache.contains(&prefix)
+        } else {
+            false
         }
-        
-        // Standardize and extract prefix (first 3 characters after any letter prefix)
-        let diag_upper = diagnosis.to_uppercase();
-        
-        // ICD-10 codes typically have a letter prefix followed by numbers
-        // Extract the letter and first two digits (e.g., "D55" from "D551A")
-        if diag_upper.len() >= 3 {
-            let prefix = &diag_upper[..3];
-            return self.all_codes().contains(prefix);
-        }
-        
-        false
     }
     
     /// Determine the disease category for a diagnosis code
     #[must_use] pub fn get_disease_category(&self, diagnosis: &str) -> Option<String> {
-        let diagnosis = diagnosis.trim();
-        if diagnosis.is_empty() {
-            return None;
-        }
-        
-        // Standardize and extract prefix
-        let diag_upper = diagnosis.to_uppercase();
-        
-        if diag_upper.len() >= 3 {
-            let prefix = &diag_upper[..3];
-            
-            for (category, codes) in &self.codes {
-                if codes.contains(prefix) {
-                    return Some(category.clone());
-                }
-            }
-        }
-        
-        None
+        // Use the common prefix extraction logic
+        self.extract_prefix(diagnosis).and_then(|prefix| {
+            // Find the category with this code (use iterators for early return)
+            self.codes.iter()
+                .find(|(_, codes)| codes.contains(&prefix))
+                .map(|(category, _)| category.clone())
+        })
     }
     
     /// Get a map of all disease categories and their codes
@@ -193,7 +207,6 @@ pub fn apply_scd_algorithm(
     config: &ScdConfig
 ) -> Result<Vec<ScdResult>> {
     let scd_codes = ScdDiseaseCodes::new();
-    let mut results = Vec::new();
     
     // Get column indices
     let patient_id_idx = health_data.schema()
@@ -217,10 +230,13 @@ pub fn apply_scd_algorithm(
         .downcast_ref::<Date32Array>()
         .ok_or_else(|| IdsError::Data("Date column is not a date array".to_string()))?;
     
-    // Maps to store intermediate results
-    let mut patient_scd = HashMap::new();
-    let mut patient_first_date = HashMap::new();
-    let mut patient_categories = HashMap::new();
+    // Maps to store intermediate results - pre-allocate with estimated capacity
+    let total_rows = health_data.num_rows();
+    let estimated_capacity = total_rows / 5; // Assuming roughly 20% of patients have SCD codes
+    
+    let mut patient_scd = HashMap::with_capacity(estimated_capacity);
+    let mut patient_first_date = HashMap::with_capacity(estimated_capacity);
+    let mut patient_categories = HashMap::with_capacity(estimated_capacity);
     
     // Get diagnosis column indices
     let mut diag_indices = Vec::new();
@@ -236,69 +252,91 @@ pub fn apply_scd_algorithm(
         return Err(IdsError::Data("No valid diagnosis columns found".to_string()));
     }
     
-    // Process each row
-    for row_idx in 0..health_data.num_rows() {
-        // Skip if patient ID is null
-        if patient_id_array.is_null(row_idx) {
+    // Pre-fetch diagnosis arrays for better cache locality
+    let mut diag_arrays = Vec::with_capacity(diag_indices.len());
+    for &idx in &diag_indices {
+        let array = health_data.column(idx);
+        if let Some(string_array) = array.as_any().downcast_ref::<StringArray>() {
+            diag_arrays.push(string_array);
+        } else {
+            log::warn!("Diagnosis column is not a string array");
             continue;
         }
+    }
+    
+    // Process in chunks for better cache efficiency
+    const CHUNK_SIZE: usize = 10000;
+    let total_chunks = (total_rows + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    
+    for chunk_index in 0..total_chunks {
+        let start_idx = chunk_index * CHUNK_SIZE;
+        let end_idx = (start_idx + CHUNK_SIZE).min(total_rows);
         
-        let patient_id = patient_id_array.value(row_idx).to_string();
-        let mut is_scd_row = false;
-        let mut categories = HashSet::new();
-        
-        // Check each diagnosis column
-        for &diag_idx in &diag_indices {
-            let diag_array = health_data.column(diag_idx);
-            let diag_array = if let Some(array) = diag_array.as_any().downcast_ref::<StringArray>() { array } else {
-                log::warn!("Diagnosis column is not a string array");
-                continue;
-            };
-            
-            // Skip if diagnosis is null
-            if diag_array.is_null(row_idx) {
+        // Process each row in this chunk
+        for row_idx in start_idx..end_idx {
+            // Skip if patient ID is null
+            if patient_id_array.is_null(row_idx) {
                 continue;
             }
             
-            let diagnosis = diag_array.value(row_idx);
+            let patient_id = patient_id_array.value(row_idx).to_string();
+            let mut is_scd_row = false;
+            let mut categories = HashSet::new();
             
-            // Check if it's a SCD code
-            if scd_codes.is_scd_code(diagnosis) {
-                is_scd_row = true;
+            // Check each diagnosis column
+            for diag_array in &diag_arrays {
+                // Skip if diagnosis is null
+                if diag_array.is_null(row_idx) {
+                    continue;
+                }
                 
-                // Add disease category if present
-                if let Some(category) = scd_codes.get_disease_category(diagnosis) {
-                    categories.insert(category);
+                let diagnosis = diag_array.value(row_idx);
+                
+                // Check if it's a SCD code
+                if scd_codes.is_scd_code(diagnosis) {
+                    is_scd_row = true;
+                    
+                    // Add disease category if present
+                    if let Some(category) = scd_codes.get_disease_category(diagnosis) {
+                        categories.insert(category);
+                    }
+                }
+            }
+            
+            // If SCD code found in this row, update patient results
+            if is_scd_row {
+                // Set the patient as having SCD
+                patient_scd.insert(patient_id.clone(), true);
+                
+                // Get the date for this row
+                if !date_array.is_null(row_idx) {
+                    let days_since_epoch = date_array.value(row_idx);
+                    let date = NaiveDate::from_num_days_from_ce_opt(days_since_epoch + 719163)
+                        .unwrap_or_default();
+                    
+                    // Update first SCD date if this is earlier or not set yet
+                    if let Some(existing_date) = patient_first_date.get(&patient_id) {
+                        if date < *existing_date {
+                            patient_first_date.insert(patient_id.clone(), date);
+                        }
+                    } else {
+                        patient_first_date.insert(patient_id.clone(), date);
+                    }
+                }
+                
+                // Update disease categories
+                let patient_cats = patient_categories.entry(patient_id).or_insert_with(HashSet::new);
+                for category in categories {
+                    patient_cats.insert(category);
                 }
             }
         }
         
-        // If SCD code found in this row, update patient results
-        if is_scd_row {
-            // Set the patient as having SCD
-            patient_scd.insert(patient_id.clone(), true);
-            
-            // Get the date for this row
-            if !date_array.is_null(row_idx) {
-                let days_since_epoch = date_array.value(row_idx);
-                let date = NaiveDate::from_num_days_from_ce_opt(days_since_epoch + 719163)
-                    .unwrap_or_default();
-                
-                // Update first SCD date if this is earlier or not set yet
-                if let Some(existing_date) = patient_first_date.get(&patient_id) {
-                    if date < *existing_date {
-                        patient_first_date.insert(patient_id.clone(), date);
-                    }
-                } else {
-                    patient_first_date.insert(patient_id.clone(), date);
-                }
-            }
-            
-            // Update disease categories
-            let patient_cats = patient_categories.entry(patient_id).or_insert_with(HashSet::new);
-            for category in categories {
-                patient_cats.insert(category);
-            }
+        // Log progress every few chunks
+        if chunk_index % 10 == 0 || chunk_index == total_chunks - 1 {
+            log::debug!("Processed SCD chunk {}/{} ({:.1}%)", 
+                        chunk_index + 1, total_chunks, 
+                        (chunk_index + 1) as f64 * 100.0 / total_chunks as f64);
         }
     }
     
@@ -308,9 +346,20 @@ pub fn apply_scd_algorithm(
     // Create a set of patients that have SCD
     let scd_patient_ids: HashSet<String> = patient_scd.keys().cloned().collect();
     
-    // Convert to ScdResult objects
+    // Build unique patient set more efficiently in a single pass
+    let mut unique_patients = HashSet::with_capacity(total_rows / 2);
+    for i in 0..patient_id_array.len() {
+        if !patient_id_array.is_null(i) {
+            unique_patients.insert(patient_id_array.value(i).to_string());
+        }
+    }
+    
+    // Pre-allocate results vector
+    let mut results = Vec::with_capacity(unique_patients.len());
+    
+    // Convert to ScdResult objects for patients with SCD
     for (patient_id, is_scd) in patient_scd {
-        let mut disease_categories = HashMap::new();
+        let mut disease_categories = HashMap::with_capacity(all_categories.len());
         
         // Initialize all categories to false
         for category in &all_categories {
@@ -334,28 +383,28 @@ pub fn apply_scd_algorithm(
         });
     }
     
-    // Add patients with no SCD
-    let mut unique_patients = HashSet::new();
-    for i in 0..patient_id_array.len() {
-        if !patient_id_array.is_null(i) {
-            unique_patients.insert(patient_id_array.value(i).to_string());
-        }
-    }
+    log::debug!("Found {} patients with SCD", results.len());
     
-    for patient_id in unique_patients {
-        if !scd_patient_ids.contains(&patient_id) {
-            let mut disease_categories = HashMap::new();
-            for category in &all_categories {
-                disease_categories.insert(category.clone(), false);
-            }
-            
-            results.push(ScdResult {
-                patient_id,
-                is_scd: false,
-                first_scd_date: None,
-                disease_categories,
-            });
+    // Add patients with no SCD
+    let patients_without_scd: Vec<_> = unique_patients
+        .into_iter()
+        .filter(|id| !scd_patient_ids.contains(id))
+        .collect();
+    
+    log::debug!("Adding {} patients without SCD", patients_without_scd.len());
+    
+    for patient_id in patients_without_scd {
+        let mut disease_categories = HashMap::with_capacity(all_categories.len());
+        for category in &all_categories {
+            disease_categories.insert(category.clone(), false);
         }
+        
+        results.push(ScdResult {
+            patient_id,
+            is_scd: false,
+            first_scd_date: None,
+            disease_categories,
+        });
     }
     
     Ok(results)

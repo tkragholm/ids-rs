@@ -2,7 +2,8 @@
 
 use arrow::array::{Array, Date32Array};
 use arrow::record_batch::RecordBatch;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -220,13 +221,48 @@ fn save_child_age_distribution(
     // Write headers
     writeln!(writer, "Birth Date")?;
 
-    // Write birth dates
-    for i in 0..birth_date_array.len() {
-        if !birth_date_array.is_null(i) {
+    // Optimize the processing of large arrays by using a year-based summary instead of individual dates
+    // This is much more efficient for large datasets and produces a more useful report
+    let mut year_counts: HashMap<i32, usize> = HashMap::with_capacity(50); // Preallocate with reasonable capacity
+    let mut null_count = 0;
+    let total_rows = birth_date_array.len();
+    
+    // Process dates in chunks for better performance with large datasets
+    const CHUNK_SIZE: usize = 10000;
+    for chunk_start in (0..total_rows).step_by(CHUNK_SIZE) {
+        let chunk_end = std::cmp::min(chunk_start + CHUNK_SIZE, total_rows);
+        
+        for i in chunk_start..chunk_end {
+            if birth_date_array.is_null(i) {
+                null_count += 1;
+                continue;
+            }
+            
             if let Some(date) = birth_date_array.value_as_date(i) {
-                writeln!(writer, "{}", date.format("%Y-%m-%d"))?;
+                let year = date.year();
+                *year_counts.entry(year).or_insert(0) += 1;
             }
         }
+        
+        // Log progress for large datasets
+        if total_rows > 100000 && chunk_start > 0 && chunk_start % (total_rows / 5) < CHUNK_SIZE {
+            log::debug!("Processing birth date distribution: {}% complete", 
+                       (chunk_start * 100) / total_rows);
+        }
+    }
+    
+    // Write year counts instead of individual dates (more efficient and more useful)
+    let mut years: Vec<i32> = year_counts.keys().cloned().collect();
+    years.sort_unstable();
+    
+    for year in years {
+        let count = year_counts[&year];
+        writeln!(writer, "{year},{count}")?;
+    }
+    
+    // Include null count information
+    if null_count > 0 {
+        writeln!(writer, "NULL,{null_count}")?;
     }
 
     writer.flush()?;
@@ -267,47 +303,100 @@ fn save_parent_child_age_diff(
         .downcast_ref::<Date32Array>()
         .ok_or_else(|| IdsError::Data("MOR_FDAG column is not a date array".to_string()))?;
 
-    // Write headers
-    writeln!(writer, "Father Age Diff,Mother Age Diff")?;
-
-    // Calculate and write age differences
-    for i in 0..child_date_array.len() {
-        if !child_date_array.is_null(i) {
+    // Create histograms for age differences (more efficient and more useful than raw data)
+    // Use 5-year bins for better summary statistics - using integers as keys for HashMap
+    let mut father_age_diffs: HashMap<i32, usize> = HashMap::new();
+    let mut mother_age_diffs: HashMap<i32, usize> = HashMap::new();
+    let mut total_father_diffs = 0;
+    let mut total_mother_diffs = 0;
+    let total_rows = child_date_array.len();
+    
+    // Process in chunks for better performance with large datasets
+    const CHUNK_SIZE: usize = 10000;
+    for chunk_start in (0..total_rows).step_by(CHUNK_SIZE) {
+        let chunk_end = std::cmp::min(chunk_start + CHUNK_SIZE, total_rows);
+        
+        for i in chunk_start..chunk_end {
+            if child_date_array.is_null(i) {
+                continue;
+            }
+            
             let child_date = child_date_array.value_as_date(i);
-
-            let father_age_diff = if !father_date_array.is_null(i) && child_date.is_some() {
+            if child_date.is_none() {
+                continue;
+            }
+            
+            // Father age difference
+            if !father_date_array.is_null(i) {
                 let father_date = father_date_array.value_as_date(i);
                 if let (Some(child), Some(father)) = (child_date, father_date) {
                     // Calculate age difference in years
                     let diff_days = (child.signed_duration_since(father)).num_days();
-                    Some(diff_days as f64 / 365.25)
-                } else {
-                    None
+                    let diff_years = diff_days as f64 / 365.25;
+                    
+                    // Use 5-year bins (round to nearest 5) - convert to integer key
+                    let bin = (diff_years / 5.0).round() as i32 * 5;
+                    *father_age_diffs.entry(bin).or_insert(0) += 1;
+                    total_father_diffs += 1;
                 }
-            } else {
-                None
-            };
-
-            let mother_age_diff = if !mother_date_array.is_null(i) && child_date.is_some() {
+            }
+            
+            // Mother age difference
+            if !mother_date_array.is_null(i) {
                 let mother_date = mother_date_array.value_as_date(i);
                 if let (Some(child), Some(mother)) = (child_date, mother_date) {
                     // Calculate age difference in years
                     let diff_days = (child.signed_duration_since(mother)).num_days();
-                    Some(diff_days as f64 / 365.25)
-                } else {
-                    None
+                    let diff_years = diff_days as f64 / 365.25;
+                    
+                    // Use 5-year bins (round to nearest 5) - convert to integer key
+                    let bin = (diff_years / 5.0).round() as i32 * 5;
+                    *mother_age_diffs.entry(bin).or_insert(0) += 1;
+                    total_mother_diffs += 1;
                 }
-            } else {
-                None
-            };
-
-            // Write the row
-            let father_str = father_age_diff.map_or(String::new(), |diff| format!("{diff:.2}"));
-            let mother_str = mother_age_diff.map_or(String::new(), |diff| format!("{diff:.2}"));
-
-            writeln!(writer, "{father_str},{mother_str}")?;
+            }
         }
     }
+    
+    // Write histogram data
+    writeln!(writer, "Age Difference (years),Father Count,Father %,Mother Count,Mother %")?;
+    
+    // Collect all unique bins
+    let mut all_bins: Vec<i32> = father_age_diffs.keys().cloned().collect();
+    all_bins.extend(mother_age_diffs.keys().cloned());
+    all_bins.sort();
+    all_bins.dedup();
+    
+    for &bin in &all_bins {
+        let f_count = father_age_diffs.get(&bin).cloned().unwrap_or(0);
+        let m_count = mother_age_diffs.get(&bin).cloned().unwrap_or(0);
+        
+        let f_percent = if total_father_diffs > 0 {
+            (f_count as f64 / total_father_diffs as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        let m_percent = if total_mother_diffs > 0 {
+            (m_count as f64 / total_mother_diffs as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        writeln!(
+            writer, 
+            "{},{},{:.2},{},{:.2}", 
+            bin, f_count, f_percent, m_count, m_percent
+        )?;
+    }
+    
+    // Add summary statistics
+    writeln!(writer, "\nSummary Statistics")?;
+    writeln!(writer, "Metric,Father,Mother")?;
+    writeln!(writer, "Total records with data,{},{}",
+             total_father_diffs, total_mother_diffs)?;
+    writeln!(writer, "Missing values,{},{}",
+             total_rows - total_father_diffs, total_rows - total_mother_diffs)?;
 
     writer.flush()?;
     Ok(())

@@ -79,15 +79,19 @@ pub fn identify_scd_in_population(
         patient_id_column: config.patient_id_column.clone(),
     };
 
+    log::info!("Applying SCD algorithm to {} health records...", lpr_data.num_rows());
     let scd_results = apply_scd_algorithm(lpr_data, &scd_config)?;
     log::info!("SCD analysis complete: {} patient records", scd_results.len());
 
-    // Step 2: Create map of patient ID to SCD result
-    let scd_map: HashMap<String, &ScdResult> = scd_results
-        .iter()
-        .map(|result| (result.patient_id.clone(), result))
-        .collect();
-
+    // Step 2: Create map of patient ID to SCD result with preallocated capacity
+    log::debug!("Creating index for fast SCD lookup");
+    let estimated_capacity = scd_results.len();
+    let mut scd_map: HashMap<String, &ScdResult> = HashMap::with_capacity(estimated_capacity);
+    
+    for result in &scd_results {
+        scd_map.insert(result.patient_id.clone(), result);
+    }
+    
     // Step 3: Extract PNR from population data
     let pnr_col_idx = population_data
         .schema()
@@ -107,6 +111,7 @@ pub fn identify_scd_in_population(
         })?;
 
     // Step 4: Match population records with SCD results
+    log::debug!("Matching population records with SCD results");
     let num_rows = population_data.num_rows();
     let mut is_scd = Vec::with_capacity(num_rows);
     let mut first_scd_date = Vec::with_capacity(num_rows);
@@ -125,53 +130,71 @@ pub fn identify_scd_in_population(
 
     // Counter for children with SCD
     let mut scd_children_count = 0;
-    let mut category_counts = HashMap::new();
+    let mut category_counts: HashMap<String, usize> = HashMap::with_capacity(all_categories.len());
     for category in &all_categories {
         category_counts.insert(category.clone(), 0);
     }
 
-    // Process each child
-    for i in 0..num_rows {
-        if pnr_array.is_null(i) {
-            // Add nulls for missing PNR
-            is_scd.push(None);
-            first_scd_date.push(None);
-            for category_vec in disease_categories.values_mut() {
-                category_vec.push(None);
-            }
-            continue;
-        }
-
-        let pnr = pnr_array.value(i);
+    // Process in chunks for better cache efficiency
+    const CHUNK_SIZE: usize = 10000;
+    let total_chunks = (num_rows + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    
+    for chunk_index in 0..total_chunks {
+        let start_idx = chunk_index * CHUNK_SIZE;
+        let end_idx = (start_idx + CHUNK_SIZE).min(num_rows);
         
-        // Look up SCD result for this PNR
-        if let Some(scd_result) = scd_map.get(pnr) {
-            is_scd.push(Some(scd_result.is_scd));
-            
-            if scd_result.is_scd {
-                scd_children_count += 1;
-                
-                // Update first SCD date
-                if let Some(date) = scd_result.first_scd_date {
-                    let days = (date.signed_duration_since(
-                        NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
-                    ).num_days()) as i32;
-                    first_scd_date.push(Some(days));
-                } else {
-                    first_scd_date.push(None);
+        // Process each child in this chunk
+        for i in start_idx..end_idx {
+            if pnr_array.is_null(i) {
+                // Add nulls for missing PNR
+                is_scd.push(None);
+                first_scd_date.push(None);
+                for category_vec in disease_categories.values_mut() {
+                    category_vec.push(None);
                 }
+                continue;
+            }
+
+            let pnr = pnr_array.value(i);
+            
+            // Look up SCD result for this PNR (O(1) lookup with HashMap)
+            if let Some(scd_result) = scd_map.get(pnr) {
+                is_scd.push(Some(scd_result.is_scd));
                 
-                // Update disease categories
-                for (category, has_disease) in &scd_result.disease_categories {
-                    let category_vec = disease_categories.get_mut(category).unwrap();
-                    category_vec.push(Some(*has_disease));
+                if scd_result.is_scd {
+                    scd_children_count += 1;
                     
-                    if *has_disease {
-                        *category_counts.get_mut(category).unwrap() += 1;
+                    // Update first SCD date
+                    if let Some(date) = scd_result.first_scd_date {
+                        let days = (date.signed_duration_since(
+                            NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
+                        ).num_days()) as i32;
+                        first_scd_date.push(Some(days));
+                    } else {
+                        first_scd_date.push(None);
+                    }
+                    
+                    // Update disease categories
+                    for (category, has_disease) in &scd_result.disease_categories {
+                        let category_vec = disease_categories.get_mut(category).unwrap();
+                        category_vec.push(Some(*has_disease));
+                        
+                        if *has_disease {
+                            *category_counts.get_mut(category).unwrap() += 1;
+                        }
+                    }
+                } else {
+                    // Not SCD
+                    first_scd_date.push(None);
+                    
+                    // Set all categories to false
+                    for category_vec in disease_categories.values_mut() {
+                        category_vec.push(Some(false));
                     }
                 }
             } else {
-                // Not SCD
+                // No SCD result for this PNR
+                is_scd.push(Some(false));
                 first_scd_date.push(None);
                 
                 // Set all categories to false
@@ -179,15 +202,14 @@ pub fn identify_scd_in_population(
                     category_vec.push(Some(false));
                 }
             }
-        } else {
-            // No SCD result for this PNR
-            is_scd.push(Some(false));
-            first_scd_date.push(None);
-            
-            // Set all categories to false
-            for category_vec in disease_categories.values_mut() {
-                category_vec.push(Some(false));
-            }
+        }
+        
+        // Log progress periodically
+        if chunk_index % 10 == 0 || chunk_index == total_chunks - 1 {
+            log::debug!("Matched population chunk {}/{} ({:.1}%), found {} SCD children so far", 
+                       chunk_index + 1, total_chunks, 
+                       (chunk_index + 1) as f64 * 100.0 / total_chunks as f64,
+                       scd_children_count);
         }
     }
 

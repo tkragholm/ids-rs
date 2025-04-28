@@ -183,14 +183,18 @@ pub fn integrate_lpr2_components(
     let adm_date_idx = lpr_adm.schema().index_of("D_INDDTO")
         .map_err(|e| IdsError::Data(format!("D_INDDTO column not found in LPR_ADM: {e}")))?;
     let adm_date_array = lpr_adm.column(adm_date_idx);
-    let adm_date_array = adm_date_array.as_any().downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data("D_INDDTO column is not a date array".to_string()))?;
+    
+    // Use our flexible date conversion regardless of the column's actual type
+    log::debug!("D_INDDTO column type: {:?}", adm_date_array.data_type());
+    let adm_date_array = date_utils::convert_to_date32_array(adm_date_array.as_ref())?;
 
     let disc_date_idx = lpr_adm.schema().index_of("D_UDDTO")
         .map_err(|e| IdsError::Data(format!("D_UDDTO column not found in LPR_ADM: {e}")))?;
     let disc_date_array = lpr_adm.column(disc_date_idx);
-    let disc_date_array = disc_date_array.as_any().downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data("D_UDDTO column is not a date array".to_string()))?;
+    
+    // Use our flexible date conversion regardless of the column's actual type
+    log::debug!("D_UDDTO column type: {:?}", disc_date_array.data_type());
+    let disc_date_array = date_utils::convert_to_date32_array(disc_date_array.as_ref())?;
 
     // Build index from RECNUM to row
     let _recnum_to_row = build_recnum_index(&recnum_array);
@@ -380,14 +384,18 @@ pub fn integrate_lpr3_components(
     let start_date_idx = lpr3_kontakter.schema().index_of("dato_start")
         .map_err(|e| IdsError::Data(format!("dato_start column not found in LPR3_KONTAKTER: {e}")))?;
     let start_date_array = lpr3_kontakter.column(start_date_idx);
-    let start_date_array = start_date_array.as_any().downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data("dato_start column is not a date array".to_string()))?;
+    
+    // Use our flexible date conversion regardless of the column's actual type
+    log::debug!("dato_start column type: {:?}", start_date_array.data_type());
+    let start_date_array = date_utils::convert_to_date32_array(start_date_array.as_ref())?;
 
     let end_date_idx = lpr3_kontakter.schema().index_of("dato_slut")
         .map_err(|e| IdsError::Data(format!("dato_slut column not found in LPR3_KONTAKTER: {e}")))?;
     let end_date_array = lpr3_kontakter.column(end_date_idx);
-    let end_date_array = end_date_array.as_any().downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data("dato_slut column is not a date array".to_string()))?;
+    
+    // Use our flexible date conversion regardless of the column's actual type
+    log::debug!("dato_slut column type: {:?}", end_date_array.data_type());
+    let end_date_array = date_utils::convert_to_date32_array(end_date_array.as_ref())?;
 
     // Prepare arrays for integrated data
     let num_rows = lpr3_kontakter.num_rows();
@@ -514,8 +522,10 @@ pub fn filter_by_date_range(
         .map_err(|e| IdsError::Data(format!("admission_date column not found: {e}")))?;
 
     let date_array = data.column(date_idx);
-    let date_array = date_array.as_any().downcast_ref::<Date32Array>()
-        .ok_or_else(|| IdsError::Data("admission_date column is not a date array".to_string()))?;
+    
+    // Use our flexible date conversion regardless of the column's actual type
+    log::debug!("admission_date column type: {:?}", date_array.data_type());
+    let date_array = date_utils::convert_to_date32_array(date_array.as_ref())?;
 
     // Create filter mask
     let mut mask = Vec::with_capacity(data.num_rows());
