@@ -21,7 +21,7 @@ use crate::schema::filter_expr::{evaluate_expr, filter_record_batch, Expr};
 pub const DEFAULT_BATCH_SIZE: usize = 16384;
 
 /// Helper function to get batch size from environment
-pub fn get_batch_size() -> Option<usize> {
+#[must_use] pub fn get_batch_size() -> Option<usize> {
     std::env::var("IDS_BATCH_SIZE")
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
@@ -35,10 +35,10 @@ pub fn get_batch_size() -> Option<usize> {
 /// # Arguments
 /// * `path` - Path to the Parquet file
 /// * `schema` - Optional Arrow Schema for projecting specific columns
-/// * `batch_size` - Optional batch size for reading (defaults to DEFAULT_BATCH_SIZE)
+/// * `batch_size` - Optional batch size for reading (defaults to `DEFAULT_BATCH_SIZE`)
 ///
 /// # Returns
-/// A vector of RecordBatch objects
+/// A vector of `RecordBatch` objects
 pub async fn read_parquet_async(
     path: &Path,
     schema: Option<&Schema>,
@@ -77,12 +77,12 @@ pub async fn read_parquet_async(
         }
 
         // If no fields matched, just read all columns
-        if !projection.is_empty() {
+        if projection.is_empty() {
+            log::warn!("No matching fields found in schema projection, reading all columns");
+        } else {
             // Create projection mask and apply to builder
             let projection_mask = ProjectionMask::leaves(builder.parquet_schema(), projection);
             builder = builder.with_projection(projection_mask);
-        } else {
-            log::warn!("No matching fields found in schema projection, reading all columns");
         }
     }
 
@@ -122,7 +122,7 @@ pub async fn read_parquet_async(
 /// * `batch_size` - Optional batch size for reading
 ///
 /// # Returns
-/// A vector of filtered RecordBatch objects
+/// A vector of filtered `RecordBatch` objects
 pub async fn read_parquet_with_pnr_filter_async(
     path: &Path,
     schema: Option<&Schema>,
@@ -201,7 +201,7 @@ pub async fn read_parquet_with_pnr_filter_async(
 /// * `batch_size` - Optional batch size for reading
 ///
 /// # Returns
-/// A vector of filtered RecordBatch objects
+/// A vector of filtered `RecordBatch` objects
 pub async fn read_parquet_with_filter_async(
     path: &Path,
     expr: &Expr,
@@ -308,7 +308,7 @@ pub async fn read_parquet_with_filter_async(
 /// * `batch_size` - Optional batch size for reading
 ///
 /// # Returns
-/// A vector of RecordBatch objects from all files
+/// A vector of `RecordBatch` objects from all files
 pub async fn load_parquet_files_parallel_async(
     dir: &Path,
     schema: Option<&Schema>,
@@ -463,7 +463,7 @@ pub async fn load_parquet_files_parallel_with_filter_async(
     log::info!("Found {} Parquet files in directory", parquet_files.len());
 
     // Create futures for each file with filtering
-    let column_vec = columns.map(|cols| cols.to_vec());
+    let column_vec = columns.map(<[std::string::String]>::to_vec);
 
     let futures = parquet_files.iter().map(|path| {
         let path = path.clone();

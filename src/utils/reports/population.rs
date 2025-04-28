@@ -252,7 +252,7 @@ fn save_child_age_distribution(
     }
     
     // Write year counts instead of individual dates (more efficient and more useful)
-    let mut years: Vec<i32> = year_counts.keys().cloned().collect();
+    let mut years: Vec<i32> = year_counts.keys().copied().collect();
     years.sort_unstable();
     
     for year in years {
@@ -362,14 +362,14 @@ fn save_parent_child_age_diff(
     writeln!(writer, "Age Difference (years),Father Count,Father %,Mother Count,Mother %")?;
     
     // Collect all unique bins
-    let mut all_bins: Vec<i32> = father_age_diffs.keys().cloned().collect();
-    all_bins.extend(mother_age_diffs.keys().cloned());
-    all_bins.sort();
+    let mut all_bins: Vec<i32> = father_age_diffs.keys().copied().collect();
+    all_bins.extend(mother_age_diffs.keys().copied());
+    all_bins.sort_unstable();
     all_bins.dedup();
     
     for &bin in &all_bins {
-        let f_count = father_age_diffs.get(&bin).cloned().unwrap_or(0);
-        let m_count = mother_age_diffs.get(&bin).cloned().unwrap_or(0);
+        let f_count = father_age_diffs.get(&bin).copied().unwrap_or(0);
+        let m_count = mother_age_diffs.get(&bin).copied().unwrap_or(0);
         
         let f_percent = if total_father_diffs > 0 {
             (f_count as f64 / total_father_diffs as f64) * 100.0
@@ -385,16 +385,14 @@ fn save_parent_child_age_diff(
         
         writeln!(
             writer, 
-            "{},{},{:.2},{},{:.2}", 
-            bin, f_count, f_percent, m_count, m_percent
+            "{bin},{f_count},{f_percent:.2},{m_count},{m_percent:.2}"
         )?;
     }
     
     // Add summary statistics
     writeln!(writer, "\nSummary Statistics")?;
     writeln!(writer, "Metric,Father,Mother")?;
-    writeln!(writer, "Total records with data,{},{}",
-             total_father_diffs, total_mother_diffs)?;
+    writeln!(writer, "Total records with data,{total_father_diffs},{total_mother_diffs}")?;
     writeln!(writer, "Missing values,{},{}",
              total_rows - total_father_diffs, total_rows - total_mother_diffs)?;
 

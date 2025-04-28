@@ -58,7 +58,7 @@ pub fn parse_flexible(date_str: &str) -> Result<NaiveDate> {
     }
 
     // Log the failed attempt for debugging
-    log::debug!("Failed to parse date: {}", cleaned_str);
+    log::debug!("Failed to parse date: {cleaned_str}");
 
     Err(IdsError::Validation(format!(
         "Invalid date format: {cleaned_str}"
