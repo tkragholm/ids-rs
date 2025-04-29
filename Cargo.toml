@@ -32,6 +32,8 @@ futures = "0.3"
 # Utilities
 rand = "0.9.1"
 itertools = "0.14"
+rustc-hash = "2.1.0"
+smallvec = "1.13.1"
 
 [lib]
 name = "ids_rs"
