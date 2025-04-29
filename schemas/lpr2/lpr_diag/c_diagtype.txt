@@ -1,0 +1,7 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+A	Aktionsdiagnose	01.01.1977	31.12.2500	01.01.1977	31.12.2500
+B	Bidiagnose	01.01.1977	31.12.2500	01.01.1977	31.12.2500
+G	Grundmorbus	når forskellig fra aktionsdiagnose	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+H	Henvisningsdiagnose	01.01.1995	31.12.2500	01.01.1995	31.12.2500
+M	Midlertidig diagnose	kun for åbne somatisk ambulante besøg	01.01.1998	31.12.2013	01.01.1998	31.12.2013
+C	Komplikation	01.01.2002	31.12.2013	01.01.2002	31.12.2013

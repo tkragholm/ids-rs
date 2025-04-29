@@ -1,0 +1,8 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+0	Heldøgnspatient	01.01.1977	31.12.2001	01.01.1977	31.12.2001
+0	Indlagt patient	01.01.2002	31.12.2500	01.01.2002	31.12.2500
+1	Dagpatient	01.01.1977	31.12.1986	.	.
+1	Deldøgnspatient	01.01.1987	31.12.2001	01.01.1994	31.12.2001
+2	Natpatient	01.01.1977	31.12.1986	.	.
+2	Ambulant patient	01.01.1987	31.12.2500	01.01.1994	31.12.2500
+3	Skadestuepatient	01.01.1987	31.12.2013	01.01.1994	31.12.2013

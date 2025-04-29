@@ -1,0 +1,9 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+0	Akut indlæggelse	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+1	Indkaldt via forambulatorium	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+2	Indkaldt via andet ambulatorium	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+3	Anden indkaldelse	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+4	Genindkaldt	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+5	Indkaldt via koordineret forundersøgelse	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+8	Herfødt	01.01.1977	31.12.1986	01.01.1977	31.12.1986
+9	Uoplyst	01.01.1977	31.12.1986	01.01.1977	31.12.1986

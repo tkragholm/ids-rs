@@ -59,6 +59,14 @@ impl From<io::Error> for IdsError {
     }
 }
 
+impl From<arrow::error::ArrowError> for IdsError {
+    fn from(err: arrow::error::ArrowError) -> Self {
+        Self::External(Box::new(err))
+    }
+}
+
+// Remove this impl since it's not allowed to implement traits for types not in current crate
+
 // Helper functions
 pub fn validation_error(message: impl ToString) -> IdsError {
     IdsError::Validation(message.to_string())

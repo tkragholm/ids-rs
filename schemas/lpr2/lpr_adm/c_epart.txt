@@ -1,0 +1,10 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+1	Til fods	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+2	Cykel	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+3	Knallert	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+4	Motorcykel eller scooter	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+5	Personbil	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+6	Varevogn	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+7	Lastbil	bus	m.m.	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+8	Anden transportform	tilskadekomne	01.01.1995	31.12.2003	01.01.1995	31.12.2003
+9	Ikke specificeret transportform	tilskadekomne	01.01.1995	31.12.2003	01.01.1995	31.12.2003

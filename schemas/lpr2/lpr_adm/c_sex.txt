@@ -1,0 +1,5 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+1	Mand	01.01.1977	31.12.2004	01.01.1977	31.12.2004
+2	Kvinde	01.01.1977	31.12.2004	01.01.1977	31.12.2004
+M	Mand	01.01.2005	01.01.2500	01.01.2005	01.01.2500
+K	Kvinde	01.01.2005	01.01.2500	01.01.2005	01.01.2500

@@ -11,8 +11,8 @@ use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::algorithm::lpr::{process_lpr_data, LprConfig};
-use crate::algorithm::scd::{apply_scd_algorithm, ScdConfig, ScdResult};
+use crate::algorithm::health::lpr::{process_lpr_data, LprConfig};
+use crate::algorithm::health::diagnosis::scd::{apply_scd_algorithm, ScdConfig, ScdResult};
 use crate::error::{IdsError, Result};
 
 /// Configuration for Population SCD analysis

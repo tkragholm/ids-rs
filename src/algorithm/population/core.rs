@@ -1,4 +1,4 @@
-//! Population generation algorithms for combining BEF and MFR data
+//! Core population generation algorithms for combining BEF and MFR data
 
 use arrow::array::{Array, Date32Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -18,6 +18,12 @@ pub struct PopulationConfig {
     pub birth_inclusion_start_year: i32,
     /// End year for filtering births (inclusive)
     pub birth_inclusion_end_year: i32,
+    /// Whether to include death register data
+    pub include_death_data: bool,
+    /// Whether to include death cause register data
+    pub include_death_cause_data: bool,
+    /// Whether to include migration register data
+    pub include_migration_data: bool,
 }
 
 impl Default for PopulationConfig {
@@ -25,6 +31,9 @@ impl Default for PopulationConfig {
         Self {
             birth_inclusion_start_year: 1995,
             birth_inclusion_end_year: 2020,
+            include_death_data: true,
+            include_death_cause_data: true,
+            include_migration_data: true,
         }
     }
 }

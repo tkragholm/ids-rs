@@ -1,0 +1,11 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+0	Slag	stød grundet fald på samme niveau	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+1	Slag	stød grundet fald på trappe eller til lavere niveau	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+2	Slag	stød grundet kontakt med anden genstand	person eller dyr	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+3	Klemning	snit eller stik	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+4	Fremmedlegeme	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+5	Kvælning	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+6	Kemisk påvirkning	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+7	Termisk	elektrisk eller strålingspåvirkning	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+8	Akut overbelastning af legeme eler legemesdel	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+9	Anden og ukendt skadesmekanisme	01.01.1987	31.12.2003	01.01.1987	31.12.2003

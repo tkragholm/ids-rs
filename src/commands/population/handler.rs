@@ -22,6 +22,9 @@ pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()>
     let algo_config = PopulationConfig {
         birth_inclusion_start_year: config.birth_inclusion_start_year,
         birth_inclusion_end_year: config.birth_inclusion_end_year,
+        include_death_data: true,
+        include_death_cause_data: true,
+        include_migration_data: true,
     };
 
     // Read BEF data using BEF registry

@@ -44,6 +44,8 @@ pub enum Expr {
     And(Box<Expr>, Box<Expr>),
     Or(Box<Expr>, Box<Expr>),
     Not(Box<Expr>),
+    In(String, Vec<String>),   // Check if column value is in set of values
+    AlwaysTrue,                // Always evaluates to true
 }
 
 impl Expr {
@@ -58,6 +60,10 @@ impl Expr {
     #[must_use] pub fn not(self) -> Self {
         Self::Not(Box::new(self))
     }
+    
+    #[must_use] pub fn always_true() -> Self {
+        Self::AlwaysTrue
+    }
 
     #[must_use] pub fn required_columns(&self) -> HashSet<String> {
         let mut set = HashSet::new();
@@ -70,12 +76,18 @@ impl Expr {
             Self::Filter { column, .. } => {
                 set.insert(column.clone());
             }
+            Self::In(column, _) => {
+                set.insert(column.clone());
+            }
             Self::And(lhs, rhs) | Self::Or(lhs, rhs) => {
                 lhs.collect_columns(set);
                 rhs.collect_columns(set);
             }
             Self::Not(inner) => {
                 inner.collect_columns(set);
+            }
+            Self::AlwaysTrue => {
+                // No columns needed for AlwaysTrue
             }
         }
     }
@@ -97,6 +109,10 @@ impl ColumnBuilder {
             column: self.name,
             filter: val.into(),
         }
+    }
+
+    #[must_use] pub fn in_list(self, values: Vec<String>) -> Expr {
+        Expr::In(self.name, values)
     }
 
     #[must_use] pub fn gt(self, val: i64) -> Expr {
@@ -184,6 +200,39 @@ pub fn evaluate_expr(batch: &RecordBatch, expr: &Expr) -> Result<BooleanArray> {
             &evaluate_expr(batch, rhs)?,
         )?),
         Expr::Not(inner) => Ok(not(&evaluate_expr(batch, inner)?)?),
+        Expr::In(column, values) => evaluate_in_expr(batch, column, values),
+        Expr::AlwaysTrue => {
+            // Create a boolean array with all true values
+            Ok(BooleanArray::from(vec![true; batch.num_rows()]))
+        }
+    }
+}
+
+pub fn evaluate_in_expr(
+    batch: &RecordBatch,
+    column: &str,
+    values: &[String],
+) -> Result<BooleanArray> {
+    let index = batch.schema().index_of(column)?;
+    let array = batch.column(index);
+    
+    // Handle string arrays
+    if let Some(str_array) = array.as_any().downcast_ref::<StringArray>() {
+        // Create a HashSet from values for O(1) lookups
+        let value_set: HashSet<&str> = values.iter().map(|s| s.as_str()).collect();
+        
+        // Map each value in the column to true if it's in value_set, false otherwise
+        let result_iter = str_array
+            .iter()
+            .map(|opt_str| opt_str.map(|s| value_set.contains(s)));
+        
+        // Collect into a BooleanArray
+        Ok(result_iter.collect())
+    } else {
+        Err(ArrowError::ComputeError(format!(
+            "Column '{}' is not a StringArray, cannot perform IN operation with string values",
+            column
+        )))
     }
 }
 

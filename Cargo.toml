@@ -26,14 +26,15 @@ indicatif = "0.17"
 arrow = { version = "55.0", features = ["chrono-tz"] }
 parquet = { version = "55.0", features = ["arrow", "async"] }
 rayon = "1.8.0"
-tokio = { version = "1", features = ["fs", "rt-multi-thread", "macros"] }
+tokio = { version = "1.44.2", features = ["fs", "rt-multi-thread", "macros"] }
 futures = "0.3"
 
 # Utilities
 rand = "0.9.1"
 itertools = "0.14"
-rustc-hash = "2.1.0"
-smallvec = "1.13.1"
+rustc-hash = "2.1.1"
+smallvec = "1.15.0"
+regex = "1.11.1"
 
 [lib]
 name = "ids_rs"

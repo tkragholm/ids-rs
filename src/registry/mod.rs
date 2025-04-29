@@ -27,20 +27,26 @@ pub trait RegisterLoader {
 
 pub mod akm;
 pub mod bef;
+pub mod dod;
+pub mod dodsaarsag;
 pub mod idan;
 pub mod ind;
 pub mod lpr;
 pub mod mfr;
 pub mod uddf;
 pub mod transform;
+pub mod vnds;
 
 // Re-export registry structs for easier access
 pub use akm::AkmRegister;
 pub use bef::BefRegister;
+pub use dod::DodRegister;
+pub use dodsaarsag::DodsaarsagRegister;
 pub use idan::IdanRegister;
 pub use ind::IndRegister;
 pub use mfr::MfrRegister;
 pub use uddf::UddfRegister;
+pub use vnds::VndsRegister;
 pub use lpr::{
     LprAdmRegister, 
     LprDiagRegister, 
@@ -67,10 +73,13 @@ pub fn registry_from_name(name: &str) -> Result<Box<dyn RegisterLoader>> {
     match name.to_lowercase().as_str() {
         "akm" => Ok(Box::new(akm::AkmRegister)),
         "bef" => Ok(Box::new(bef::BefRegister)),
+        "dod" => Ok(Box::new(dod::DodRegister)),
+        "dodsaarsag" => Ok(Box::new(dodsaarsag::DodsaarsagRegister)),
         "idan" => Ok(Box::new(idan::IdanRegister)),
         "ind" => Ok(Box::new(ind::IndRegister)),
         "mfr" => Ok(Box::new(mfr::MfrRegister)),
         "uddf" => Ok(Box::new(uddf::UddfRegister)),
+        "vnds" => Ok(Box::new(vnds::VndsRegister)),
         "lpr_adm" => Ok(Box::new(lpr::LprAdmRegister)),
         "lpr_diag" => Ok(Box::new(lpr::LprDiagRegister)),
         "lpr_bes" => Ok(Box::new(lpr::LprBesRegister)),
@@ -93,6 +102,10 @@ pub fn registry_from_path(path: &str) -> Result<Box<dyn RegisterLoader>> {
             return Ok(Box::new(akm::AkmRegister));
         } else if lower_name.contains("bef") {
             return Ok(Box::new(bef::BefRegister));
+        } else if lower_name.contains("dod") && !lower_name.contains("dodsaarsag") {
+            return Ok(Box::new(dod::DodRegister));
+        } else if lower_name.contains("dodsaarsag") {
+            return Ok(Box::new(dodsaarsag::DodsaarsagRegister));
         } else if lower_name.contains("idan") {
             return Ok(Box::new(idan::IdanRegister));
         } else if lower_name.contains("ind") {
@@ -101,6 +114,8 @@ pub fn registry_from_path(path: &str) -> Result<Box<dyn RegisterLoader>> {
             return Ok(Box::new(mfr::MfrRegister));
         } else if lower_name.contains("uddf") || lower_name.contains("uddannelse") {
             return Ok(Box::new(uddf::UddfRegister));
+        } else if lower_name.contains("vnds") || lower_name.contains("migration") {
+            return Ok(Box::new(vnds::VndsRegister));
         } else if lower_name.contains("lpr_adm") {
             return Ok(Box::new(lpr::LprAdmRegister));
         } else if lower_name.contains("lpr_diag") {

@@ -1,0 +1,8 @@
+t_bes 	1994 - 	Tabellen indeholder datoer for besøg, der knytter sig til somatiske ambulante og deldøgns-kontakter. Fra 2003 indeholder tabellen også besøgsdatoer fra hjemmebesøg og kan indeholde flere besøgsdatoer pr. dag pr. patient. Hjemmebesøg kan frasorteres ved at koble med tabellen t_sksube og se på de besøgsdatoer, hvor der på samme dag er foretaget en procedure med koden AAF6.
+Funktion Satellittabel med unikt indhold
+Sidst ændret 21-11-2016 af ERV
+Beskrivelse Ambulante besøgsdatoer
+Tabelenhed En række i tabellen indeholder oplysninger om et ambulant besøg.
+Variabel 	Periode 	Indhold
+d_ambdto 	1994 - 	Dato for ambulant besøg
+v_recnum 	1994 - 	Recordnummer

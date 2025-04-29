@@ -1,0 +1,11 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+0	Trafikområde	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+1	Boligområde	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+2	Produktions- og værkstedsområde	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+3	Butiks- handels- og serviceområde	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+4	Skole	offentlig administrations- og institutionsområde	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+5	Idræts- og sportsområdet	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+6	Forlystelses- og parkområdet	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+7	Fri natur	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+8	Hav	sø og vådområder	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+9	Uoplyst	01.01.1987	31.12.2003	01.01.1987	31.12.2003

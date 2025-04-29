@@ -4,6 +4,8 @@
 
 pub mod akm;
 pub mod bef;
+pub mod dod;             // Death Register (DOD)
+pub mod dodsaarsag;      // Death Cause Register (DODSAARSAG)
 pub mod examples;
 pub mod filter_expr;
 pub mod idan;
@@ -17,6 +19,7 @@ pub mod mfr;
 pub mod parquet_async;
 pub mod parquet_utils;
 pub mod uddf;
+pub mod vnds;            // Migration Register (VNDS)
 
 // Re-export parquet utilities
 pub use parquet_utils::{

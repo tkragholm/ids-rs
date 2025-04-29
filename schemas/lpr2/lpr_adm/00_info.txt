@@ -1,0 +1,45 @@
+Variabel 	Periode 	Indhold
+c_adiag 	1977 - 	Kontaktens aktionsdiagnose
+c_afd 	1977 - 	Patientens stamafdeling
+c_amt 	1977 - 	Patientens bopælsamt
+c_andenbeh 	1977 - 1986 	Planlagt anden behandling
+c_blok 	1994 - 	Specialeblok
+c_eakt 	1987 - 2003 	Aktivitet i forbindelse med ulykke der fører til sygehuskontakt
+c_emek 	1987 - 2003 	Ulykkesmekanisme
+c_emodpart 	1995 - 2003 	Transportform for modpart ved ulykke
+c_epart 	1995 - 2003 	Transportform for tilskadekomne ved trafikulykke/uheld
+c_ested 	1987 - 2003 	Kode for ulykkessted
+c_etraf 	1987 - 2003 	Trafikulykke/uheld eller ej
+c_hafd 	2004 - 	Henvisende afdeling
+c_henm 	1987 - 	Henvisningsmåde
+c_hsgh 	2004 - 	Henvisende sygehus
+c_indform 	1977 - 1986 	Indlæggelsesform
+c_indfra 	1977 - 1986 	Hvor patienten er indlagt fra
+c_indm 	1977 - 	Indskrivningsmåde
+c_kom 	1977 - 	Patientens bopælskommune
+c_kontaars 	1987 - 	Kontaktårsag
+c_pattype 	1977 - 	Patienttype
+c_senstat 	1977 - 1986 	Planlagt senere stationær behandling
+c_sex 	1977 - 	Patientens køn
+c_sgh 	1977 - 	Patientens stamsygehus
+c_sghamt 	1977 - 	Sygehusamt
+c_spec 	1977 - 	Stamafdelingens hovedspeciale
+c_udm 	1987 - 	Afslutningsmåde
+c_udtil 	1977 - 1986 	Hvilken instans patienten er udskrevet til
+c_ulykke 	1977 - 1986 	Ulykkeskode
+d_ebhdto 	1999 - 2003 	Dato for endelig behandling
+d_fusdto 	1994 - 2003 	Dato for forundersøgelse
+d_hendto 	1977 - 	Henvisningsdato
+d_inddto 	1977 - 	Kontaktens startdato
+d_opdatdto 	2005 - 	Intern dato for opdatering af kontakten
+d_uddto 	1977 - 	Kontakten afslutningsdato
+k_recnum 	1977 - 	Recordnummer
+v_alddg 	2001 - 	Patientens alder i dage
+v_alder 	1977 - 	Patientens alder
+v_aldmdr 	2001 - 	Patientens alder i måneder
+v_behdage 	1977 - 	Behandlingsdage
+v_cpr 	1977 - 	Patientens cpr-nummer
+v_indminut 	1977 - 	Kontaktens startminut
+v_indtime 	1977 - 	Kontaktens starttime
+v_sengdage 	1994 - 	Behandlingsdage/sengedage
+v_udtime 	1994 - 	Kontaktens afslutningstime

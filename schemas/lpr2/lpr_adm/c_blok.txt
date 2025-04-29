@@ -1,0 +1,8 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+1	Medicinsk blok	01.01.1994	01.01.2500	01.01.1994	01.01.2500
+2	Kirurgisk blok	01.01.1994	01.01.2500	01.01.1994	01.01.2500
+5	Psykiatrisk blok	01.01.1994	01.01.2500	01.01.1994	01.01.2500
+6	Laboratorie blok	01.01.1994	01.01.2500	01.01.1994	01.01.2500
+8	Øvrige specialer	01.01.1994	01.01.2500	01.01.1994	01.01.2500
+9	Andre specialer	01.01.1994	01.01.2500	01.01.1994	01.01.2500
+99	Uden for specialer	01.01.1994	01.01.2500	01.01.1994	01.01.2500

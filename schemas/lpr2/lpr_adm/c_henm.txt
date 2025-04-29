@@ -1,0 +1,16 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+0	Ingen henvisning	01.01.1987	31.12.2500	01.01.1987	31.12.2500
+1	Henvist fra alment praktiserende læge	01.01.1987	31.12.2500	01.01.1987	31.12.2500
+2	Henvist fra praktiserende speciallæge	01.01.1987	31.12.2500	01.01.1987	31.12.2500
+3	Henvist fra eget heldøgnsafsnit eller eget deldøgnsafsnit	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+5	Henvist fra andet heldøgnsafsnit eller andet deldøgnsafsnit	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+6	Henvist fra skadestue eller ambulatorium	01.01.1987	31.12.1998	01.01.1987	31.12.1998
+8	Herfødt	01.01.1987	31.12.2500	01.01.1987	31.12.2500
+9	Uoplyst	01.01.1987	31.12.2003	01.01.1987	31.12.2003
+A	Andet	01.01.1995	31.12.2500	01.01.1995	31.12.2500
+B	Eget ambulatorium	01.01.1999	31.12.2003	01.01.1999	31.12.2003
+C	Andet ambulatorium	01.01.1999	31.12.2003	01.01.1999	31.12.2003
+D	Skadestue	01.01.1999	31.12.2003	01.01.1999	31.12.2003
+E	Udlandet (kun direkte henvisninger)	01.01.2002	31.12.2500	01.01.2002	31.12.2500
+F	Henvist fra sygehusafsnit	01.01.2004	31.12.2500	01.01.2004	31.12.2500
+G	Henvist fra sygehusafsnit	venteforløb	01.01.2004	31.12.2500	01.01.2004	31.12.2500

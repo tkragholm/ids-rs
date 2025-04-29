@@ -1,0 +1,4 @@
+kode	betydning	Gyldig fra dato	Gyldig til dato	Anvendt fra dato	Anvendt til dato
+1	Akut	01.01.1977	31.12.2500	01.01.1977	31.12.2500
+2	Ikke akut	01.01.1977	31.12.2500	01.01.1977	31.12.2500
+9	Uoplyst	01.01.1977	31.12.2003	01.01.1977	31.12.2003
