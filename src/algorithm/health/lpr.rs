@@ -223,7 +223,7 @@ pub fn integrate_lpr2_components(
     
     // Build integrated records
     let num_rows = lpr_adm.num_rows();
-    log::info!("Building integrated LPR2 records for {} rows", num_rows);
+    log::info!("Building integrated LPR2 records for {num_rows} rows");
     
     // Result arrays
     let mut patient_ids = Vec::with_capacity(num_rows);
@@ -238,11 +238,11 @@ pub fn integrate_lpr2_components(
     
     for i in 0..num_rows {
         // Get record number for this row
-        let recnum = if !recnum_array.is_null(i) {
-            recnum_array.value(i).to_string()
-        } else {
+        let recnum = if recnum_array.is_null(i) {
             // Skip records without a record number
             continue;
+        } else {
+            recnum_array.value(i).to_string()
         };
         
         // Add patient ID (PNR)
@@ -393,7 +393,7 @@ pub fn integrate_lpr3_components(
     
     // Build integrated records
     let num_rows = lpr3_kontakter.num_rows();
-    log::info!("Building integrated LPR3 records for {} rows", num_rows);
+    log::info!("Building integrated LPR3 records for {num_rows} rows");
     
     // Result arrays
     let mut patient_ids = Vec::with_capacity(num_rows);
@@ -408,11 +408,11 @@ pub fn integrate_lpr3_components(
     
     for i in 0..num_rows {
         // Get contact ID for this row
-        let kontakt_id = if !kontakt_id_array.is_null(i) {
-            kontakt_id_array.value(i).to_string()
-        } else {
+        let kontakt_id = if kontakt_id_array.is_null(i) {
             // Skip records without a contact ID
             continue;
+        } else {
+            kontakt_id_array.value(i).to_string()
         };
         
         // Add patient ID (PNR/CPR)

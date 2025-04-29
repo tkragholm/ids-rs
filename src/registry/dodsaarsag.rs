@@ -63,7 +63,7 @@ impl super::RegisterLoader for DodsaarsagRegister {
         // Create a simple equality expression for PNR filtering if needed
         let predicate_expr = if let Some(pnrs) = pnr_filter {
             let pnr_values: Vec<String> = pnrs.iter().cloned().collect();
-            Expr::In("PNR".to_string(), pnr_values.into())
+            Expr::In("PNR".to_string(), pnr_values)
         } else {
             Expr::AlwaysTrue
         };

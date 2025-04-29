@@ -6,7 +6,7 @@
 use arrow::datatypes::{DataType, Field, Schema};
 
 /// Create the schema for the Danish Death Register (DOD)
-pub fn dod_schema() -> Schema {
+#[must_use] pub fn dod_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
         Field::new("DODDATO", DataType::Utf8, true),
@@ -14,7 +14,7 @@ pub fn dod_schema() -> Schema {
 }
 
 /// Create schema for standardized version of DOD register data
-pub fn dod_standardized_schema() -> Schema {
+#[must_use] pub fn dod_standardized_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
         Field::new("DEATH_DATE", DataType::Date32, true),

@@ -5,7 +5,7 @@ use chrono::{Datelike, NaiveDate};
 /// The UNIX epoch date (1970-01-01)
 pub const EPOCH_DATE: NaiveDate = unsafe { NaiveDate::from_ymd_opt(1970, 1, 1).unwrap_unchecked() };
 
-/// Convert a NaiveDate to days since UNIX epoch (1970-01-01)
+/// Convert a `NaiveDate` to days since UNIX epoch (1970-01-01)
 /// 
 /// This function calculates the number of days between the given date
 /// and the UNIX epoch (January 1, 1970).
@@ -22,7 +22,7 @@ pub fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
     (date - EPOCH_DATE).num_days() as i32
 }
 
-/// Convert days since UNIX epoch (1970-01-01) to a NaiveDate
+/// Convert days since UNIX epoch (1970-01-01) to a `NaiveDate`
 /// 
 /// # Arguments
 /// 
@@ -30,10 +30,10 @@ pub fn date_to_days_since_epoch(date: NaiveDate) -> i32 {
 /// 
 /// # Returns
 /// 
-/// The corresponding NaiveDate
+/// The corresponding `NaiveDate`
 #[must_use]
 pub fn days_since_epoch_to_date(days: i32) -> NaiveDate {
-    EPOCH_DATE + chrono::Duration::days(days as i64)
+    EPOCH_DATE + chrono::Duration::days(i64::from(days))
 }
 
 /// Parse a date from a Danish format string

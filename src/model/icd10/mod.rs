@@ -34,9 +34,9 @@ pub enum Icd10Chapter {
 
 impl Icd10Chapter {
     /// Determine the ICD-10 chapter from a diagnosis code
-    pub fn from_code(code: &str) -> Option<Self> {
+    #[must_use] pub fn from_code(code: &str) -> Option<Self> {
         // Return None for empty or too short codes
-        if code.is_empty() || code.len() < 1 {
+        if code.is_empty() || code.is_empty() {
             return None;
         }
 
@@ -104,7 +104,7 @@ impl Icd10Chapter {
     }
 
     /// Get the description of the ICD-10 chapter
-    pub fn description(&self) -> &'static str {
+    #[must_use] pub fn description(&self) -> &'static str {
         match self {
             Self::InfectiousParasitic => "I: Infectious and parasitic diseases",
             Self::Neoplasms => "II: Neoplasms",
@@ -132,7 +132,7 @@ impl Icd10Chapter {
     }
     
     /// Get the code range for this chapter
-    pub fn code_range(&self) -> &'static str {
+    #[must_use] pub fn code_range(&self) -> &'static str {
         match self {
             Self::InfectiousParasitic => "A00-B99",
             Self::Neoplasms => "C00-D48",

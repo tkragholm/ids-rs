@@ -21,8 +21,8 @@ pub struct SecondaryDiagnosis {
 
 impl SecondaryDiagnosis {
     /// Create a new secondary diagnosis
-    pub fn new(code: String, diagnosis_type: String, weight: Option<f32>) -> Self {
-        let weight = weight.unwrap_or_else(|| {
+    #[must_use] pub fn new(code: String, diagnosis_type: String, weight: Option<f32>) -> Self {
+        let weight = weight.unwrap_or({
             // Calculate weight based on diagnosis type
             match diagnosis_type.as_str() {
                 "B" => 0.8, // Higher weight for bi-diagnoses
@@ -43,7 +43,7 @@ impl SecondaryDiagnosis {
 }
 
 /// Create Arrow array for a list of secondary diagnoses
-pub fn create_secondary_diagnoses_array(
+#[must_use] pub fn create_secondary_diagnoses_array(
     diagnoses_list: &[Option<Vec<SecondaryDiagnosis>>],
 ) -> ArrayRef {
     // Create field for the inner struct
@@ -74,36 +74,33 @@ pub fn create_secondary_diagnoses_array(
     list_offsets.push(0);
 
     for diagnoses_opt in diagnoses_list {
-        match diagnoses_opt {
-            Some(diagnoses) => {
-                list_validity.push(true);
+        if let Some(diagnoses) = diagnoses_opt {
+            list_validity.push(true);
 
-                // Add values for each diagnosis in this list
-                for diagnosis in diagnoses {
-                    // Code is required
-                    code_values.push(Some(diagnosis.code.clone()));
-                    current_code_length += 1;
+            // Add values for each diagnosis in this list
+            for diagnosis in diagnoses {
+                // Code is required
+                code_values.push(Some(diagnosis.code.clone()));
+                current_code_length += 1;
 
-                    // Type is optional
-                    diagnosis_type_values.push(Some(diagnosis.diagnosis_type.clone()));
-                    current_diagnosis_type_length += 1;
+                // Type is optional
+                diagnosis_type_values.push(Some(diagnosis.diagnosis_type.clone()));
+                current_diagnosis_type_length += 1;
 
-                    // Weight is optional
-                    weight_values.push(Some(diagnosis.weight));
-                    current_weight_length += 1;
-                }
-
-                code_offsets.push(current_code_length);
-                diagnosis_type_offsets.push(current_diagnosis_type_length);
-                weight_offsets.push(current_weight_length);
-
-                list_offsets.push(list_offsets.last().unwrap() + diagnoses.len());
+                // Weight is optional
+                weight_values.push(Some(diagnosis.weight));
+                current_weight_length += 1;
             }
-            None => {
-                // This list is null
-                list_validity.push(false);
-                list_offsets.push(*list_offsets.last().unwrap());
-            }
+
+            code_offsets.push(current_code_length);
+            diagnosis_type_offsets.push(current_diagnosis_type_length);
+            weight_offsets.push(current_weight_length);
+
+            list_offsets.push(list_offsets.last().unwrap() + diagnoses.len());
+        } else {
+            // This list is null
+            list_validity.push(false);
+            list_offsets.push(*list_offsets.last().unwrap());
         }
     }
 
@@ -153,7 +150,7 @@ pub fn create_secondary_diagnoses_array(
 ///
 /// This function converts raw diagnosis tuples into structured secondary diagnoses
 /// with appropriate weights and types.
-pub fn process_secondary_diagnoses(diagnoses: &[(String, String)]) -> Vec<SecondaryDiagnosis> {
+#[must_use] pub fn process_secondary_diagnoses(diagnoses: &[(String, String)]) -> Vec<SecondaryDiagnosis> {
     diagnoses
         .iter()
         .filter(|(_, diag_type)| diag_type != "A") // Filter out primary diagnoses
@@ -167,7 +164,7 @@ pub fn process_secondary_diagnoses(diagnoses: &[(String, String)]) -> Vec<Second
 ///
 /// This function returns the field definition for a list of secondary diagnoses
 /// that can be included in a schema.
-pub fn create_secondary_diagnoses_field() -> Field {
+#[must_use] pub fn create_secondary_diagnoses_field() -> Field {
     // Define secondary diagnosis struct fields
     let secondary_diag_fields = vec![
         Field::new("code", DataType::Utf8, false),

@@ -6,7 +6,7 @@
 use arrow::datatypes::{DataType, Field, Schema};
 
 /// Create the schema for the Danish Death Cause Register (DODSAARSAG)
-pub fn dodsaarsag_schema() -> Schema {
+#[must_use] pub fn dodsaarsag_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
         Field::new("C_AARSAG", DataType::Utf8, true),  // Cause of death code (ICD-10)
@@ -15,7 +15,7 @@ pub fn dodsaarsag_schema() -> Schema {
 }
 
 /// Create schema for standardized version of DODSAARSAG register data
-pub fn dodsaarsag_standardized_schema() -> Schema {
+#[must_use] pub fn dodsaarsag_standardized_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
         Field::new("DEATH_CAUSE", DataType::Utf8, true),  // Normalized cause code

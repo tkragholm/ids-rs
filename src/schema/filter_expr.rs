@@ -219,7 +219,7 @@ pub fn evaluate_in_expr(
     // Handle string arrays
     if let Some(str_array) = array.as_any().downcast_ref::<StringArray>() {
         // Create a HashSet from values for O(1) lookups
-        let value_set: HashSet<&str> = values.iter().map(|s| s.as_str()).collect();
+        let value_set: HashSet<&str> = values.iter().map(std::string::String::as_str).collect();
         
         // Map each value in the column to true if it's in value_set, false otherwise
         let result_iter = str_array
@@ -230,8 +230,7 @@ pub fn evaluate_in_expr(
         Ok(result_iter.collect())
     } else {
         Err(ArrowError::ComputeError(format!(
-            "Column '{}' is not a StringArray, cannot perform IN operation with string values",
-            column
+            "Column '{column}' is not a StringArray, cannot perform IN operation with string values"
         )))
     }
 }

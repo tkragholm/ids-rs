@@ -78,7 +78,7 @@ struct ControlData {
 }
 
 impl ControlData {
-    /// Create a new ControlData from a vector of (Pnr, NaiveDate) pairs and their indices
+    /// Create a new `ControlData` from a vector of (Pnr, `NaiveDate`) pairs and their indices
     fn new(controls: Vec<(Pnr, NaiveDate, usize)>) -> Self {
         let capacity = controls.len();
         let mut pnrs = Vec::with_capacity(capacity);
@@ -259,7 +259,7 @@ impl Matcher {
 
             // Store the control index in the appropriate bucket
             index
-                .entry(bucket as i32)
+                .entry(bucket)
                 .or_insert_with(SmallVec::<[usize; 16]>::new)
                 .push(idx);
         }
@@ -409,7 +409,7 @@ impl Matcher {
 
             // Determine the number of threads for optimal parallelism
             let num_threads = rayon::current_num_threads();
-            info!("Using parallel processing with {} threads", num_threads);
+            info!("Using parallel processing with {num_threads} threads");
 
             // Group cases by birth day range for better parallelism
             let case_groups =
@@ -633,7 +633,7 @@ impl Matcher {
         Ok((case_batch, control_batch))
     }
 
-    /// Extract PNR and birth date pairs with record batch indices from a RecordBatch
+    /// Extract PNR and birth date pairs with record batch indices from a `RecordBatch`
     fn extract_pnr_and_birth_date_with_indices(
         &self,
         batch: &RecordBatch,
@@ -676,7 +676,7 @@ impl Matcher {
         Ok(pairs)
     }
 
-    /// Extract PNR and birth date pairs from a RecordBatch
+    /// Extract PNR and birth date pairs from a `RecordBatch`
     fn extract_pnr_and_birth_date(&self, batch: &RecordBatch) -> Result<Vec<(Pnr, NaiveDate)>> {
         let pnr_idx = batch
             .schema()
@@ -741,7 +741,7 @@ impl Matcher {
         Ok(pnr_to_idx)
     }
 
-    /// Filter a RecordBatch by row indices
+    /// Filter a `RecordBatch` by row indices
     fn filter_batch_by_indices(
         &self,
         batch: &RecordBatch,

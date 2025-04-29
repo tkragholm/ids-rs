@@ -30,7 +30,7 @@ impl fmt::Debug for DiagnosisPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DiagnosisPattern")
             .field("prefix", &self.prefix)
-            .field("regex", &self.regex.as_ref().map(|r| r.as_str()))
+            .field("regex", &self.regex.as_ref().map(regex::Regex::as_str))
             .field("description", &self.description)
             .finish()
     }
@@ -38,7 +38,7 @@ impl fmt::Debug for DiagnosisPattern {
 
 impl DiagnosisPattern {
     /// Create a new pattern with a simple prefix (e.g., "D61")
-    pub fn new_prefix(prefix: &str, description: &str) -> Self {
+    #[must_use] pub fn new_prefix(prefix: &str, description: &str) -> Self {
         Self {
             prefix: Some(prefix.to_string()),
             regex: None,
@@ -50,13 +50,13 @@ impl DiagnosisPattern {
     pub fn new_regex(pattern: &str, description: &str) -> Result<Self, regex::Error> {
         Ok(Self {
             prefix: None,
-            regex: Some(Regex::new(&format!("^{}", pattern))?),
+            regex: Some(Regex::new(&format!("^{pattern}"))?),
             description: description.to_string(),
         })
     }
 
     /// Check if this pattern matches the given diagnosis code
-    pub fn matches(&self, diagnosis: &NormalizedDiagnosis) -> bool {
+    #[must_use] pub fn matches(&self, diagnosis: &NormalizedDiagnosis) -> bool {
         // Check prefix match first (faster)
         if let Some(prefix) = &self.prefix {
             if &diagnosis.prefix == prefix {
@@ -74,7 +74,7 @@ impl DiagnosisPattern {
 }
 
 /// Normalize an ICD-10 diagnosis code for consistent matching
-pub fn normalize_diagnosis_code(code: &str) -> Option<NormalizedDiagnosis> {
+#[must_use] pub fn normalize_diagnosis_code(code: &str) -> Option<NormalizedDiagnosis> {
     let code = code.trim();
     if code.is_empty() || code.len() < 3 {
         return None;

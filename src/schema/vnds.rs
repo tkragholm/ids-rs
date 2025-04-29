@@ -6,7 +6,7 @@
 use arrow::datatypes::{DataType, Field, Schema};
 
 /// Create the schema for the Danish Migration Register (VNDS)
-pub fn vnds_schema() -> Schema {
+#[must_use] pub fn vnds_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
         Field::new("INDUD_KODE", DataType::Utf8, true),  // Migration code (in/out)
@@ -15,7 +15,7 @@ pub fn vnds_schema() -> Schema {
 }
 
 /// Create schema for standardized version of VNDS register data
-pub fn vnds_standardized_schema() -> Schema {
+#[must_use] pub fn vnds_standardized_schema() -> Schema {
     Schema::new(vec![
         Field::new("PNR", DataType::Utf8, false),
         Field::new("MIGRATION_TYPE", DataType::Utf8, true),  // "IN" or "OUT"
@@ -33,7 +33,7 @@ pub enum MigrationType {
 
 impl MigrationType {
     /// Convert a migration code to a migration type
-    pub fn from_code(code: &str) -> Option<Self> {
+    #[must_use] pub fn from_code(code: &str) -> Option<Self> {
         match code {
             "I" | "i" | "1" => Some(Self::Immigration),
             "U" | "u" | "0" => Some(Self::Emigration),
@@ -42,7 +42,7 @@ impl MigrationType {
     }
     
     /// Get the string representation of the migration type
-    pub fn as_str(&self) -> &'static str {
+    #[must_use] pub fn as_str(&self) -> &'static str {
         match self {
             Self::Immigration => "IN",
             Self::Emigration => "OUT",

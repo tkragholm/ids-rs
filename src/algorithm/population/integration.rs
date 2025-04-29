@@ -98,23 +98,23 @@ pub fn integrate_population_data(
         .map(|f| Field::new(f.name(), f.data_type().clone(), f.is_nullable()))
         .collect();
 
-    if let Some(_) = &death_date_array {
+    if death_date_array.is_some() {
         fields.push(Field::new("DEATH_DATE", DataType::Date32, true));
     }
 
-    if let Some(_) = &death_cause_array {
+    if death_cause_array.is_some() {
         fields.push(Field::new("DEATH_CAUSE", DataType::Utf8, true));
     }
 
-    if let Some(_) = &death_cause_chapter_array {
+    if death_cause_chapter_array.is_some() {
         fields.push(Field::new("DEATH_CAUSE_CHAPTER", DataType::Utf8, true));
     }
 
-    if let Some(_) = &migration_type_array {
+    if migration_type_array.is_some() {
         fields.push(Field::new("MIGRATION_TYPE", DataType::Utf8, true));
     }
 
-    if let Some(_) = &migration_date_array {
+    if migration_date_array.is_some() {
         fields.push(Field::new("MIGRATION_DATE", DataType::Date32, true));
     }
 

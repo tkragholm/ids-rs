@@ -62,7 +62,7 @@ impl super::RegisterLoader for DodRegister {
         // Create a simple equality expression for PNR filtering if needed
         let predicate_expr = if let Some(pnrs) = pnr_filter {
             let pnr_values: Vec<String> = pnrs.iter().cloned().collect();
-            Expr::In("PNR".to_string(), pnr_values.into())
+            Expr::In("PNR".to_string(), pnr_values)
         } else {
             Expr::AlwaysTrue
         };
@@ -108,14 +108,11 @@ fn standardize_dod_batch(batch: &RecordBatch) -> Result<RecordBatch> {
                 nulls.push(i);
             } else {
                 let date_str = string_array.value(i);
-                match date_utils::parse_danish_date(date_str) {
-                    Some(date) => {
-                        parsed_dates.push(date_utils::date_to_days_since_epoch(date));
-                    }
-                    None => {
-                        parsed_dates.push(0); // Placeholder value for null
-                        nulls.push(i);
-                    }
+                if let Some(date) = date_utils::parse_danish_date(date_str) {
+                    parsed_dates.push(date_utils::date_to_days_since_epoch(date));
+                } else {
+                    parsed_dates.push(0); // Placeholder value for null
+                    nulls.push(i);
                 }
             }
         }

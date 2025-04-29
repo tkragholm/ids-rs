@@ -49,7 +49,7 @@ impl ScdDiseaseCodes {
         // Add to the patterns map
         self.patterns
             .entry(category.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pattern);
     }
     
@@ -59,7 +59,7 @@ impl ScdDiseaseCodes {
             // Add to the patterns map
             self.patterns
                 .entry(category.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(pattern);
                 
             // Note: Regex patterns aren't added to the prefix cache
@@ -441,7 +441,7 @@ pub fn apply_scd_algorithm(
     Ok(results)
 }
 
-/// Convert SCD results to a RecordBatch
+/// Convert SCD results to a `RecordBatch`
 pub fn scd_results_to_record_batch(results: &[ScdResult]) -> Result<RecordBatch> {
     if results.is_empty() {
         return Err(IdsError::Data("No SCD results to convert".to_string()));
