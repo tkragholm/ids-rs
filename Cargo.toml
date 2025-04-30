@@ -24,10 +24,17 @@ indicatif = "0.17"
 
 # Data processing
 arrow = { version = "55.0", features = ["chrono-tz"] }
+async-trait = "0.1.88"
 parquet = { version = "55.0", features = ["arrow", "async"] }
 rayon = "1.8.0"
-tokio = { version = "1.44.2", features = ["fs", "rt-multi-thread", "macros"] }
+tokio = { version = "1.44.2", features = [
+    "fs",
+    "rt-multi-thread",
+    "macros",
+    "parking_lot",
+] }
 futures = "0.3"
+datafusion = { version = "47.0.0", features = ["default", "serde"] }
 
 # Utilities
 rand = "0.9.1"

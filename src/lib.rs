@@ -9,6 +9,7 @@ pub use error::{IdsError, Result};
 pub mod algorithm;
 pub mod cli;
 pub mod commands;
+pub mod data;
 pub mod model;
 pub mod registry;
 pub mod schema;

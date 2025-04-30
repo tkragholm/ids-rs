@@ -1,0 +1,27 @@
+pub trait FileSource: Send + Sync {
+    // Required methods
+    fn create_file_opener(
+        &self,
+        object_store: Arc<dyn ObjectStore>,
+        base_config: &FileScanConfig,
+        partition: usize,
+    ) -> Arc<dyn FileOpener>;
+    fn as_any(&self) -> &dyn Any;
+    fn with_batch_size(&self, batch_size: usize) -> Arc<dyn FileSource>;
+    fn with_schema(&self, schema: SchemaRef) -> Arc<dyn FileSource>;
+    fn with_projection(&self, config: &FileScanConfig) -> Arc<dyn FileSource>;
+    fn with_statistics(&self, statistics: Statistics) -> Arc<dyn FileSource>;
+    fn metrics(&self) -> &ExecutionPlanMetricsSet;
+    fn statistics(&self) -> Result<Statistics>;
+    fn file_type(&self) -> &str;
+
+    // Provided methods
+    fn fmt_extra(&self, _t: DisplayFormatType, _f: &mut Formatter<'_>) -> Result { ... }
+    fn repartitioned(
+        &self,
+        target_partitions: usize,
+        repartition_file_min_size: usize,
+        output_ordering: Option<LexOrdering>,
+        config: &FileScanConfig,
+    ) -> Result<Option<FileScanConfig>> { ... }
+}

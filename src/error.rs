@@ -65,6 +65,12 @@ impl From<arrow::error::ArrowError> for IdsError {
     }
 }
 
+impl From<datafusion::error::DataFusionError> for IdsError {
+    fn from(err: datafusion::error::DataFusionError) -> Self {
+        Self::External(Box::new(err))
+    }
+}
+
 // Remove this impl since it's not allowed to implement traits for types not in current crate
 
 // Helper functions
