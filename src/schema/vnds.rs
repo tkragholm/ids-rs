@@ -42,7 +42,7 @@ impl MigrationType {
     }
     
     /// Get the string representation of the migration type
-    #[must_use] pub fn as_str(&self) -> &'static str {
+    #[must_use] pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Immigration => "IN",
             Self::Emigration => "OUT",

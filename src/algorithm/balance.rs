@@ -192,7 +192,7 @@ fn calculate_numeric_balance(
     let control_std = std_dev(&control_values, control_mean);
     
     // Calculate standardized difference
-    let pooled_std = ((case_std.powi(2) + control_std.powi(2)) / 2.0).sqrt();
+    let pooled_std = (control_std.mul_add(control_std, case_std.powi(2)) / 2.0).sqrt();
     let std_diff = if pooled_std > 0.0 {
         (case_mean - control_mean) / pooled_std
     } else {
@@ -278,7 +278,7 @@ fn calculate_categorical_balance(
     
     // For proportions, using special formula for standardized difference
     let std_diff = (case_proportion - control_proportion) / 
-        ((case_proportion * (1.0 - case_proportion) + control_proportion * (1.0 - control_proportion)) / 2.0).sqrt();
+        (case_proportion.mul_add(1.0 - case_proportion, control_proportion * (1.0 - control_proportion)) / 2.0).sqrt();
     
     Ok(BalanceMetric {
         name: format!("{column_name}_category_{most_common_category}"),

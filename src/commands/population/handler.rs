@@ -104,7 +104,7 @@ pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()>
     // Use a File object and ParquetWriter to write the file
     let file = std::fs::File::create(&population_file)?;
     let schema = family_data.schema();
-    let writer = parquet::arrow::ArrowWriter::try_new(file, schema.clone(), None).map_err(|e| {
+    let writer = parquet::arrow::ArrowWriter::try_new(file, schema, None).map_err(|e| {
         crate::error::IdsError::Data(format!("Failed to create parquet writer: {e}"))
     })?;
 

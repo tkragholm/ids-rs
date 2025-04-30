@@ -61,7 +61,7 @@ impl Expr {
         Self::Not(Box::new(self))
     }
     
-    #[must_use] pub fn always_true() -> Self {
+    #[must_use] pub const fn always_true() -> Self {
         Self::AlwaysTrue
     }
 

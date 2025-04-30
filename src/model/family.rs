@@ -67,12 +67,12 @@ impl FamilyRelations {
     }
     
     /// Check if the person has both parents
-    #[must_use] pub fn has_both_parents(&self) -> bool {
+    #[must_use] pub const fn has_both_parents(&self) -> bool {
         self.father.is_some() && self.mother.is_some()
     }
     
     /// Check if the person has at least one parent
-    #[must_use] pub fn has_any_parent(&self) -> bool {
+    #[must_use] pub const fn has_any_parent(&self) -> bool {
         self.father.is_some() || self.mother.is_some()
     }
 }

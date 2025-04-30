@@ -58,7 +58,7 @@ pub fn handle_study_design_command(config: &StudyDesignCommandConfig) -> Result<
     // Step 2: Identify SCD in population
     info!("Step 2: Identifying SCD in Population");
     let population_scd_config = PopulationScdCommandConfig {
-        population_path: population_path.clone(),
+        population_path,
         lpr_data_path: config.lpr_data_path.clone(),
         output_dir: config.output_dir.join("02_scd"),
         include_lpr2: config.include_lpr2,

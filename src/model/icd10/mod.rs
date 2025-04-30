@@ -104,7 +104,7 @@ impl Icd10Chapter {
     }
 
     /// Get the description of the ICD-10 chapter
-    #[must_use] pub fn description(&self) -> &'static str {
+    #[must_use] pub const fn description(&self) -> &'static str {
         match self {
             Self::InfectiousParasitic => "I: Infectious and parasitic diseases",
             Self::Neoplasms => "II: Neoplasms",
@@ -132,7 +132,7 @@ impl Icd10Chapter {
     }
     
     /// Get the code range for this chapter
-    #[must_use] pub fn code_range(&self) -> &'static str {
+    #[must_use] pub const fn code_range(&self) -> &'static str {
         match self {
             Self::InfectiousParasitic => "A00-B99",
             Self::Neoplasms => "C00-D48",

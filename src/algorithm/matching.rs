@@ -200,7 +200,7 @@ impl Matcher {
 
     /// Create a new matcher with the given criteria
     #[must_use]
-    pub fn new(criteria: MatchingCriteria) -> Self {
+    pub const fn new(criteria: MatchingCriteria) -> Self {
         Self { criteria }
     }
 
@@ -212,7 +212,7 @@ impl Matcher {
         match_date: NaiveDate,
     ) -> Result<Vec<MatchedPair>> {
         let mut matches = Vec::new();
-        let mut available_controls = controls.clone();
+        let mut available_controls = controls;
 
         for (case_pnr, case_birth_date) in cases {
             // Find eligible controls

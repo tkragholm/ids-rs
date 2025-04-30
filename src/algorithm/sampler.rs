@@ -126,7 +126,7 @@ pub fn write_parquet(path: &str, batches: &[RecordBatch]) -> Result<()> {
         .build();
 
     // Create the writer
-    let mut writer = ArrowWriter::try_new(file, schema.clone(), Some(props))
+    let mut writer = ArrowWriter::try_new(file, schema, Some(props))
         .map_err(|e| IdsError::Data(format!("Error creating parquet writer: {e}")))?;
 
     // Write all batches

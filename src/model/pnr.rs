@@ -93,7 +93,7 @@ impl Pnr {
     }
     
     /// Get the person's birth date from the PNR
-    #[must_use] pub fn birth_date(&self) -> Option<NaiveDate> {
+    #[must_use] pub const fn birth_date(&self) -> Option<NaiveDate> {
         self.birth_date
     }
     

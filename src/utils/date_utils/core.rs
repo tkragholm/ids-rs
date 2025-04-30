@@ -120,7 +120,7 @@ pub fn age_at(birth_date: NaiveDate, reference_date: NaiveDate) -> u32 {
 
 /// Returns the number of days in a month
 #[must_use] 
-pub fn days_in_month(year: i32, month: u32) -> u32 {
+pub const fn days_in_month(year: i32, month: u32) -> u32 {
     match month {
         2 => if is_leap_year(year) { 29 } else { 28 },
         4 | 6 | 9 | 11 => 30,
@@ -131,7 +131,7 @@ pub fn days_in_month(year: i32, month: u32) -> u32 {
 
 /// Checks if a year is a leap year
 #[must_use] 
-pub fn is_leap_year(year: i32) -> bool {
+pub const fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 

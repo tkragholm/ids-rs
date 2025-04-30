@@ -22,7 +22,7 @@ pub enum CovariateValue {
 
 impl CovariateValue {
     /// Get the value as a number if possible
-    #[must_use] pub fn as_numeric(&self) -> Option<f64> {
+    #[must_use] pub const fn as_numeric(&self) -> Option<f64> {
         match self {
             Self::Numeric(value) => Some(*value),
             Self::Boolean(true) => Some(1.0),
@@ -50,7 +50,7 @@ impl CovariateValue {
     }
     
     /// Get the value as a date if possible
-    #[must_use] pub fn as_date(&self) -> Option<NaiveDate> {
+    #[must_use] pub const fn as_date(&self) -> Option<NaiveDate> {
         match self {
             Self::Date(value) => Some(*value),
             _ => None,
@@ -58,7 +58,7 @@ impl CovariateValue {
     }
     
     /// Check if the value is missing
-    #[must_use] pub fn is_none(&self) -> bool {
+    #[must_use] pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 }
@@ -94,7 +94,7 @@ impl Covariate {
     }
 
     /// Get all values
-    #[must_use] pub fn values(&self) -> &HashMap<String, CovariateValue> {
+    #[must_use] pub const fn values(&self) -> &HashMap<String, CovariateValue> {
         &self.values
     }
 

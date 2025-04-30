@@ -46,7 +46,7 @@ pub struct FamilyData {
 /// Utility functions for working with population data
 impl Population {
     /// Create a new Population instance
-    #[must_use] pub fn new(
+    #[must_use] pub const fn new(
         pnr: Pnr,
         birth_date: NaiveDate,
         father_id: Option<Pnr>,
@@ -148,7 +148,7 @@ impl Population {
     }
 
     /// Convert a vector of Population instances to a `RecordBatch`
-    pub fn to_record_batch(population: &[Population]) -> Result<RecordBatch> {
+    pub fn to_record_batch(population: &[Self]) -> Result<RecordBatch> {
         if population.is_empty() {
             return Err(IdsError::Data("Empty population data".to_string()));
         }
@@ -213,7 +213,7 @@ impl Population {
 
 impl FamilyData {
     /// Create a new `FamilyData` instance
-    #[must_use] pub fn new(
+    #[must_use] pub const fn new(
         pnr: Pnr,
         birth_date: NaiveDate,
         father_id: Option<Pnr>,
@@ -237,7 +237,7 @@ impl FamilyData {
     #[must_use] pub fn create_family_data(
         children: &[Population],
         parent_data: &HashMap<Pnr, NaiveDate>,
-    ) -> Vec<FamilyData> {
+    ) -> Vec<Self> {
         children.iter().map(|child| {
             let father_birth_date = child.father_id.as_ref()
                 .and_then(|id| parent_data.get(id).copied());
@@ -245,7 +245,7 @@ impl FamilyData {
             let mother_birth_date = child.mother_id.as_ref()
                 .and_then(|id| parent_data.get(id).copied());
 
-            FamilyData {
+            Self {
                 pnr: child.pnr.clone(),
                 birth_date: child.birth_date,
                 father_id: child.father_id.clone(),
@@ -258,7 +258,7 @@ impl FamilyData {
     }
 
     /// Convert a vector of `FamilyData` instances to a `RecordBatch`
-    pub fn to_record_batch(family_data: &[FamilyData]) -> Result<RecordBatch> {
+    pub fn to_record_batch(family_data: &[Self]) -> Result<RecordBatch> {
         if family_data.is_empty() {
             return Err(IdsError::Data("Empty family data".to_string()));
         }

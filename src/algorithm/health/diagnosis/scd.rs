@@ -25,7 +25,7 @@ impl ScdDiseaseCodes {
     /// Create a new `ScdDiseaseCodes` instance with predefined disease categories and codes
     #[must_use] 
     pub fn new() -> Self {
-        let mut codes = ScdDiseaseCodes {
+        let mut codes = Self {
             patterns: HashMap::with_capacity(10), // Pre-allocate for the 10 categories
             all_codes_cache: HashSet::with_capacity(150), // Approximate total codes
         };
@@ -188,7 +188,7 @@ impl ScdDiseaseCodes {
     
     /// Get all SCD codes as a flat set (returns a reference to pre-computed set)
     #[must_use] 
-    pub fn all_codes(&self) -> &HashSet<String> {
+    pub const fn all_codes(&self) -> &HashSet<String> {
         &self.all_codes_cache
     }
     
