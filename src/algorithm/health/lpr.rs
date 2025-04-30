@@ -243,7 +243,7 @@ pub fn integrate_lpr2_components(
 
     // Process in chunks to reduce memory usage
     const CHUNK_SIZE: usize = 500000; // Process 500k rows at a time
-    let num_chunks = (num_rows + CHUNK_SIZE - 1) / CHUNK_SIZE; // Ceiling division
+    let num_chunks = num_rows.div_ceil(CHUNK_SIZE); // Ceiling division
     
     let mut all_batches = Vec::with_capacity(num_chunks);
     let integrated_schema = create_integrated_schema();
@@ -460,7 +460,7 @@ pub fn integrate_lpr3_components(
 
     // Process in chunks to reduce memory usage
     const CHUNK_SIZE: usize = 500000; // Process 500k rows at a time
-    let num_chunks = (num_rows + CHUNK_SIZE - 1) / CHUNK_SIZE; // Ceiling division
+    let num_chunks = num_rows.div_ceil(CHUNK_SIZE); // Ceiling division
     
     let mut all_batches = Vec::with_capacity(num_chunks);
     let integrated_schema = create_integrated_schema();
