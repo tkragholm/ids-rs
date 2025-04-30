@@ -84,7 +84,7 @@ impl Pnr {
     
     /// Get the PNR string value
     #[must_use] pub fn value(&self) -> &str {
-        &self.value
+        self.value.as_str()
     }
     
     /// Check if the PNR format is valid

@@ -82,8 +82,11 @@ mod tests {
     
     #[test]
     fn test_parse_f64() {
-        assert_eq!(parse_f64("123.45").unwrap(), 123.45);
-        assert_eq!(parse_f64(" 456.78 ").unwrap(), 456.78);
+        #[allow(clippy::float_cmp)]
+        {
+            assert_eq!(parse_f64("123.45").unwrap(), 123.45);
+            assert_eq!(parse_f64(" 456.78 ").unwrap(), 456.78);
+        }
         assert!(parse_f64("abc").is_err());
     }
     
@@ -96,7 +99,10 @@ mod tests {
     
     #[test]
     fn test_parse_optional_f64() {
-        assert_eq!(parse_optional_f64("123.45").unwrap(), Some(123.45));
+        #[allow(clippy::float_cmp)]
+        {
+            assert_eq!(parse_optional_f64("123.45").unwrap(), Some(123.45));
+        }
         assert_eq!(parse_optional_f64("NULL").unwrap(), None);
         assert_eq!(parse_optional_f64("").unwrap(), None);
     }

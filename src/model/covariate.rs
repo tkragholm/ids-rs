@@ -34,7 +34,7 @@ impl CovariateValue {
     /// Get the value as a string if possible
     #[must_use] pub fn as_categorical(&self) -> Option<&str> {
         match self {
-            Self::Categorical(value) => Some(value),
+            Self::Categorical(value) => Some(value.as_str()),
             _ => None,
         }
     }
@@ -90,7 +90,7 @@ impl Covariate {
 
     /// Get the name of the covariate
     #[must_use] pub fn name(&self) -> &str {
-        &self.name
+        self.name.as_str()
     }
 
     /// Get all values
