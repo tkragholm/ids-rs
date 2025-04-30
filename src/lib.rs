@@ -9,7 +9,6 @@ pub use error::{IdsError, Result};
 pub mod algorithm;
 pub mod cli;
 pub mod commands;
-pub mod core;
 pub mod model;
 pub mod registry;
 pub mod schema;
@@ -17,6 +16,6 @@ pub mod store;
 pub mod utils;
 
 // Re-export commonly used items
-pub use utils::date_utils::DateExtensions;
-pub use core::string::StringExtensions;
+pub use utils::string_utils::{StringCaseExtensions, StringParsingExtensions};
 pub use model::pnr::Pnr;
+pub use utils::date_utils::DateExtensions;

@@ -1,4 +1,4 @@
-use crate::error::{Result, validation_error};
+//! String case conversion utilities.
 
 /// Convert a string to `snake_case`
 #[must_use] pub fn to_snake_case(s: &str) -> String {
@@ -63,42 +63,8 @@ use crate::error::{Result, validation_error};
     result
 }
 
-/// Parse a string as i32
-pub fn parse_i32(s: &str) -> Result<i32> {
-    s.trim()
-        .parse::<i32>()
-        .map_err(|_| validation_error(format!("Cannot parse as i32: '{s}'")))
-}
-
-/// Parse a string as f64
-pub fn parse_f64(s: &str) -> Result<f64> {
-    s.trim()
-        .parse::<f64>()
-        .map_err(|_| validation_error(format!("Cannot parse as f64: '{s}'")))
-}
-
-/// Parse a string as an optional i32
-pub fn parse_optional_i32(s: &str) -> Result<Option<i32>> {
-    let trimmed = s.trim();
-    if trimmed.is_empty() || trimmed == "NA" || trimmed == "NULL" {
-        Ok(None)
-    } else {
-        Ok(Some(parse_i32(trimmed)?))
-    }
-}
-
-/// Parse a string as an optional f64
-pub fn parse_optional_f64(s: &str) -> Result<Option<f64>> {
-    let trimmed = s.trim();
-    if trimmed.is_empty() || trimmed == "NA" || trimmed == "NULL" {
-        Ok(None)
-    } else {
-        Ok(Some(parse_f64(trimmed)?))
-    }
-}
-
 /// Extension traits for string operations
-pub trait StringExtensions {
+pub trait StringCaseExtensions {
     /// Convert to `snake_case`
     fn to_snake_case(&self) -> String;
     
@@ -107,21 +73,9 @@ pub trait StringExtensions {
     
     /// Convert to Title Case
     fn to_title_case(&self) -> String;
-    
-    /// Parse as i32
-    fn parse_i32(&self) -> Result<i32>;
-    
-    /// Parse as f64
-    fn parse_f64(&self) -> Result<f64>;
-    
-    /// Parse as Option<i32>
-    fn parse_optional_i32(&self) -> Result<Option<i32>>;
-    
-    /// Parse as Option<f64>
-    fn parse_optional_f64(&self) -> Result<Option<f64>>;
 }
 
-impl StringExtensions for str {
+impl StringCaseExtensions for str {
     fn to_snake_case(&self) -> String {
         to_snake_case(self)
     }
@@ -133,20 +87,33 @@ impl StringExtensions for str {
     fn to_title_case(&self) -> String {
         to_title_case(self)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
     
-    fn parse_i32(&self) -> Result<i32> {
-        parse_i32(self)
+    #[test]
+    fn test_to_snake_case() {
+        assert_eq!(to_snake_case("camelCase"), "camel_case");
+        assert_eq!(to_snake_case("PascalCase"), "pascal_case");
+        assert_eq!(to_snake_case("simple"), "simple");
+        assert_eq!(to_snake_case("with space"), "with_space");
+        assert_eq!(to_snake_case("with-dash"), "with_dash");
     }
     
-    fn parse_f64(&self) -> Result<f64> {
-        parse_f64(self)
+    #[test]
+    fn test_to_camel_case() {
+        assert_eq!(to_camel_case("snake_case"), "snakeCase");
+        assert_eq!(to_camel_case("simple"), "simple");
+        assert_eq!(to_camel_case("with space"), "withSpace");
+        assert_eq!(to_camel_case("with-dash"), "withDash");
     }
     
-    fn parse_optional_i32(&self) -> Result<Option<i32>> {
-        parse_optional_i32(self)
-    }
-    
-    fn parse_optional_f64(&self) -> Result<Option<f64>> {
-        parse_optional_f64(self)
+    #[test]
+    fn test_to_title_case() {
+        assert_eq!(to_title_case("snake_case"), "Snake Case");
+        assert_eq!(to_title_case("camelCase"), "Camel Case");
+        assert_eq!(to_title_case("simple"), "Simple");
     }
 }

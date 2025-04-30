@@ -1,5 +1,7 @@
-use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
+//! Logging utilities for application logging setup.
+
 use colored::Colorize;
+use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
 use std::sync::Once;
 
 static LOGGER_INIT: Once = Once::new();
@@ -22,7 +24,8 @@ impl log::Log for SimpleLogger {
                 Level::Trace => "TRACE".normal(),
             };
 
-            println!("[{}] {}: {}", 
+            println!(
+                "[{}] {}: {}",
                 chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
                 level_str,
                 record.args()
@@ -36,12 +39,11 @@ impl log::Log for SimpleLogger {
 /// Initialize logging with the specified level
 pub fn init_logging(level: LevelFilter) -> Result<(), SetLoggerError> {
     let mut result = Ok(());
-    
+
     LOGGER_INIT.call_once(|| {
-        result = log::set_logger(&SimpleLogger)
-            .map(|()| log::set_max_level(level));
+        result = log::set_logger(&SimpleLogger).map(|()| log::set_max_level(level));
     });
-    
+
     result
 }
 

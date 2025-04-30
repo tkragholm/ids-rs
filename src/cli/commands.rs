@@ -38,11 +38,11 @@ impl CommandHandler for SampleCommand {
 
         // Sample from the loaded data
         Console::print_info(&format!("Sampling {} records...", self.sample_count));
-        let sampled = crate::core::sampler::sample_records(&records, self.sample_count, None)?;
+        let sampled = crate::algorithm::sampler::sample_records(&records, self.sample_count, None)?;
 
         // Save to the output path
         Console::print_info(&format!("Writing sampled data to {}", self.output_path));
-        crate::core::sampler::write_parquet(&self.output_path, &sampled)?;
+        crate::algorithm::sampler::write_parquet(&self.output_path, &sampled)?;
 
         Console::print_success("Sampling completed");
         Ok(())

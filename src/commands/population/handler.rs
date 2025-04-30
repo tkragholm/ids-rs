@@ -3,7 +3,7 @@
 use log::info;
 use std::fs;
 
-use crate::algorithm::population::{generate_population, PopulationConfig};
+use crate::algorithm::population::core::{generate_population, PopulationConfig};
 use crate::commands::population::config::PopulationCommandConfig;
 use crate::utils::date_utils;
 use crate::error::{IdsError, Result};

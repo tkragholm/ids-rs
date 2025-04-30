@@ -9,7 +9,7 @@ use log::info;
 use std::fs;
 use std::path::Path;
 
-use crate::algorithm::population_scd::{
+use crate::algorithm::population::classification::{
     extract_scd_children, process_lpr_and_identify_scd, PopulationScdConfig,
 };
 use crate::error::{IdsError, Result};
