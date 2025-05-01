@@ -6,6 +6,14 @@ use crate::data::registry::traits::RegisterLoader;
 use crate::error::Result;
 use std::path::{Path, PathBuf};
 
+pub mod lpr2_loader;
+pub mod lpr3_loader;
+pub mod lpr_provider;
+
+pub use lpr2_loader::Lpr2Register;
+pub use lpr3_loader::Lpr3Register;
+pub use lpr_provider::LprTableProvider;
+
 /// LPR version
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LprVersion {
@@ -15,7 +23,17 @@ pub enum LprVersion {
     V3,
 }
 
+impl std::fmt::Display for LprVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::V2 => write!(f, "LPR v2"),
+            Self::V3 => write!(f, "LPR v3"),
+        }
+    }
+}
+
 /// Paths to LPR data files
+#[derive(Debug)]
 pub struct LprPaths {
     /// Base path
     pub base_path: PathBuf,
@@ -34,7 +52,7 @@ pub struct LprPaths {
 }
 
 impl LprPaths {
-    /// Create a new LprPaths instance
+    /// Create a new `LprPaths` instance
     pub fn new(base_path: impl AsRef<Path>) -> Self {
         Self {
             base_path: base_path.as_ref().to_path_buf(),

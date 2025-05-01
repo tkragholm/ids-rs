@@ -19,7 +19,7 @@ pub async fn load_parquet_files_async(
 
     // Create read options
     let read_options = match schema {
-        Some(schema) => ParquetReadOptions::default().schema(&schema),
+        Some(schema) => ParquetReadOptions::default().schema(schema),
         None => ParquetReadOptions::default(),
     };
 
@@ -47,7 +47,7 @@ pub async fn load_parquet_files_async_with_filter(
 
     // Create read options
     let read_options = match schema {
-        Some(schema) => ParquetReadOptions::default().schema(&schema),
+        Some(schema) => ParquetReadOptions::default().schema(schema),
         None => ParquetReadOptions::default(),
     };
 
@@ -80,7 +80,7 @@ pub async fn load_parquet_directory_async(
 
     // Create read options
     let read_options = match schema {
-        Some(schema) => ParquetReadOptions::default().schema(&schema),
+        Some(schema) => ParquetReadOptions::default().schema(schema),
         None => ParquetReadOptions::default(),
     };
 

@@ -1,9 +1,8 @@
 use crate::error::Result;
 use arrow::array::ArrayRef;
 use arrow::datatypes::SchemaRef;
-use datafusion::catalog::memory::DataSourceExec;
+// Removed deprecated import
 use datafusion::common::DFSchema;
-use datafusion::datasource::physical_plan::{FileScanConfig, ParquetExecBuilder};
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionContext;
 use datafusion::logical_expr::{col, lit, Expr};
@@ -26,7 +25,7 @@ pub struct RegistryPruningStatistics {
 
 impl RegistryPruningStatistics {
     /// Create a new instance with schema
-    pub fn new(schema: SchemaRef) -> Self {
+    #[must_use] pub fn new(schema: SchemaRef) -> Self {
         Self {
             schema,
             min_values: HashMap::new(),
@@ -81,24 +80,36 @@ pub fn create_pnr_pruning_predicate(
     }
 }
 
-/// Create ParquetExec with pruning statistics
-pub fn create_parquet_exec_with_pruning(
-    config: FileScanConfig,
-    statistics: RegistryPruningStatistics,
+/// This function is a placeholder that needs to be updated for `DataFusion` 47.0.0
+pub async fn create_table_with_pruning(
+    path: &str,
+    schema: SchemaRef,
     predicate: Option<PruningPredicate>,
 ) -> Result<Arc<dyn TableProvider>> {
-    let builder = ParquetExecBuilder::new(config);
-
-    if let Some(predicate) = predicate {
-        // Use the inner physical expression from the pruning predicate
-        let physical_expr = predicate.inner().clone();
-        Ok(Arc::new(builder.with_predicate(physical_expr).build()))
-    } else {
-        Ok(Arc::new(builder.build()))
+    // For now, we'll use the register_parquet approach which doesn't support pruning directly
+    let ctx = SessionContext::new();
+    
+    // Register the table first
+    ctx.register_parquet(
+        "temp_table", 
+        path, 
+        ParquetReadOptions::default().schema(schema.as_ref())
+    ).await?;
+    
+    // If we have a predicate, we need to apply it via SQL
+    if let Some(_) = predicate {
+        // This isn't using the predicate directly, but in a real implementation
+        // you would convert the predicate to an appropriate filter
+        // This is just a placeholder for now
+        ctx.sql("SELECT * FROM temp_table").await?;
     }
+    
+    // In a real implementation, we would return the table provider
+    // For now, this is a placeholder
+    Err(crate::error::IdsError::Validation("Pruning functionality not yet implemented for DataFusion 47.0.0".to_string()))
 }
 
-/// Create a SessionContext with a registered table using pruning
+/// Create a `SessionContext` with a registered table using pruning
 pub async fn create_context_with_pruning(
     path: &str,
     schema: SchemaRef,
@@ -108,7 +119,7 @@ pub async fn create_context_with_pruning(
     let ctx = SessionContext::new();
 
     // Create read options with schema
-    let read_options = ParquetReadOptions::default().schema(&schema);
+    let read_options = ParquetReadOptions::default().schema(schema.as_ref());
 
     // Register the table
     ctx.register_parquet(table_name, path, read_options).await?;
@@ -119,7 +130,7 @@ pub async fn create_context_with_pruning(
             // Create PNR IN list for SQL
             let pnrs_list = pnrs
                 .iter()
-                .map(|p| format!("'{}'", p))
+                .map(|p| format!("'{p}'"))
                 .collect::<Vec<_>>()
                 .join(",");
 

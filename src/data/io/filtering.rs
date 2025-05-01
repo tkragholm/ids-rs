@@ -11,7 +11,7 @@ pub struct PnrFilter {
 
 impl PnrFilter {
     /// Create a new PNR filter
-    pub fn new(pnrs: HashSet<String>) -> Self {
+    #[must_use] pub const fn new(pnrs: HashSet<String>) -> Self {
         Self {
             pnrs,
             direct_filter: true,
@@ -20,7 +20,7 @@ impl PnrFilter {
     }
 
     /// Create a PNR filter with relation
-    pub fn with_relation(pnrs: HashSet<String>, relation_column: &str) -> Self {
+    #[must_use] pub fn with_relation(pnrs: HashSet<String>, relation_column: &str) -> Self {
         Self {
             pnrs,
             direct_filter: false,
@@ -29,22 +29,22 @@ impl PnrFilter {
     }
 
     /// Get the PNRs in this filter
-    pub fn pnrs(&self) -> &HashSet<String> {
+    #[must_use] pub const fn pnrs(&self) -> &HashSet<String> {
         &self.pnrs
     }
 
     /// Get the relation column if any
-    pub fn relation_column(&self) -> Option<&str> {
+    #[must_use] pub fn relation_column(&self) -> Option<&str> {
         self.relation_column.as_deref()
     }
 
     /// Check if this is a direct filter
-    pub fn is_direct_filter(&self) -> bool {
+    #[must_use] pub const fn is_direct_filter(&self) -> bool {
         self.direct_filter
     }
 
-    /// Convert to a DataFusion expression
-    pub fn to_expr(&self) -> Option<Expr> {
+    /// Convert to a `DataFusion` expression
+    #[must_use] pub fn to_expr(&self) -> Option<Expr> {
         if self.pnrs.is_empty() {
             return None;
         }
@@ -55,14 +55,10 @@ impl PnrFilter {
         // Create IN expression
         if self.direct_filter {
             Some(col("PNR").in_list(pnr_values, false))
-        } else if let Some(relation_col) = &self.relation_column {
-            Some(col(relation_col).in_list(pnr_values, false))
-        } else {
-            None
-        }
+        } else { self.relation_column.as_ref().map(|relation_col| col(relation_col).in_list(pnr_values, false)) }
     }
 
-    /// Apply filter to a DataFrame
+    /// Apply filter to a `DataFrame`
     pub fn apply_to_dataframe(&self, df: DataFrame) -> Result<DataFrame> {
         if let Some(expr) = self.to_expr() {
             Ok(df.filter(expr)?)

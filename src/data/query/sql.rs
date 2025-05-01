@@ -6,7 +6,6 @@ use datafusion::execution::context::SessionContext;
 use datafusion::logical_expr::LogicalPlanBuilder;
 use datafusion::prelude::*;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// SQL query engine for registry data
 pub struct RegistrySqlEngine {
@@ -14,9 +13,15 @@ pub struct RegistrySqlEngine {
     registered_tables: HashMap<String, String>,
 }
 
+impl Default for RegistrySqlEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RegistrySqlEngine {
     /// Create a new SQL engine
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             ctx: SessionContext::new(),
             registered_tables: HashMap::new(),
@@ -32,22 +37,23 @@ impl RegistrySqlEngine {
         table_alias: Option<&str>,
     ) -> Result<()> {
         // Create a context for this registry
-        let ctx = loader.create_context(base_path, pnr_filter).await?;
+        let _ctx = loader.create_context(base_path, pnr_filter).await?;
 
         // Get the default table name
-        let table_name = R::register_name().to_lowercase();
-
-        // Get the table from the context
-        let table = ctx.table(&table_name).await?;
+        let table_name = loader.register_name().to_lowercase();
 
         // Register with alias if provided
         let final_name = table_alias.unwrap_or(&table_name);
 
         // Register the table in our context
-        // TODO: In DataFusion 47.0.0, LogicalPlan doesn't implement TableProvider
-        // Need to find the correct approach to register a table from a DataFrame
-        // For now, we'll register the table directly
-        self.ctx.register_table(final_name, table.clone())?;
+        // In DataFusion, we need to convert the DataFrame to a TableProvider
+        // The current approach is to use the SQL API to create a view
+        let create_view_sql = format!(
+            "CREATE OR REPLACE VIEW {final_name} AS SELECT * FROM {table_name}"
+        );
+
+        // Execute the SQL to create the view
+        self.ctx.sql(&create_view_sql).await?;
 
         // Store the mapping
         self.registered_tables
@@ -62,23 +68,23 @@ impl RegistrySqlEngine {
         Ok(df.collect().await?)
     }
 
-    /// Execute a SQL query and return a DataFrame
+    /// Execute a SQL query and return a `DataFrame`
     pub async fn query_sql(&self, query: &str) -> Result<DataFrame> {
         Ok(self.ctx.sql(query).await?)
     }
 
     /// Get list of registered tables
-    pub fn registered_tables(&self) -> Vec<String> {
+    #[must_use] pub fn registered_tables(&self) -> Vec<String> {
         self.registered_tables.keys().cloned().collect()
     }
 
-    /// Get the DataFusion context
-    pub fn context(&self) -> &SessionContext {
+    /// Get the `DataFusion` context
+    #[must_use] pub const fn context(&self) -> &SessionContext {
         &self.ctx
     }
 
     /// Create a new query builder
-    pub fn query_builder(&self) -> QueryBuilder {
+    #[must_use] pub fn query_builder(&self) -> QueryBuilder {
         QueryBuilder::new(self.ctx.clone())
     }
 }
@@ -91,7 +97,7 @@ pub struct QueryBuilder {
 
 impl QueryBuilder {
     /// Create a new query builder
-    pub fn new(ctx: SessionContext) -> Self {
+    #[must_use] pub const fn new(ctx: SessionContext) -> Self {
         Self {
             ctx,
             plan_builder: None,
@@ -108,7 +114,7 @@ impl QueryBuilder {
     /// Add a filter to the query
     pub fn filter(&mut self, expr: Expr) -> Result<&mut Self> {
         if let Some(builder) = &mut self.plan_builder {
-            self.plan_builder = Some(builder.clone().filter(expr)?.clone());
+            self.plan_builder = Some(builder.clone().filter(expr)?);
             Ok(self)
         } else {
             Err(IdsError::Validation(
@@ -120,7 +126,7 @@ impl QueryBuilder {
     /// Add a projection to the query
     pub fn select(&mut self, exprs: Vec<Expr>) -> Result<&mut Self> {
         if let Some(builder) = &mut self.plan_builder {
-            self.plan_builder = Some(builder.clone().project(exprs)?.clone());
+            self.plan_builder = Some(builder.clone().project(exprs)?);
             Ok(self)
         } else {
             Err(IdsError::Validation(
@@ -132,7 +138,7 @@ impl QueryBuilder {
     /// Add grouping to the query
     pub fn group_by(&mut self, group_by: Vec<Expr>, aggregates: Vec<Expr>) -> Result<&mut Self> {
         if let Some(builder) = &mut self.plan_builder {
-            self.plan_builder = Some(builder.clone().aggregate(group_by, aggregates)?.clone());
+            self.plan_builder = Some(builder.clone().aggregate(group_by, aggregates)?);
             Ok(self)
         } else {
             Err(IdsError::Validation(
@@ -144,7 +150,7 @@ impl QueryBuilder {
     /// Add a limit to the query
     pub fn limit(&mut self, limit: usize) -> Result<&mut Self> {
         if let Some(builder) = &mut self.plan_builder {
-            self.plan_builder = Some(builder.clone().limit(0, Some(limit))?.clone());
+            self.plan_builder = Some(builder.clone().limit(0, Some(limit))?);
             Ok(self)
         } else {
             Err(IdsError::Validation(
@@ -156,7 +162,14 @@ impl QueryBuilder {
     /// Add sorting to the query
     pub fn sort(&mut self, exprs: Vec<Expr>) -> Result<&mut Self> {
         if let Some(builder) = &mut self.plan_builder {
-            self.plan_builder = Some(builder.clone().sort(exprs)?.clone());
+            // Create sorted expressions with proper order information
+            // Default to ascending (true) and NULLS LAST (false)
+            let sort_exprs: Vec<_> = exprs
+                .into_iter()
+                .map(|expr| expr.sort(true, false))
+                .collect();
+
+            self.plan_builder = Some(builder.clone().sort(sort_exprs)?);
             Ok(self)
         } else {
             Err(IdsError::Validation(
@@ -165,11 +178,12 @@ impl QueryBuilder {
         }
     }
 
-    /// Build the query into a DataFrame
+    /// Build the query into a `DataFrame`
     pub fn build(&self) -> Result<DataFrame> {
         if let Some(builder) = &self.plan_builder {
-            let plan = builder.build()?;
-            Ok(DataFrame::new(self.ctx.clone(), plan))
+            let plan = builder.clone().build()?;
+            // Use state() to get the SessionState from SessionContext
+            Ok(DataFrame::new(self.ctx.state(), plan))
         } else {
             Err(IdsError::Validation(
                 "No query plan started. Call from() first".to_string(),

@@ -14,7 +14,7 @@ pub struct PnrFilter {
 
 impl PnrFilter {
     /// Create a new PNR filter
-    pub fn new(pnrs: HashSet<String>) -> Self {
+    #[must_use] pub const fn new(pnrs: HashSet<String>) -> Self {
         Self {
             pnrs,
             direct_filter: true,
@@ -23,7 +23,7 @@ impl PnrFilter {
     }
 
     /// Create a PNR filter with relation
-    pub fn with_relation(pnrs: HashSet<String>, relation_column: &str) -> Self {
+    #[must_use] pub fn with_relation(pnrs: HashSet<String>, relation_column: &str) -> Self {
         Self {
             pnrs,
             direct_filter: false,
@@ -32,17 +32,17 @@ impl PnrFilter {
     }
 
     /// Get the PNRs in this filter
-    pub fn pnrs(&self) -> &HashSet<String> {
+    #[must_use] pub const fn pnrs(&self) -> &HashSet<String> {
         &self.pnrs
     }
 
     /// Get the relation column if any
-    pub fn relation_column(&self) -> Option<&str> {
+    #[must_use] pub fn relation_column(&self) -> Option<&str> {
         self.relation_column.as_deref()
     }
 
     /// Check if this is a direct filter
-    pub fn is_direct_filter(&self) -> bool {
+    #[must_use] pub const fn is_direct_filter(&self) -> bool {
         self.direct_filter
     }
 }
@@ -54,7 +54,7 @@ pub trait RegisterLoader: Send + Sync + 'static {
     type SchemaType: RegistrySchema;
 
     /// Get the name of the register
-    fn register_name() -> &'static str;
+    fn register_name(&self) -> &'static str;
 
     /// Load records from the register (async)
     async fn load(
@@ -74,22 +74,22 @@ pub trait RegisterLoader: Send + Sync + 'static {
 
         // Register source as a table
         ctx.register_parquet(
-            Self::register_name().to_lowercase(),
+            self.register_name().to_lowercase(),
             base_path,
-            ParquetReadOptions::default().with_file_schema(schema),
+            ParquetReadOptions::default().schema(schema.as_ref()),
         )
         .await?;
 
         // Apply PNR filter if provided
         if let Some(filter) = pnr_filter {
             // Create SQL execution for the filter
-            let table_name = Self::register_name().to_lowercase();
+            let table_name = self.register_name().to_lowercase();
             if filter.is_direct_filter() {
                 // Create PNR IN list SQL
                 let pnrs_list = filter
                     .pnrs()
                     .iter()
-                    .map(|p| format!("'{}'", p))
+                    .map(|p| format!("'{p}'"))
                     .collect::<Vec<_>>()
                     .join(",");
 
@@ -108,7 +108,7 @@ pub trait RegisterLoader: Send + Sync + 'static {
                 let pnrs_list = filter
                     .pnrs()
                     .iter()
-                    .map(|p| format!("'{}'", p))
+                    .map(|p| format!("'{p}'"))
                     .collect::<Vec<_>>()
                     .join(",");
 
@@ -135,7 +135,7 @@ pub trait RegisterLoader: Send + Sync + 'static {
         pnr_filter: Option<&PnrFilter>,
     ) -> Result<Vec<RecordBatch>> {
         let ctx = self.create_context(base_path, pnr_filter).await?;
-        let table_name = Self::register_name().to_lowercase();
+        let table_name = self.register_name().to_lowercase();
 
         let df = ctx.table(&table_name).await?;
         let result = df.collect().await?;
@@ -143,7 +143,19 @@ pub trait RegisterLoader: Send + Sync + 'static {
     }
 
     /// Get the schema for this registry
-    fn get_schema() -> SchemaRef {
+    fn get_schema(&self) -> SchemaRef {
         Self::SchemaType::schema_arc()
     }
+}
+
+// We'll use a trait object for any type of register loader
+pub type AnyRegisterLoader = Box<dyn std::any::Any + Send + Sync>;
+
+/// Dynamic registry loader trait, avoids using async methods that aren't dyn-compatible
+pub trait DynamicLoader: Send + Sync + 'static {
+    /// Get the name of the register
+    fn name(&self) -> &'static str;
+    
+    /// Get the schema for this registry
+    fn schema(&self) -> SchemaRef;
 }

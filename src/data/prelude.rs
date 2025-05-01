@@ -4,11 +4,11 @@
 
 // Schema types
 pub use super::schema::RegistrySchema;
-pub use super::schema::registry::*;
+pub use super::schema::registry;
 
 // Registry types
 pub use super::registry::{RegisterLoader, PnrFilter};
-pub use super::registry::loaders::*;
+pub use super::registry::loaders;
 pub use super::registry::factory::RegistryFactory;
 
 // IO utilities

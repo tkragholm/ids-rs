@@ -12,8 +12,8 @@ pub async fn inner_join(
     let right_df = ctx.table(right_table).await?;
     
     let join_expr = join_columns.iter()
-        .map(|(left, right)| col(&format!("{}.{}", left_table, left)).eq(col(&format!("{}.{}", right_table, right))))
-        .reduce(|acc, expr| acc.and(expr))
+        .map(|(left, right)| col(format!("{left_table}.{left}")).eq(col(format!("{right_table}.{right}"))))
+        .reduce(datafusion::prelude::Expr::and)
         .unwrap_or(lit(true));
     
     Ok(left_df.join(right_df, JoinType::Inner, &[], &[], Some(join_expr))?)
@@ -30,8 +30,8 @@ pub async fn left_join(
     let right_df = ctx.table(right_table).await?;
     
     let join_expr = join_columns.iter()
-        .map(|(left, right)| col(&format!("{}.{}", left_table, left)).eq(col(&format!("{}.{}", right_table, right))))
-        .reduce(|acc, expr| acc.and(expr))
+        .map(|(left, right)| col(format!("{left_table}.{left}")).eq(col(format!("{right_table}.{right}"))))
+        .reduce(datafusion::prelude::Expr::and)
         .unwrap_or(lit(true));
     
     Ok(left_df.join(right_df, JoinType::Left, &[], &[], Some(join_expr))?)
@@ -49,7 +49,7 @@ pub async fn multi_join(
     }
     
     if tables.len() == 1 {
-        return ctx.table(tables[0]).await.map_err(|e| e.into());
+        return ctx.table(tables[0]).await.map_err(std::convert::Into::into);
     }
     
     let mut result_df = ctx.table(tables[0]).await?;
@@ -59,9 +59,9 @@ pub async fn multi_join(
         
         let join_expr = join_columns.iter()
             .map(|col_name| {
-                col(&format!("{}.{}", tables[0], col_name)).eq(col(&format!("{}.{}", tables[i], col_name)))
+                col(format!("{}.{}", tables[0], col_name)).eq(col(format!("{}.{}", tables[i], col_name)))
             })
-            .reduce(|acc, expr| acc.and(expr))
+            .reduce(datafusion::prelude::Expr::and)
             .unwrap_or(lit(true));
         
         result_df = result_df.join(right_df, join_type, &[], &[], Some(join_expr))?;

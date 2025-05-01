@@ -8,6 +8,7 @@ Cargo.lock
 STUDY.md
 CLAUDE.md
 .DS_Store
-/REFACTORS
-REGISTERS.md
-types-refactoring-plan/
+/docs
+/.claude
+/.venv
+/TODO

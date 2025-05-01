@@ -1,20 +1,20 @@
-//! LPR table provider for `DataFusion` integration
+//! LPR table provider for DataFusion integration
 //!
 //! This module contains a custom table provider for LPR data.
 
 use crate::data::registry::loaders::lpr::{LprPaths, LprVersion};
 use crate::error::{IdsError, Result};
 use arrow::datatypes::SchemaRef;
-use datafusion::catalog::Session;
-use datafusion::datasource::listing::{ListingTableUrl, PartitionedFile};
-use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::{FileScanConfigBuilder, ParquetSource};
-use datafusion::datasource::source::DataSourceExec;
+use datafusion::datasource::file_format::parquet::ParquetFormat;
+use datafusion::datasource::file_format::FileFormat;
+use datafusion::datasource::listing::{
+    ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl, PartitionedFile,
+};
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::Result as DFResult;
+use datafusion::execution::context::SessionState;
 use datafusion::logical_expr::TableProviderFilterPushDown;
 use datafusion::logical_expr::{Expr, LogicalPlan};
-
 use datafusion::physical_plan::ExecutionPlan;
 use std::any::Any;
 use std::borrow::Cow;
@@ -23,7 +23,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Alias for `DataFusion`'s filter pushdown enum
+/// Alias for DataFusion's filter pushdown enum
 type FilterPushdown = TableProviderFilterPushDown;
 
 /// Custom table provider for LPR data
@@ -41,7 +41,7 @@ pub struct LprTableProvider {
 
 impl LprTableProvider {
     /// Create a new LPR table provider
-    #[must_use] pub const fn new(
+    pub fn new(
         version: LprVersion,
         paths: LprPaths,
         schema: SchemaRef,
@@ -156,15 +156,17 @@ impl TableProvider for LprTableProvider {
 
         for filter in filters {
             if let Expr::BinaryExpr(expr) = *filter {
-                if let Expr::Column(col) = expr.left.as_ref() {
-                    // LPR v2 uses PNR, LPR v3 uses CPR
-                    let pnr_col = match self.version {
-                        LprVersion::V2 => "PNR",
-                        LprVersion::V3 => "CPR",
-                    };
+                if let Some(left) = expr.left.as_ref() {
+                    if let Expr::Column(col) = left.as_ref() {
+                        // LPR v2 uses PNR, LPR v3 uses CPR
+                        let pnr_col = match self.version {
+                            LprVersion::V2 => "PNR",
+                            LprVersion::V3 => "CPR",
+                        };
 
-                    if col.name == pnr_col {
-                        pushdowns.push(FilterPushdown::Exact);
+                        if col.name == pnr_col {
+                            pushdowns.push(FilterPushdown::Exact);
+                        }
                     }
                 }
             }
@@ -179,14 +181,14 @@ impl TableProvider for LprTableProvider {
 
     async fn scan(
         &self,
-        state: &dyn Session,
+        state: &SessionState,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        filters: &[&Expr],
         limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         // Find all the parquet files
         let parquet_files = self.find_lpr_files().map_err(|e| {
-            datafusion::error::DataFusionError::Execution(format!("Error finding LPR files: {e}"))
+            datafusion::error::DataFusionError::Execution(format!("Error finding LPR files: {}", e))
         })?;
 
         if parquet_files.is_empty() {
@@ -196,56 +198,24 @@ impl TableProvider for LprTableProvider {
         }
 
         // Create the listing table URL
-        let url = ListingTableUrl::parse(self.paths.base_path.to_string_lossy())?;
+        let url = ListingTableUrl::parse(&self.paths.base_path.to_string_lossy())?;
 
-        // Create the partitioned files list
-        let mut files = Vec::new();
-        for file_path in parquet_files {
-            // Get the file size for statistics
-            let file_size = fs::metadata(&file_path)
-                .map(|m| m.len()) // Already u64
-                .unwrap_or(0);
+        // Create the listing options with parquet format
+        let format = ParquetFormat::default().with_enable_pruning(true);
+        let listing_options = ListingOptions::new(Arc::new(format))
+            .with_file_extension(".parquet");
 
-            // Convert to string path
-            let file_path_str = file_path.to_string_lossy().to_string();
+        // Create a table config
+        let config = ListingTableConfig::new(url)
+            .with_schema(self.schema.clone())
+            .with_listing_options(listing_options);
 
-            // Add the file
-            files.push(PartitionedFile::new(file_path_str, file_size));
-        }
+        // Create the listing table
+        let table = ListingTable::try_new(config)?;
 
-        // In DataFusion 47.0.0, we use DataSourceExec with a FileScanConfig
+        // Let the table provider handle the scan
+        let plan = table.scan(state, projection, filters, limit).await?;
 
-        // Create the format (ParquetSource as the FileSource implementation)
-        let format = ParquetSource::default()
-            .with_enable_page_index(true) // Enable page-level pruning
-            .with_pushdown_filters(true); // Enable predicate pushdown
-        let format_arc = Arc::new(format);
-
-        // Create FileScanConfig using builder
-        let url = ObjectStoreUrl::parse(self.paths.base_path.to_string_lossy())?;
-
-        // Start building the config
-        let mut config_builder = FileScanConfigBuilder::new(url, self.schema.clone(), format_arc);
-
-        // Add each file individually since with_file takes a single file
-        for file in files {
-            config_builder = config_builder.with_file(file);
-        }
-
-        // Add projection and limit if provided
-        if let Some(proj) = projection {
-            config_builder = config_builder.with_projection(Some(proj.clone()));
-        }
-
-        if let Some(lim) = limit {
-            config_builder = config_builder.with_limit(Some(lim));
-        }
-
-        // Build the config
-        let config = config_builder.build();
-
-        // Create DataSourceExec with the config and return it
-        // DataSourceExec implements ExecutionPlan trait
-        Ok(DataSourceExec::from_data_source(config) as Arc<dyn ExecutionPlan>)
+        Ok(plan)
     }
 }

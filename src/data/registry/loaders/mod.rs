@@ -7,3 +7,4 @@ pub mod lpr;
 
 // Re-export registry loaders
 pub use akm::AkmRegister;
+pub use lpr::{Lpr2Register, Lpr3Register, LprRegistry, LprVersion, LprPaths};

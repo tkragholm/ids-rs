@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use super::filtering::PnrFilter;
 
-/// Unified ParquetReader with DataFusion integration
+/// Unified `ParquetReader` with `DataFusion` integration
 pub struct ParquetReader {
     path: PathBuf,
     schema: Option<SchemaRef>,
@@ -17,7 +17,7 @@ pub struct ParquetReader {
 }
 
 impl ParquetReader {
-    /// Create a new ParquetReader
+    /// Create a new `ParquetReader`
     pub fn new(path: impl AsRef<Path>) -> Self {
         Self {
             path: path.as_ref().to_path_buf(),
@@ -29,25 +29,25 @@ impl ParquetReader {
     }
 
     /// Set the schema for this reader
-    pub fn with_schema(mut self, schema: SchemaRef) -> Self {
+    #[must_use] pub fn with_schema(mut self, schema: SchemaRef) -> Self {
         self.schema = Some(schema);
         self
     }
 
     /// Set the batch size for this reader
-    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
+    #[must_use] pub const fn with_batch_size(mut self, batch_size: usize) -> Self {
         self.batch_size = batch_size;
         self
     }
 
     /// Enable or disable parallel loading
-    pub fn parallel(mut self, parallel: bool) -> Self {
+    #[must_use] pub const fn parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
     }
 
     /// Enable or disable async loading
-    pub fn async_loading(mut self, async_loading: bool) -> Self {
+    #[must_use] pub const fn async_loading(mut self, async_loading: bool) -> Self {
         self.async_loading = async_loading;
         self
     }
@@ -72,14 +72,14 @@ impl ParquetReader {
             runtime.block_on(self.read_async())
         } else {
             let ctx = SessionContext::new();
-            let _config = ctx.runtime_env().clone();
+            let _config = ctx.runtime_env();
 
             // Note: batch_size configuration is handled differently in DataFusion 47.0.0
             // Configure ctx with batch size if needed
 
             // Create read options
             let read_options = if let Some(schema) = &self.schema {
-                ParquetReadOptions::default().schema(&schema)
+                ParquetReadOptions::default().schema(schema.as_ref())
             } else {
                 ParquetReadOptions::default()
             };
@@ -112,7 +112,7 @@ impl ParquetReader {
 
         // Create read options
         let read_options = if let Some(schema) = &self.schema {
-            ParquetReadOptions::default().schema(&schema)
+            ParquetReadOptions::default().schema(schema.as_ref())
         } else {
             ParquetReadOptions::default()
         };
@@ -136,7 +136,7 @@ impl ParquetReader {
 
         // Create read options
         let read_options = if let Some(schema) = &self.schema {
-            ParquetReadOptions::default().schema(&schema)
+            ParquetReadOptions::default().schema(schema.as_ref())
         } else {
             ParquetReadOptions::default()
         };
@@ -203,7 +203,7 @@ impl ParquetReader {
             })?;
 
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "parquet") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
                 result.push(path);
             }
         }
@@ -212,7 +212,7 @@ impl ParquetReader {
     }
 }
 
-/// Load parquet files from a directory using DataFusion
+/// Load parquet files from a directory using `DataFusion`
 pub async fn load_parquet_directory(
     dir_path: impl AsRef<Path>,
     schema: Option<SchemaRef>,
@@ -223,11 +223,11 @@ pub async fn load_parquet_directory(
     // Create DataFusion context
     let ctx = SessionContext::new();
 
-    // Create read options
-    // Getting a reference to the schema to address lifetime issues
-    let read_options = match schema {
-        Some(schema) => ParquetReadOptions::default().schema(schema.as_ref()),
-        None => ParquetReadOptions::default(),
+    // Create read options with schema if provided
+    let read_options = if let Some(s) = &schema {
+        ParquetReadOptions::default().schema(s.as_ref())
+    } else {
+        ParquetReadOptions::default()
     };
 
     // Read parquet files into DataFrame
