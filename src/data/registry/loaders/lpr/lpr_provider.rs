@@ -177,13 +177,14 @@ impl TableProvider for LprTableProvider {
         }
     }
 
-    async fn scan(
+    fn scan(
         &self,
-        state: &dyn Session,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        _filters: &[&Expr],
         limit: Option<usize>,
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = DFResult<Arc<dyn datafusion::physical_plan::ExecutionPlan>>> + Send>> {
+        Box::pin(async move {
         // Find all the parquet files
         let parquet_files = self.find_lpr_files().map_err(|e| {
             datafusion::error::DataFusionError::Execution(format!("Error finding LPR files: {e}"))
@@ -196,7 +197,7 @@ impl TableProvider for LprTableProvider {
         }
 
         // Create the listing table URL
-        let url = ListingTableUrl::parse(self.paths.base_path.to_string_lossy())?;
+        let _url = ListingTableUrl::parse(self.paths.base_path.to_string_lossy())?;
 
         // Create the partitioned files list
         let mut files = Vec::new();
@@ -246,6 +247,7 @@ impl TableProvider for LprTableProvider {
 
         // Create DataSourceExec with the config and return it
         // DataSourceExec implements ExecutionPlan trait
-        Ok(DataSourceExec::from_data_source(config) as Arc<dyn ExecutionPlan>)
+        Ok(DataSourceExec::from_data_source(config) as Arc<dyn datafusion::physical_plan::ExecutionPlan>)
+        })
     }
 }

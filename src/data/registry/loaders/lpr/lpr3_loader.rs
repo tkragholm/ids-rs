@@ -41,7 +41,7 @@ impl RegisterLoader for Lpr3Register {
         let ctx = SessionContext::new();
 
         // Get schema
-        let schema = Self::SchemaType::schema_arc();
+        let _schema = Self::SchemaType::schema_arc();
 
         // Find paths to LPR v3 files
         let paths = self.find_files(Path::new(base_path))?;

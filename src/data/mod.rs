@@ -16,9 +16,13 @@ pub mod schema;
 pub mod transform;
 //pub mod examples;
 
+// New modules with improved organization
+pub mod filter;
+pub mod pruning;
+
 // Re-export key types
 pub use query::RegistrySqlEngine;
-pub use registry::PnrFilter;
+pub use filter::PnrFilter; // Updated from registry::PnrFilter
 pub use registry::RegisterLoader;
 pub use schema::RegistrySchema;
 pub use transform::TransformPipeline;

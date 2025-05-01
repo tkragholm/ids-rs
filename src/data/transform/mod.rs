@@ -582,30 +582,18 @@ impl JoinOperation {
 
 #[async_trait::async_trait]
 impl AsyncDataFrameOperation for JoinOperation {
-    async fn apply(&self, df: DataFrame) -> Result<DataFrame> {
+    async fn apply(&self, _df: DataFrame) -> Result<DataFrame> {
         // Get the session context from the dataframe
         // DataFusion 47.0.0 compatibility - we can't recover context from DataFrame
         // This is just a stub - the JoinOperation requires modification for DataFusion 47.0.0
         // We'll need to update this to accept a context reference in the constructor
-        return Err(IdsError::Validation("JoinOperation requires a context reference for DataFusion 47.0.0. Operation needs to be modified.".to_string()));
-
-        // Get the right dataframe
-        let right_df = ctx.table(&self.right_table).await?;
-
-        // Create join conditions
-        let mut conditions = Vec::new();
-        for (l, r) in self.left_cols.iter().zip(self.right_cols.iter()) {
-            conditions.push(col(l).eq(col(r)));
-        }
-
-        // Combine join conditions with AND
-        let join_expr = conditions
-            .into_iter()
-            .reduce(datafusion::prelude::Expr::and)
-            .unwrap_or(lit(true));
-
-        // Perform the join
-        Ok(df.join(right_df, self.join_type, &[], &[], Some(join_expr))?)
+        Err(IdsError::Validation("JoinOperation requires a context reference for DataFusion 47.0.0. Operation needs to be modified.".to_string()))
+        
+        // Notes: Implementation would look like:
+        // 1. Get the right dataframe: ctx.table(&self.right_table).await?
+        // 2. Create join conditions for each pair of columns
+        // 3. Combine conditions with AND
+        // 4. Perform join: df.join(right_df, self.join_type, &[], &[], Some(join_expr))?
     }
 
     fn name(&self) -> &str {
@@ -658,20 +646,16 @@ impl SqlOperation {
 
 #[async_trait::async_trait]
 impl AsyncDataFrameOperation for SqlOperation {
-    async fn apply(&self, df: DataFrame) -> Result<DataFrame> {
+    async fn apply(&self, _df: DataFrame) -> Result<DataFrame> {
         // DataFusion 47.0.0 compatibility - we can't recover context from DataFrame
-        // This is just a stub - the JoinOperation requires modification for DataFusion 47.0.0
+        // This is just a stub - the SqlOperation requires modification for DataFusion 47.0.0
         // We'll need to update this to accept a context reference in the constructor
-        return Err(IdsError::Validation("JoinOperation requires a context reference for DataFusion 47.0.0. Operation needs to be modified.".to_string()));
-
-        // Register the input dataframe as a temp table
-        ctx.register_table(&self.temp_table_name, df.into_view())?;
-
-        // Execute the SQL
-        let result_df = ctx.sql(&self.sql).await?;
-
-        // Return the result
-        Ok(result_df)
+        Err(IdsError::Validation("SqlOperation requires a context reference for DataFusion 47.0.0. Operation needs to be modified.".to_string()))
+        
+        // Notes: Implementation would look like:
+        // 1. Register the input dataframe: ctx.register_table(&self.temp_table_name, df.into_view())?
+        // 2. Execute SQL: ctx.sql(&self.sql).await?
+        // 3. Return result DataFrame
     }
 
     fn name(&self) -> &str {

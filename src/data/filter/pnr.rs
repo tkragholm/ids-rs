@@ -7,15 +7,27 @@ pub struct PnrFilter {
     pnrs: HashSet<String>,
     direct_filter: bool,
     relation_column: Option<String>,
+    pnr_column: String,
 }
 
 impl PnrFilter {
     /// Create a new PNR filter
-    #[must_use] pub const fn new(pnrs: HashSet<String>) -> Self {
+    #[must_use] pub fn new(pnrs: HashSet<String>) -> Self {
         Self {
             pnrs,
             direct_filter: true,
             relation_column: None,
+            pnr_column: "PNR".to_string(),
+        }
+    }
+
+    /// Create a new PNR filter with a specific column name
+    #[must_use] pub fn with_column(pnrs: HashSet<String>, column_name: &str) -> Self {
+        Self {
+            pnrs,
+            direct_filter: true,
+            relation_column: None,
+            pnr_column: column_name.to_string(),
         }
     }
 
@@ -25,6 +37,7 @@ impl PnrFilter {
             pnrs,
             direct_filter: false,
             relation_column: Some(relation_column.to_string()),
+            pnr_column: "PNR".to_string(),
         }
     }
 
@@ -36,6 +49,11 @@ impl PnrFilter {
     /// Get the relation column if any
     #[must_use] pub fn relation_column(&self) -> Option<&str> {
         self.relation_column.as_deref()
+    }
+
+    /// Get the PNR column name
+    #[must_use] pub fn pnr_column(&self) -> &str {
+        &self.pnr_column
     }
 
     /// Check if this is a direct filter
@@ -54,8 +72,10 @@ impl PnrFilter {
 
         // Create IN expression
         if self.direct_filter {
-            Some(col("PNR").in_list(pnr_values, false))
-        } else { self.relation_column.as_ref().map(|relation_col| col(relation_col).in_list(pnr_values, false)) }
+            Some(col(&self.pnr_column).in_list(pnr_values, false))
+        } else { 
+            self.relation_column.as_ref().map(|relation_col| col(relation_col).in_list(pnr_values, false)) 
+        }
     }
 
     /// Apply filter to a `DataFrame`
@@ -65,5 +85,20 @@ impl PnrFilter {
         } else {
             Ok(df)
         }
+    }
+
+    /// Create a predicate for DataFusion execution
+    pub fn to_predicate(&self) -> Option<Expr> {
+        self.to_expr()
+    }
+    
+    /// Check if this filter is empty (contains no PNRs)
+    #[must_use] pub fn is_empty(&self) -> bool {
+        self.pnrs.is_empty()
+    }
+    
+    /// Get the number of PNRs in this filter
+    #[must_use] pub fn len(&self) -> usize {
+        self.pnrs.len()
     }
 }

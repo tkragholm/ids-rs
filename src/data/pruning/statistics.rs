@@ -1,23 +1,13 @@
-use crate::error::{IdsError, Result};
+use crate::error::Result;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, UInt32Array, UInt64Array};
 use arrow::datatypes::{DataType, SchemaRef};
-use datafusion::common::{Column, DFSchema, ScalarValue};
-use datafusion::datasource::{TableProvider, TableType};
-use datafusion::execution::context::{SessionConfig, SessionContext};
-use datafusion::functions_aggregate::expr_fn::max;
-use datafusion::functions_aggregate::expr_fn::min;
-use datafusion::logical_expr::{col, lit, Expr};
-use datafusion::physical_expr::create_physical_expr;
-use datafusion::physical_expr::execution_props::ExecutionProps;
-use datafusion::physical_optimizer::pruning::{PruningPredicate, PruningStatistics};
-use datafusion::prelude::*;
+use datafusion::common::{Column, ScalarValue};
+use datafusion::logical_expr::{Expr};
+use datafusion::physical_optimizer::pruning::{PruningStatistics};
 
-use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-use super::filtering::PnrFilter;
 
 /// Represents a file's statistics for pruning decisions
 #[derive(Debug, Clone)]
@@ -189,11 +179,11 @@ impl FileStatistics {
 /// Pruning statistics for efficient file filtering
 #[derive(Debug)]
 pub struct RegistryPruningStatistics {
-    schema: SchemaRef,
-    files: Vec<FileStatistics>,
-    min_values: HashMap<String, ArrayRef>,
-    max_values: HashMap<String, ArrayRef>,
-    row_counts: Option<ArrayRef>,
+    pub schema: SchemaRef,
+    pub files: Vec<FileStatistics>,
+    pub min_values: HashMap<String, ArrayRef>,
+    pub max_values: HashMap<String, ArrayRef>,
+    pub row_counts: Option<ArrayRef>,
 }
 
 impl RegistryPruningStatistics {
@@ -405,254 +395,16 @@ impl PruningStatistics for RegistryPruningStatistics {
     }
 }
 
-/// A custom table provider with pruning support
-#[derive(Debug)]
-pub struct PrunableTableProvider {
-    schema: SchemaRef,
-    statistics: Arc<RegistryPruningStatistics>,
-    file_list: Vec<PathBuf>,
-}
-
-impl PrunableTableProvider {
-    /// Create a new prunable table provider
-    pub fn new(
-        schema: SchemaRef,
-        statistics: RegistryPruningStatistics,
-        file_list: Vec<PathBuf>,
-    ) -> Self {
-        Self {
-            schema,
-            statistics: Arc::new(statistics),
-            file_list,
-        }
-    }
-}
-
-impl TableProvider for PrunableTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn table_type(&self) -> TableType {
-        TableType::Base
-    }
-
-    fn supports_filters_pushdown(
-        &self,
-        filters: &[&Expr],
-    ) -> datafusion::error::Result<Vec<datafusion::logical_expr::TableProviderFilterPushDown>> {
-        // We can push down filters for columns we have statistics for
-        let mut result = Vec::with_capacity(filters.len());
-
-        for filter in filters {
-            // Check if this is a filter we can push down
-            match filter {
-                Expr::BinaryExpr(binary) => {
-                    // Extract column name if left side is a column
-                    if let Expr::Column(col) = &*binary.left {
-                        let column_name = &col.name;
-
-                        // Check if we have statistics for this column
-                        if self.statistics.min_values.contains_key(column_name)
-                            || self.statistics.max_values.contains_key(column_name)
-                        {
-                            result
-                                .push(datafusion::logical_expr::TableProviderFilterPushDown::Exact);
-                            continue;
-                        }
-                    }
-                }
-                Expr::InList(in_list) => {
-                    if let Expr::Column(col) = &*in_list.expr {
-                        let column_name = &col.name;
-
-                        // We have special handling for PNR columns
-                        if column_name == "PNR" || column_name == "CPR" {
-                            result
-                                .push(datafusion::logical_expr::TableProviderFilterPushDown::Exact);
-                            continue;
-                        }
-                    }
-                }
-                _ => {}
-            }
-
-            result.push(datafusion::logical_expr::TableProviderFilterPushDown::Inexact);
-        }
-
-        Ok(result)
-    }
-    
-    #[datafusion::common::async_trait]
-    async fn scan(
-        &self,
-        _state: &dyn datafusion::catalog::Session,
-        projection: Option<&Vec<usize>>,
-        filters: &[Expr],
-        limit: Option<usize>,
-    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-        use datafusion::datasource::listing::PartitionedFile;
-        use datafusion::datasource::object_store::ObjectStoreUrl;
-        use datafusion::datasource::physical_plan::{FileScanConfigBuilder, ParquetSource};
-        use datafusion::datasource::source::DataSourceExec;
-        use arrow::record_batch::RecordBatch;
-        use std::fs;
-        
-        // Filter the file list based on filters
-        let files = if !filters.is_empty() {
-            // For each filter, get files that pass it
-            let mut filtered_files = self.file_list.clone();
-            for filter in filters {
-                filtered_files = filtered_files.into_iter()
-                    .filter(|file| {
-                        // For each file, check if the statistics suggest it should be processed
-                        let file_stats = self.statistics.files.iter()
-                            .find(|stats| stats.path == *file);
-                            
-                        if let Some(stats) = file_stats {
-                            stats.should_process(filter)
-                        } else {
-                            // If we don't have statistics, process the file
-                            true
-                        }
-                    })
-                    .collect();
-            }
-            filtered_files
-        } else {
-            self.file_list.clone()
-        };
-        
-        if files.is_empty() {
-            // Return an empty plan
-            let empty_schema = self.schema.clone();
-            let empty_batch = RecordBatch::new_empty(empty_schema.clone());
-            let provider = MemTable::try_new(empty_schema, vec![vec![empty_batch]])?;
-            let plan = provider.scan(
-                _state,
-                projection,
-                &[],
-                limit,
-            ).await?;
-            
-            return Ok(plan);
-        }
-        
-        // Create the format with predicate pushdown
-        let format = ParquetSource::default()
-            .with_enable_page_index(true) // Enable page-level pruning
-            .with_pushdown_filters(true); // Enable predicate pushdown
-        let format_arc = Arc::new(format);
-        
-        // Create FileScanConfig using builder
-        let url = ObjectStoreUrl::parse("file://".to_string())?;
-        
-        // Start building the config
-        let mut config_builder = FileScanConfigBuilder::new(url, self.schema.clone(), format_arc);
-        
-        // Add each file individually with size info for better statistics
-        for file_path in &files {
-            let file_size = fs::metadata(file_path)
-                .map(|m| m.len())
-                .unwrap_or(0);
-            
-            let file_path_str = file_path.to_string_lossy().to_string();
-            config_builder = config_builder.with_file(PartitionedFile::new(file_path_str, file_size));
-        }
-        
-        // Add projection if provided
-        if let Some(proj) = projection {
-            config_builder = config_builder.with_projection(Some(proj.clone()));
-        }
-        
-        // Add limit if provided
-        if let Some(lim) = limit {
-            config_builder = config_builder.with_limit(Some(lim));
-        }
-        
-        // Build the config
-        let config = config_builder.build();
-        
-        // Create DataSourceExec with the config and return it
-        Ok(DataSourceExec::from_data_source(config) as Arc<dyn ExecutionPlan>)
-    }
-}
-
-/// Create a pruning predicate for PNR filtering
-pub fn create_pnr_pruning_predicate(
-    pnrs: &HashSet<String>,
-    schema: SchemaRef,
-) -> Result<PruningPredicate> {
-    if pnrs.is_empty() {
-        // If no PNRs, return an expression that always evaluates to false
-        let expr = lit(false);
-        let df_schema = DFSchema::try_from(schema.as_ref().clone())?;
-        let props = ExecutionProps::new();
-        let physical_expr = create_physical_expr(&expr, &df_schema, &props)?;
-        Ok(PruningPredicate::try_new(physical_expr, schema)?)
-    } else {
-        // Create IN expression for PNR
-        let pnr_values: Vec<Expr> = pnrs.iter().map(|pnr| lit(pnr.clone())).collect();
-
-        let expr = col("PNR").in_list(pnr_values, false);
-
-        // Create pruning predicate
-        let df_schema = DFSchema::try_from(schema.as_ref().clone())?;
-        let props = ExecutionProps::new();
-        let physical_expr = create_physical_expr(&expr, &df_schema, &props)?;
-
-        Ok(PruningPredicate::try_new(physical_expr, schema)?)
-    }
-}
-
-/// Create a pruning predicate from a filter
-pub fn create_pruning_predicate(
-    filter: &PnrFilter,
-    schema: SchemaRef,
-) -> Result<Option<PruningPredicate>> {
-    // If filter is empty, return None
-    if filter.pnrs().is_empty() {
-        return Ok(None);
-    }
-
-    // Get the column name to filter on
-    let column_name = if filter.is_direct_filter() {
-        "PNR"
-    } else if let Some(relation_col) = filter.relation_column() {
-        relation_col
-    } else {
-        return Ok(None);
-    };
-
-    // Check if the column exists in the schema
-    if !schema.fields().iter().any(|f| f.name() == column_name) {
-        return Err(IdsError::Validation(format!(
-            "Column {column_name} not found in schema"
-        )));
-    }
-
-    // Create IN expression
-    let pnr_values: Vec<Expr> = filter.pnrs().iter().map(|pnr| lit(pnr.clone())).collect();
-
-    let expr = col(column_name).in_list(pnr_values, false);
-
-    // Create pruning predicate
-    let df_schema = DFSchema::try_from(schema.as_ref().clone())?;
-    let props = ExecutionProps::new();
-    let physical_expr = create_physical_expr(&expr, &df_schema, &props)?;
-
-    Ok(Some(PruningPredicate::try_new(physical_expr, schema)?))
-}
-
 /// Extract statistics from parquet files for a column
 pub async fn extract_column_statistics(
     paths: &[impl AsRef<Path>],
     column_name: &str,
 ) -> Result<HashMap<PathBuf, (ScalarValue, ScalarValue)>> {
+    use datafusion::execution::context::SessionContext;
+    use datafusion::functions_aggregate::expr_fn::{max, min};
+    use datafusion::logical_expr::col;
+    use datafusion::prelude::*;
+
     let mut result = HashMap::new();
     let ctx = SessionContext::new();
 
@@ -725,39 +477,4 @@ pub async fn extract_column_statistics(
     }
 
     Ok(result)
-}
-
-/// Create a `SessionContext` with a registered table using pruning
-pub async fn create_context_with_pruning(
-    path: &str,
-    schema: SchemaRef,
-    pnr_filter: Option<&PnrFilter>,
-    table_name: &str,
-) -> Result<SessionContext> {
-    let ctx = SessionContext::new_with_config(
-        SessionConfig::new()
-            .with_target_partitions(4)
-            .with_batch_size(8192),
-    );
-
-    // Create read options with schema and page index for pruning
-    let read_options = ParquetReadOptions::default()
-        .schema(schema.as_ref());
-
-    // Register the table
-    ctx.register_parquet(table_name, path, read_options).await?;
-
-    // Apply filter if provided
-    if let Some(filter) = pnr_filter {
-        if let Some(expr) = filter.to_expr() {
-            // Get the dataframe and apply filter
-            let df = ctx.table(table_name).await?;
-            let filtered_df = df.filter(expr)?;
-
-            // Register the filtered dataframe
-            ctx.register_table(table_name, filtered_df.into_view())?;
-        }
-    }
-
-    Ok(ctx)
 }

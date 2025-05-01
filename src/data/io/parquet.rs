@@ -7,7 +7,6 @@ use datafusion::datasource::physical_plan::{FileScanConfigBuilder, ParquetSource
 use datafusion::datasource::source::DataSourceExec;
 use datafusion::datasource::{MemTable, TableProvider};
 use datafusion::execution::context::{SessionConfig, SessionContext};
-use datafusion::physical_optimizer::pruning::PruningPredicate;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 
@@ -18,8 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::datafusion::create_optimized_context;
-use super::filtering::PnrFilter;
-use super::pruning::create_pnr_pruning_predicate;
+use crate::data::PnrFilter;
 
 /// Options for controlling parquet reading behavior
 #[derive(Debug, Clone)]
@@ -209,7 +207,7 @@ impl ParquetReader {
         Ok(self.file_list.as_ref().unwrap())
     }
 
-    /// Create execution plan for parquet reading with DataFusion 47.0.0
+    /// Create physical execution plan for parquet reading with DataFusion 47.0.0
     async fn create_execution_plan(&mut self) -> Result<Arc<dyn ExecutionPlan>> {
         // Ensure session context is initialized
         self.init_session_context()?;
@@ -237,7 +235,8 @@ impl ParquetReader {
                 let df = ctx
                     .read_parquet(first_file.to_string_lossy().to_string(), read_options)
                     .await?;
-                df.schema()
+                // Convert DFSchema to Schema using Arc::new
+                Arc::new(df.schema().clone().into())
             } else {
                 return Err(IdsError::Validation("No files to read".to_string()));
             }
@@ -302,21 +301,25 @@ impl ParquetReader {
             || self.config.projection.is_some()
             || self.config.limit.is_some()
         {
-            // Create execution plan
-            let plan = self.create_execution_plan().await?;
+            // Create physical execution plan
+            let physical_plan = self.create_execution_plan().await?;
 
-            // Create dataframe from the execution plan
-            let df = ctx.execute_physical_plan(plan).await?;
+            // Create a DataFrame from the physical plan using DataFusion's task context
+            let task_ctx = ctx.task_ctx();
+            let results =
+                datafusion::physical_plan::collect(physical_plan.clone(), task_ctx).await?;
 
-            // Apply filter if provided
-            let df = if let Some(filter) = &self.config.filter {
-                df.filter(filter.clone())?
+            // Apply filter if provided after collecting results - this is inefficient
+            // but a proper implementation would incorporate the filter into the logical plan
+            if let Some(filter) = &self.config.filter {
+                // This is a simplified approach - in a real implementation,
+                // you would incorporate the filter into the logical plan before creating the physical plan
+                let df = ctx.read_batches(results.clone())?;
+                let filtered_df = df.filter(filter.clone())?;
+                Ok(filtered_df.collect().await?)
             } else {
-                df
-            };
-
-            // Collect and return the results
-            Ok(df.collect().await?)
+                Ok(results)
+            }
         } else {
             // Simpler path when no advanced features are needed
             // Create read options with schema if provided
@@ -358,8 +361,12 @@ impl ParquetReader {
     /// Create a DataFrame from this reader
     pub async fn to_dataframe(&mut self) -> Result<DataFrame> {
         let ctx = self.init_session_context()?.clone();
-        let plan = self.create_execution_plan().await?;
-        let df = ctx.execute_physical_plan(plan).await?;
+        let physical_plan = self.create_execution_plan().await?;
+
+        // Create a DataFrame by collecting the results and then creating a DataFrame from them
+        let task_ctx = ctx.task_ctx();
+        let results = datafusion::physical_plan::collect(physical_plan.clone(), task_ctx).await?;
+        let df = ctx.read_batches(results)?;
 
         // Apply filter if provided
         if let Some(filter) = &self.config.filter {
@@ -411,11 +418,13 @@ impl ParquetReader {
         // Ensure session context is initialized
         let ctx = self.init_session_context()?.clone();
 
-        // Create execution plan
-        let plan = self.create_execution_plan().await?;
+        // Create physical execution plan
+        let physical_plan = self.create_execution_plan().await?;
 
-        // Create a dataframe from the plan
-        let df = ctx.execute_physical_plan(plan).await?;
+        // Create a DataFrame by collecting the results and then creating a DataFrame from them
+        let task_ctx = ctx.task_ctx();
+        let results = datafusion::physical_plan::collect(physical_plan.clone(), task_ctx).await?;
+        let df = ctx.read_batches(results)?;
 
         // Register the dataframe as a table
         ctx.register_table(name, df.into_view())?;
