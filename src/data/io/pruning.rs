@@ -1,23 +1,196 @@
-use crate::error::Result;
-use arrow::array::ArrayRef;
-use arrow::datatypes::SchemaRef;
-// Removed deprecated import
-use datafusion::common::DFSchema;
-use datafusion::datasource::TableProvider;
-use datafusion::execution::context::SessionContext;
+use crate::error::{IdsError, Result};
+use arrow::array::{ArrayRef, BooleanArray, StringArray, UInt32Array, UInt64Array};
+use arrow::datatypes::{DataType, SchemaRef};
+use datafusion::common::{Column, DFSchema, ScalarValue};
+use datafusion::datasource::{TableProvider, TableType};
+use datafusion::execution::context::{SessionConfig, SessionContext};
+use datafusion::functions_aggregate::expr_fn::max;
+use datafusion::functions_aggregate::expr_fn::min;
 use datafusion::logical_expr::{col, lit, Expr};
 use datafusion::physical_expr::create_physical_expr;
 use datafusion::physical_expr::execution_props::ExecutionProps;
-use datafusion::physical_optimizer::pruning::PruningPredicate;
-use std::sync::Arc;
-
+use datafusion::physical_optimizer::pruning::{PruningPredicate, PruningStatistics};
 use datafusion::prelude::*;
 
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use super::filtering::PnrFilter;
+
+/// Represents a file's statistics for pruning decisions
+#[derive(Debug, Clone)]
+pub struct FileStatistics {
+    /// Path to the file
+    pub path: PathBuf,
+    /// Size of the file in bytes
+    pub size: u64,
+    /// Number of rows in the file
+    pub row_count: u64,
+    /// Minimum values for columns (for range filtering)
+    pub min_values: HashMap<String, ScalarValue>,
+    /// Maximum values for columns (for range filtering)
+    pub max_values: HashMap<String, ScalarValue>,
+    /// Optional list of all unique values for certain columns (for IN filtering)
+    pub unique_values: HashMap<String, HashSet<String>>,
+    /// Optional bloom filter for efficient membership testing
+    pub bloom_filters: HashMap<String, Vec<u8>>,
+}
+
+impl FileStatistics {
+    /// Create new file statistics
+    pub fn new(path: impl AsRef<Path>, size: u64, row_count: u64) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+            size,
+            row_count,
+            min_values: HashMap::new(),
+            max_values: HashMap::new(),
+            unique_values: HashMap::new(),
+            bloom_filters: HashMap::new(),
+        }
+    }
+
+    /// Add a minimum value for a column
+    pub fn with_min_value(mut self, column: &str, value: ScalarValue) -> Self {
+        self.min_values.insert(column.to_string(), value);
+        self
+    }
+
+    /// Add a maximum value for a column
+    pub fn with_max_value(mut self, column: &str, value: ScalarValue) -> Self {
+        self.max_values.insert(column.to_string(), value);
+        self
+    }
+
+    /// Add unique values for a column
+    pub fn with_unique_values(mut self, column: &str, values: HashSet<String>) -> Self {
+        self.unique_values.insert(column.to_string(), values);
+        self
+    }
+
+    /// Check if a file should be processed based on a filter
+    pub fn should_process(&self, expr: &Expr) -> bool {
+        match expr {
+            // Handle binary expressions (like =, >, <, etc.)
+            Expr::BinaryExpr(binary) => {
+                // Extract column name if left side is a column
+                if let Expr::Column(col) = &*binary.left {
+                    let column_name = &col.name;
+
+                    // Check if we have statistics for this column
+                    if let (Some(min_value), Some(max_value)) = (
+                        self.min_values.get(column_name),
+                        self.max_values.get(column_name),
+                    ) {
+                        // For column = value
+                        if binary.op == datafusion::logical_expr::Operator::Eq {
+                            if let Expr::Literal(val) = &*binary.right {
+                                // Check if value is outside min/max range
+                                return match (min_value, val, max_value) {
+                                    (
+                                        ScalarValue::Utf8(Some(min)),
+                                        ScalarValue::Utf8(Some(val)),
+                                        ScalarValue::Utf8(Some(max)),
+                                    ) => val >= min && val <= max,
+                                    (
+                                        ScalarValue::UInt32(Some(min)),
+                                        ScalarValue::UInt32(Some(val)),
+                                        ScalarValue::UInt32(Some(max)),
+                                    ) => val >= min && val <= max,
+                                    // Add more types as needed
+                                    _ => true, // If we don't know how to compare, process the file
+                                };
+                            }
+                        }
+
+                        // For column > value
+                        if binary.op == datafusion::logical_expr::Operator::Gt {
+                            if let Expr::Literal(val) = &*binary.right {
+                                // Check if max value is <= the filter value
+                                return match (max_value, val) {
+                                    (
+                                        ScalarValue::Utf8(Some(max)),
+                                        ScalarValue::Utf8(Some(val)),
+                                    ) => max > val,
+                                    (
+                                        ScalarValue::UInt32(Some(max)),
+                                        ScalarValue::UInt32(Some(val)),
+                                    ) => max > val,
+                                    // Add more types as needed
+                                    _ => true, // If we don't know how to compare, process the file
+                                };
+                            }
+                        }
+
+                        // For column < value
+                        if binary.op == datafusion::logical_expr::Operator::Lt {
+                            if let Expr::Literal(val) = &*binary.right {
+                                // Check if min value is >= the filter value
+                                return match (min_value, val) {
+                                    (
+                                        ScalarValue::Utf8(Some(min)),
+                                        ScalarValue::Utf8(Some(val)),
+                                    ) => min < val,
+                                    (
+                                        ScalarValue::UInt32(Some(min)),
+                                        ScalarValue::UInt32(Some(val)),
+                                    ) => min < val,
+                                    // Add more types as needed
+                                    _ => true, // If we don't know how to compare, process the file
+                                };
+                            }
+                        }
+                    }
+                }
+                true // Default to processing if we can't determine
+            }
+
+            // Handle IN expressions for membership testing
+            Expr::InList(in_list) => {
+                if let Expr::Column(col) = &*in_list.expr {
+                    let column_name = &col.name;
+
+                    // For columns with unique values known
+                    if let Some(unique_values) = self.unique_values.get(column_name) {
+                        // Check if any of the filter values are in our unique values
+                        for list_expr in &in_list.list {
+                            if let Expr::Literal(ScalarValue::Utf8(Some(val))) = list_expr {
+                                if unique_values.contains(val) {
+                                    return true;
+                                }
+                            }
+                        }
+
+                        // If we checked all values and none matched, we can skip this file
+                        return false;
+                    }
+
+                    // For PNR IN list - special optimization for most common case
+                    if column_name == "PNR" || column_name == "CPR" {
+                        // If we have a bloom filter, use it for faster checking
+                        if let Some(_bloom_filter) = self.bloom_filters.get(column_name) {
+                            // TODO: Implement bloom filter checking
+                            // This would check if any value in the IN list has a chance of being in the filter
+                            return true;
+                        }
+                    }
+                }
+                true // Default to processing
+            }
+
+            // Handle other expression types
+            _ => true, // Default to processing for unsupported expressions
+        }
+    }
+}
 
 /// Pruning statistics for efficient file filtering
+#[derive(Debug)]
 pub struct RegistryPruningStatistics {
     schema: SchemaRef,
+    files: Vec<FileStatistics>,
     min_values: HashMap<String, ArrayRef>,
     max_values: HashMap<String, ArrayRef>,
     row_counts: Option<ArrayRef>,
@@ -25,31 +198,387 @@ pub struct RegistryPruningStatistics {
 
 impl RegistryPruningStatistics {
     /// Create a new instance with schema
-    #[must_use] pub fn new(schema: SchemaRef) -> Self {
+    #[must_use]
+    pub fn new(schema: SchemaRef) -> Self {
         Self {
             schema,
+            files: Vec::new(),
             min_values: HashMap::new(),
             max_values: HashMap::new(),
             row_counts: None,
         }
     }
 
-    /// Add min value statistics for a column
-    pub fn with_min_value(mut self, column_name: &str, values: ArrayRef) -> Self {
-        self.min_values.insert(column_name.to_string(), values);
+    /// Add files statistics
+    pub fn with_files(mut self, files: Vec<FileStatistics>) -> Self {
+        self.files = files;
+
+        // Extract min/max values from files for columns
+        for field in self.schema.fields() {
+            let column_name = field.name();
+
+            match field.data_type() {
+                DataType::Utf8 => {
+                    // Extract min string values
+                    let min_strings: Vec<Option<String>> = self
+                        .files
+                        .iter()
+                        .map(|f| {
+                            f.min_values.get(column_name).and_then(|v| {
+                                if let ScalarValue::Utf8(s) = v {
+                                    s.clone()
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+
+                    if !min_strings.is_empty() && min_strings.iter().any(|s| s.is_some()) {
+                        let array = StringArray::from(min_strings);
+                        self.min_values.insert(column_name.clone(), Arc::new(array));
+                    }
+
+                    // Extract max string values
+                    let max_strings: Vec<Option<String>> = self
+                        .files
+                        .iter()
+                        .map(|f| {
+                            f.max_values.get(column_name).and_then(|v| {
+                                if let ScalarValue::Utf8(s) = v {
+                                    s.clone()
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+
+                    if !max_strings.is_empty() && max_strings.iter().any(|s| s.is_some()) {
+                        let array = StringArray::from(max_strings);
+                        self.max_values.insert(column_name.clone(), Arc::new(array));
+                    }
+                }
+                DataType::UInt32 => {
+                    // Extract min uint32 values
+                    let min_ints: Vec<Option<u32>> = self
+                        .files
+                        .iter()
+                        .map(|f| {
+                            f.min_values.get(column_name).and_then(|v| {
+                                if let ScalarValue::UInt32(i) = v {
+                                    *i
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+
+                    if !min_ints.is_empty() && min_ints.iter().any(|i| i.is_some()) {
+                        let array = UInt32Array::from(min_ints);
+                        self.min_values.insert(column_name.clone(), Arc::new(array));
+                    }
+
+                    // Extract max uint32 values
+                    let max_ints: Vec<Option<u32>> = self
+                        .files
+                        .iter()
+                        .map(|f| {
+                            f.max_values.get(column_name).and_then(|v| {
+                                if let ScalarValue::UInt32(i) = v {
+                                    *i
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+
+                    if !max_ints.is_empty() && max_ints.iter().any(|i| i.is_some()) {
+                        let array = UInt32Array::from(max_ints);
+                        self.max_values.insert(column_name.clone(), Arc::new(array));
+                    }
+                }
+                // Add other types as needed
+                _ => {}
+            }
+        }
+
+        // Create row counts array
+        let row_counts: Vec<Option<u64>> = self.files.iter().map(|f| Some(f.row_count)).collect();
+
+        if !row_counts.is_empty() {
+            self.row_counts = Some(Arc::new(UInt64Array::from(row_counts)));
+        }
+
         self
     }
 
-    /// Add max value statistics for a column
-    pub fn with_max_value(mut self, column_name: &str, values: ArrayRef) -> Self {
-        self.max_values.insert(column_name.to_string(), values);
+    /// Filter files based on an expression
+    pub fn filter_files(&self, expr: &Expr) -> Vec<FileStatistics> {
+        self.files
+            .iter()
+            .filter(|file| file.should_process(expr))
+            .cloned()
+            .collect()
+    }
+}
+
+impl PruningStatistics for RegistryPruningStatistics {
+    fn num_containers(&self) -> usize {
+        self.files.len()
+    }
+
+    fn min_values(&self, column: &Column) -> Option<ArrayRef> {
+        self.min_values.get(&column.name).cloned()
+    }
+
+    fn max_values(&self, column: &Column) -> Option<ArrayRef> {
+        self.max_values.get(&column.name).cloned()
+    }
+
+    fn row_counts(&self, _column: &Column) -> Option<ArrayRef> {
+        self.row_counts.clone()
+    }
+
+    fn null_counts(&self, _column: &Column) -> Option<ArrayRef> {
+        None // We don't track null counts for now
+    }
+
+    fn contained(&self, column: &Column, values: &HashSet<ScalarValue>) -> Option<BooleanArray> {
+        // Implementation for specific IN list pruning if needed
+        let column_name = &column.name;
+
+        // For each file, check if any of the values in the set could be in the file
+        let contained: Vec<bool> = self
+            .files
+            .iter()
+            .map(|file| {
+                // Check if we have unique values for this column
+                if let Some(unique_values) = file.unique_values.get(column_name) {
+                    // If we have exact unique values, check for any overlap
+                    for value in values {
+                        if let ScalarValue::Utf8(Some(s)) = value {
+                            if unique_values.contains(s) {
+                                return true;
+                            }
+                        }
+                    }
+                    false // No overlap found
+                } else {
+                    // If we don't have unique values, check min/max bounds
+                    if let (Some(min), Some(max)) = (
+                        file.min_values.get(column_name),
+                        file.max_values.get(column_name),
+                    ) {
+                        // For each value, check if it could be in the range
+                        for value in values {
+                            let in_range = match (min, value, max) {
+                                (
+                                    ScalarValue::Utf8(Some(min_s)),
+                                    ScalarValue::Utf8(Some(val_s)),
+                                    ScalarValue::Utf8(Some(max_s)),
+                                ) => val_s >= min_s && val_s <= max_s,
+                                (
+                                    ScalarValue::UInt32(Some(min_i)),
+                                    ScalarValue::UInt32(Some(val_i)),
+                                    ScalarValue::UInt32(Some(max_i)),
+                                ) => val_i >= min_i && val_i <= max_i,
+                                // Add more types as needed
+                                _ => true, // If we can't compare, assume it might be contained
+                            };
+
+                            if in_range {
+                                return true;
+                            }
+                        }
+                        false // No values in range
+                    } else {
+                        true // If we don't have min/max, assume it might be contained
+                    }
+                }
+            })
+            .collect();
+
+        Some(BooleanArray::from(contained))
+    }
+}
+
+/// A custom table provider with pruning support
+#[derive(Debug)]
+pub struct PrunableTableProvider {
+    schema: SchemaRef,
+    statistics: Arc<RegistryPruningStatistics>,
+    file_list: Vec<PathBuf>,
+}
+
+impl PrunableTableProvider {
+    /// Create a new prunable table provider
+    pub fn new(
+        schema: SchemaRef,
+        statistics: RegistryPruningStatistics,
+        file_list: Vec<PathBuf>,
+    ) -> Self {
+        Self {
+            schema,
+            statistics: Arc::new(statistics),
+            file_list,
+        }
+    }
+}
+
+impl TableProvider for PrunableTableProvider {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 
-    /// Set row counts
-    pub fn with_row_counts(mut self, row_counts: ArrayRef) -> Self {
-        self.row_counts = Some(row_counts);
-        self
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+
+    fn table_type(&self) -> TableType {
+        TableType::Base
+    }
+
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&Expr],
+    ) -> datafusion::error::Result<Vec<datafusion::logical_expr::TableProviderFilterPushDown>> {
+        // We can push down filters for columns we have statistics for
+        let mut result = Vec::with_capacity(filters.len());
+
+        for filter in filters {
+            // Check if this is a filter we can push down
+            match filter {
+                Expr::BinaryExpr(binary) => {
+                    // Extract column name if left side is a column
+                    if let Expr::Column(col) = &*binary.left {
+                        let column_name = &col.name;
+
+                        // Check if we have statistics for this column
+                        if self.statistics.min_values.contains_key(column_name)
+                            || self.statistics.max_values.contains_key(column_name)
+                        {
+                            result
+                                .push(datafusion::logical_expr::TableProviderFilterPushDown::Exact);
+                            continue;
+                        }
+                    }
+                }
+                Expr::InList(in_list) => {
+                    if let Expr::Column(col) = &*in_list.expr {
+                        let column_name = &col.name;
+
+                        // We have special handling for PNR columns
+                        if column_name == "PNR" || column_name == "CPR" {
+                            result
+                                .push(datafusion::logical_expr::TableProviderFilterPushDown::Exact);
+                            continue;
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            result.push(datafusion::logical_expr::TableProviderFilterPushDown::Inexact);
+        }
+
+        Ok(result)
+    }
+    
+    #[datafusion::common::async_trait]
+    async fn scan(
+        &self,
+        _state: &dyn datafusion::catalog::Session,
+        projection: Option<&Vec<usize>>,
+        filters: &[Expr],
+        limit: Option<usize>,
+    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
+        use datafusion::datasource::listing::PartitionedFile;
+        use datafusion::datasource::object_store::ObjectStoreUrl;
+        use datafusion::datasource::physical_plan::{FileScanConfigBuilder, ParquetSource};
+        use datafusion::datasource::source::DataSourceExec;
+        use arrow::record_batch::RecordBatch;
+        use std::fs;
+        
+        // Filter the file list based on filters
+        let files = if !filters.is_empty() {
+            // For each filter, get files that pass it
+            let mut filtered_files = self.file_list.clone();
+            for filter in filters {
+                filtered_files = filtered_files.into_iter()
+                    .filter(|file| {
+                        // For each file, check if the statistics suggest it should be processed
+                        let file_stats = self.statistics.files.iter()
+                            .find(|stats| stats.path == *file);
+                            
+                        if let Some(stats) = file_stats {
+                            stats.should_process(filter)
+                        } else {
+                            // If we don't have statistics, process the file
+                            true
+                        }
+                    })
+                    .collect();
+            }
+            filtered_files
+        } else {
+            self.file_list.clone()
+        };
+        
+        if files.is_empty() {
+            // Return an empty plan
+            let empty_schema = self.schema.clone();
+            let empty_batch = RecordBatch::new_empty(empty_schema.clone());
+            let provider = MemTable::try_new(empty_schema, vec![vec![empty_batch]])?;
+            let plan = provider.scan(
+                _state,
+                projection,
+                &[],
+                limit,
+            ).await?;
+            
+            return Ok(plan);
+        }
+        
+        // Create the format with predicate pushdown
+        let format = ParquetSource::default()
+            .with_enable_page_index(true) // Enable page-level pruning
+            .with_pushdown_filters(true); // Enable predicate pushdown
+        let format_arc = Arc::new(format);
+        
+        // Create FileScanConfig using builder
+        let url = ObjectStoreUrl::parse("file://".to_string())?;
+        
+        // Start building the config
+        let mut config_builder = FileScanConfigBuilder::new(url, self.schema.clone(), format_arc);
+        
+        // Add each file individually with size info for better statistics
+        for file_path in &files {
+            let file_size = fs::metadata(file_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
+            
+            let file_path_str = file_path.to_string_lossy().to_string();
+            config_builder = config_builder.with_file(PartitionedFile::new(file_path_str, file_size));
+        }
+        
+        // Add projection if provided
+        if let Some(proj) = projection {
+            config_builder = config_builder.with_projection(Some(proj.clone()));
+        }
+        
+        // Add limit if provided
+        if let Some(lim) = limit {
+            config_builder = config_builder.with_limit(Some(lim));
+        }
+        
+        // Build the config
+        let config = config_builder.build();
+        
+        // Create DataSourceExec with the config and return it
+        Ok(DataSourceExec::from_data_source(config) as Arc<dyn ExecutionPlan>)
     }
 }
 
@@ -80,69 +609,153 @@ pub fn create_pnr_pruning_predicate(
     }
 }
 
-/// This function is a placeholder that needs to be updated for `DataFusion` 47.0.0
-pub async fn create_table_with_pruning(
-    path: &str,
+/// Create a pruning predicate from a filter
+pub fn create_pruning_predicate(
+    filter: &PnrFilter,
     schema: SchemaRef,
-    predicate: Option<PruningPredicate>,
-) -> Result<Arc<dyn TableProvider>> {
-    // For now, we'll use the register_parquet approach which doesn't support pruning directly
-    let ctx = SessionContext::new();
-    
-    // Register the table first
-    ctx.register_parquet(
-        "temp_table", 
-        path, 
-        ParquetReadOptions::default().schema(schema.as_ref())
-    ).await?;
-    
-    // If we have a predicate, we need to apply it via SQL
-    if let Some(_) = predicate {
-        // This isn't using the predicate directly, but in a real implementation
-        // you would convert the predicate to an appropriate filter
-        // This is just a placeholder for now
-        ctx.sql("SELECT * FROM temp_table").await?;
+) -> Result<Option<PruningPredicate>> {
+    // If filter is empty, return None
+    if filter.pnrs().is_empty() {
+        return Ok(None);
     }
-    
-    // In a real implementation, we would return the table provider
-    // For now, this is a placeholder
-    Err(crate::error::IdsError::Validation("Pruning functionality not yet implemented for DataFusion 47.0.0".to_string()))
+
+    // Get the column name to filter on
+    let column_name = if filter.is_direct_filter() {
+        "PNR"
+    } else if let Some(relation_col) = filter.relation_column() {
+        relation_col
+    } else {
+        return Ok(None);
+    };
+
+    // Check if the column exists in the schema
+    if !schema.fields().iter().any(|f| f.name() == column_name) {
+        return Err(IdsError::Validation(format!(
+            "Column {column_name} not found in schema"
+        )));
+    }
+
+    // Create IN expression
+    let pnr_values: Vec<Expr> = filter.pnrs().iter().map(|pnr| lit(pnr.clone())).collect();
+
+    let expr = col(column_name).in_list(pnr_values, false);
+
+    // Create pruning predicate
+    let df_schema = DFSchema::try_from(schema.as_ref().clone())?;
+    let props = ExecutionProps::new();
+    let physical_expr = create_physical_expr(&expr, &df_schema, &props)?;
+
+    Ok(Some(PruningPredicate::try_new(physical_expr, schema)?))
+}
+
+/// Extract statistics from parquet files for a column
+pub async fn extract_column_statistics(
+    paths: &[impl AsRef<Path>],
+    column_name: &str,
+) -> Result<HashMap<PathBuf, (ScalarValue, ScalarValue)>> {
+    let mut result = HashMap::new();
+    let ctx = SessionContext::new();
+
+    for path in paths {
+        let path = path.as_ref();
+        if !path.exists() || !path.is_file() {
+            continue;
+        }
+
+        // Read the file with page index enabled
+        let df = ctx
+            .read_parquet(
+                path.to_string_lossy().to_string(),
+                ParquetReadOptions::default(),
+            )
+            .await?;
+
+        // Read minimal data to compute statistics
+        let df = df.select_columns(&[column_name])?;
+        let min_df = df.clone().aggregate(vec![], vec![min(col(column_name))])?;
+        let max_df = df.aggregate(vec![], vec![max(col(column_name))])?;
+
+        // Execute and get results
+        let min_batch = min_df.collect().await?;
+        let max_batch = max_df.collect().await?;
+
+        if !min_batch.is_empty() && !max_batch.is_empty() {
+            // Extract min value
+            let min_col = min_batch[0].column(0);
+            let min_val = if min_col.is_null(0) {
+                continue;
+            } else {
+                // Get ScalarValue based on type
+                match min_col.data_type() {
+                    DataType::Utf8 => {
+                        let array = min_col.as_any().downcast_ref::<StringArray>().unwrap();
+                        ScalarValue::Utf8(Some(array.value(0).to_string()))
+                    }
+                    DataType::UInt32 => {
+                        let array = min_col.as_any().downcast_ref::<UInt32Array>().unwrap();
+                        ScalarValue::UInt32(Some(array.value(0)))
+                    }
+                    // Add more types as needed
+                    _ => continue,
+                }
+            };
+
+            // Extract max value
+            let max_col = max_batch[0].column(0);
+            let max_val = if max_col.is_null(0) {
+                continue;
+            } else {
+                // Get ScalarValue based on type
+                match max_col.data_type() {
+                    DataType::Utf8 => {
+                        let array = max_col.as_any().downcast_ref::<StringArray>().unwrap();
+                        ScalarValue::Utf8(Some(array.value(0).to_string()))
+                    }
+                    DataType::UInt32 => {
+                        let array = max_col.as_any().downcast_ref::<UInt32Array>().unwrap();
+                        ScalarValue::UInt32(Some(array.value(0)))
+                    }
+                    // Add more types as needed
+                    _ => continue,
+                }
+            };
+
+            result.insert(path.to_path_buf(), (min_val, max_val));
+        }
+    }
+
+    Ok(result)
 }
 
 /// Create a `SessionContext` with a registered table using pruning
 pub async fn create_context_with_pruning(
     path: &str,
     schema: SchemaRef,
-    pnr_filter: Option<&HashSet<String>>,
+    pnr_filter: Option<&PnrFilter>,
     table_name: &str,
 ) -> Result<SessionContext> {
-    let ctx = SessionContext::new();
+    let ctx = SessionContext::new_with_config(
+        SessionConfig::new()
+            .with_target_partitions(4)
+            .with_batch_size(8192),
+    );
 
-    // Create read options with schema
-    let read_options = ParquetReadOptions::default().schema(schema.as_ref());
+    // Create read options with schema and page index for pruning
+    let read_options = ParquetReadOptions::default()
+        .schema(schema.as_ref());
 
     // Register the table
     ctx.register_parquet(table_name, path, read_options).await?;
 
     // Apply filter if provided
-    if let Some(pnrs) = pnr_filter {
-        if !pnrs.is_empty() {
-            // Create PNR IN list for SQL
-            let pnrs_list = pnrs
-                .iter()
-                .map(|p| format!("'{p}'"))
-                .collect::<Vec<_>>()
-                .join(",");
+    if let Some(filter) = pnr_filter {
+        if let Some(expr) = filter.to_expr() {
+            // Get the dataframe and apply filter
+            let df = ctx.table(table_name).await?;
+            let filtered_df = df.filter(expr)?;
 
-            let sql = format!(
-                "
-                CREATE OR REPLACE TABLE {table_name} AS
-                SELECT * FROM {table_name}
-                WHERE PNR IN ({pnrs_list})
-            "
-            );
-
-            ctx.sql(&sql).await?;
+            // Register the filtered dataframe
+            ctx.register_table(table_name, filtered_df.into_view())?;
         }
     }
 
