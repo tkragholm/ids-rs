@@ -52,7 +52,7 @@ pub async fn load_registry_data(
     }
 }
 
-/// Synchronous version of load_registry_data that uses a Tokio runtime
+/// Synchronous version of `load_registry_data` that uses a Tokio runtime
 pub fn load_registry_data_sync(
     path: &(impl AsRef<Path> + ?Sized),
     registry_name: Option<&str>,

@@ -162,17 +162,14 @@ fn standardize_dod_batch(batch: &RecordBatch) -> Result<RecordBatch> {
             ..Default::default()
         };
         
-        match cast_with_options(date_col, &DataType::Date32, &cast_options) {
-            Ok(casted) => casted,
-            Err(_) => {
-                // If casting fails, return a null array of the right type and length
-                let len = date_col.len();
-                let mut builder = arrow::array::builder::Date32Builder::with_capacity(len);
-                for _ in 0..len {
-                    builder.append_null();
-                }
-                Arc::new(builder.finish())
+        if let Ok(casted) = cast_with_options(date_col, &DataType::Date32, &cast_options) { casted } else {
+            // If casting fails, return a null array of the right type and length
+            let len = date_col.len();
+            let mut builder = arrow::array::builder::Date32Builder::with_capacity(len);
+            for _ in 0..len {
+                builder.append_null();
             }
+            Arc::new(builder.finish())
         }
     };
 
