@@ -171,6 +171,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
         lpr2_bes.as_deref(),
         lpr3_kontakter.as_deref(),
         lpr3_diagnoser.as_deref(),
+        None, // lpr3_procedurer
         &lpr_config,
     )?;
 

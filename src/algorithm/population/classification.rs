@@ -284,6 +284,7 @@ pub fn process_lpr_and_identify_scd(
         lpr2_bes,
         lpr3_kontakter,
         lpr3_diagnoser,
+        None, // lpr3_procedurer
         &lpr_config,
     )?;
     

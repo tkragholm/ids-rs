@@ -45,6 +45,18 @@ impl PnrFilter {
     #[must_use] pub const fn is_direct_filter(&self) -> bool {
         self.direct_filter
     }
+    
+    /// Convert to a data::filter::pnr::PnrFilter
+    #[must_use] pub fn to_io_filter(&self) -> crate::data::filter::pnr::PnrFilter {
+        if self.is_direct_filter() {
+            crate::data::filter::pnr::PnrFilter::new(self.pnrs.clone())
+        } else if let Some(relation_col) = self.relation_column() {
+            crate::data::filter::pnr::PnrFilter::with_relation(self.pnrs.clone(), relation_col)
+        } else {
+            // Fallback to direct filter
+            crate::data::filter::pnr::PnrFilter::new(self.pnrs.clone())
+        }
+    }
 }
 
 /// Base trait for registry loaders

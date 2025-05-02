@@ -15,6 +15,7 @@ use crate::algorithm::health::diagnosis::secondary::{
     create_secondary_diagnoses_array, create_secondary_diagnoses_field,
     process_secondary_diagnoses, SecondaryDiagnosis,
 };
+use crate::data::registry::loaders::lpr::LprRegistry;
 use crate::error::{IdsError, Result};
 use crate::model::icd10::{diagnosis_pattern::normalize_diagnosis_code, Icd10Chapter};
 use crate::utils::date_utils;
@@ -65,11 +66,99 @@ fn get_string_column(batch: &RecordBatch, column_name: &str) -> Result<Arc<Strin
         .map_err(|e| IdsError::Data(format!("{column_name} column not found: {e}")))?;
 
     let col_array = batch.column(col_idx);
-    col_array
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .ok_or_else(|| IdsError::Data(format!("{column_name} column is not a string array")))
-        .map(|a| Arc::new(a.clone()))
+    
+    // Check if the column is already a string array
+    if let Some(string_array) = col_array.as_any().downcast_ref::<StringArray>() {
+        return Ok(Arc::new(string_array.clone()));
+    }
+    
+    // If not a string array, try to convert it to string
+    let string_array = match col_array.data_type() {
+        DataType::Int32 => {
+            use arrow::array::Int32Array;
+            let int_array = col_array.as_any().downcast_ref::<Int32Array>()
+                .ok_or_else(|| IdsError::Data(format!("Failed to cast {column_name} to Int32Array")))?;
+            
+            // Convert Int32Array to StringArray
+            let mut builder = arrow::array::StringBuilder::new();
+            for i in 0..int_array.len() {
+                if int_array.is_null(i) {
+                    builder.append_null();
+                } else {
+                    builder.append_value(int_array.value(i).to_string());
+                }
+            }
+            Arc::new(builder.finish())
+        },
+        DataType::Int64 => {
+            use arrow::array::Int64Array;
+            let int_array = col_array.as_any().downcast_ref::<Int64Array>()
+                .ok_or_else(|| IdsError::Data(format!("Failed to cast {column_name} to Int64Array")))?;
+            
+            // Convert Int64Array to StringArray
+            let mut builder = arrow::array::StringBuilder::new();
+            for i in 0..int_array.len() {
+                if int_array.is_null(i) {
+                    builder.append_null();
+                } else {
+                    builder.append_value(int_array.value(i).to_string());
+                }
+            }
+            Arc::new(builder.finish())
+        },
+        DataType::Utf8 => {
+            // This is for handling Utf8View type - generic conversion for any UTF8 type
+            log::info!("Converting Utf8 type to StringArray for column {}", column_name);
+            
+            // Use Arrow's built-in cast functionality to convert to string array
+            use arrow::compute::cast;
+            use arrow::datatypes::DataType;
+            let string_array = cast(col_array, &DataType::Utf8)
+                .map_err(|e| IdsError::Data(format!(
+                    "Failed to cast {} column from Utf8 to StringArray: {}", column_name, e
+                )))?;
+                
+            // Downcast to StringArray
+            let string_array = string_array.as_any().downcast_ref::<StringArray>()
+                .ok_or_else(|| IdsError::Data(format!(
+                    "Failed to downcast {} column to StringArray after casting", column_name
+                )))?;
+                
+            Arc::new(string_array.clone())
+        },
+        _ => {
+            // Try to convert any array type to string by stringifying each element
+            log::warn!("Attempting generic conversion to StringArray for column {} with type {:?}", 
+                     column_name, col_array.data_type());
+            
+            // Use Arrow's built-in cast functionality to convert to string array
+            use arrow::compute::cast;
+            use arrow::datatypes::DataType;
+            
+            // Try to cast to string
+            match cast(col_array, &DataType::Utf8) {
+                Ok(cast_array) => {
+                    if let Some(string_array) = cast_array.as_any().downcast_ref::<StringArray>() {
+                        log::info!("Successfully converted column {} to StringArray using Arrow cast", column_name);
+                        Arc::new(string_array.clone())
+                    } else {
+                        return Err(IdsError::Data(format!(
+                            "Failed to downcast {} column to StringArray after casting from {:?}", 
+                            column_name, col_array.data_type()
+                        )));
+                    }
+                },
+                Err(e) => {
+                    return Err(IdsError::Data(format!(
+                        "{} column is not a string array and could not be converted to one (type: {:?}): {}",
+                        column_name, col_array.data_type(), e
+                    )));
+                }
+            }
+        }
+    };
+    
+    Ok(string_array)
 }
 
 /// Builds a map of record number to row index
@@ -215,14 +304,11 @@ pub fn integrate_lpr2_components(
     // Get treatment data from LPR_BES if available
     let _bes_data = if let Some(lpr_bes) = &lpr_bes {
         let bes_recnum_array = get_string_column(lpr_bes, "RECNUM")?;
-        let bes_date_idx = lpr_bes
-            .schema()
-            .index_of("D_AMBDTO")
-            .map_err(|e| IdsError::Data(format!("D_AMBDTO column not found in LPR_BES: {e}")))?;
-        let bes_date_array = lpr_bes.column(bes_date_idx);
+        // Get D_AMBDTO column which is a string in the parquet files
+        let bes_date_array = get_string_column(lpr_bes, "D_AMBDTO")?;
 
-        // Convert to Date32Array
-        let bes_date_date32 = date_utils::convert_to_date32_array(bes_date_array.as_ref())?;
+        // Convert string dates to Date32Array for consistent handling
+        let bes_date_date32 = date_utils::string_array_to_date32(&bes_date_array)?;
 
         // Map treatment dates by record number
         Some(map_treatment_dates(&bes_recnum_array, &bes_date_date32))
@@ -244,18 +330,23 @@ pub fn integrate_lpr2_components(
     // Process in chunks to reduce memory usage
     const CHUNK_SIZE: usize = 500000; // Process 500k rows at a time
     let num_chunks = num_rows.div_ceil(CHUNK_SIZE); // Ceiling division
-    
+
     let mut all_batches = Vec::with_capacity(num_chunks);
     let integrated_schema = create_integrated_schema();
-    
+
     for chunk_idx in 0..num_chunks {
         let start_idx = chunk_idx * CHUNK_SIZE;
         let end_idx = std::cmp::min((chunk_idx + 1) * CHUNK_SIZE, num_rows);
         let chunk_size = end_idx - start_idx;
-        
-        log::info!("Processing chunk {}/{} (rows {}-{})", 
-                  chunk_idx + 1, num_chunks, start_idx, end_idx - 1);
-        
+
+        log::info!(
+            "Processing chunk {}/{} (rows {}-{})",
+            chunk_idx + 1,
+            num_chunks,
+            start_idx,
+            end_idx - 1
+        );
+
         // Result arrays for this chunk
         let mut patient_ids = Vec::with_capacity(chunk_size);
         let mut primary_diagnoses = Vec::with_capacity(chunk_size);
@@ -349,7 +440,7 @@ pub fn integrate_lpr2_components(
                 Some(pat_type_array.value(i).to_string())
             });
         }
-        
+
         // Create Arrow arrays for this chunk
         let patient_id_array = StringArray::from(patient_ids);
         let primary_diag_array = StringArray::from(primary_diagnoses);
@@ -360,7 +451,7 @@ pub fn integrate_lpr2_components(
         let hospital_array = StringArray::from(hospital_codes);
         let dept_array = StringArray::from(department_codes);
         let adm_type_array = StringArray::from(admission_types);
-        
+
         // Create batch for this chunk
         let chunk_batch = RecordBatch::try_new(
             Arc::new(integrated_schema.clone()),
@@ -376,10 +467,15 @@ pub fn integrate_lpr2_components(
                 Arc::new(adm_type_array),
             ],
         )
-        .map_err(|e| IdsError::Data(format!("Failed to create integrated LPR2 batch for chunk {}: {e}", chunk_idx + 1)))?;
-        
+        .map_err(|e| {
+            IdsError::Data(format!(
+                "Failed to create integrated LPR2 batch for chunk {}: {e}",
+                chunk_idx + 1
+            ))
+        })?;
+
         all_batches.push(chunk_batch);
-        
+
         // Force memory cleanup after each chunk
         std::mem::drop(secondary_diagnoses_list);
     }
@@ -391,12 +487,12 @@ pub fn integrate_lpr2_components(
         log::info!("Only one chunk was created, returning it directly");
         return Ok(all_batches.remove(0));
     }
-    
+
     log::info!("Combining {} chunks into a single batch", all_batches.len());
     let schema_arc = Arc::new(integrated_schema);
     let integrated_batch = arrow::compute::concat_batches(&schema_arc, &all_batches)
         .map_err(|e| IdsError::Data(format!("Failed to concatenate LPR2 chunks: {e}")))?;
-    
+
     Ok(integrated_batch)
 }
 
@@ -461,18 +557,23 @@ pub fn integrate_lpr3_components(
     // Process in chunks to reduce memory usage
     const CHUNK_SIZE: usize = 500000; // Process 500k rows at a time
     let num_chunks = num_rows.div_ceil(CHUNK_SIZE); // Ceiling division
-    
+
     let mut all_batches = Vec::with_capacity(num_chunks);
     let integrated_schema = create_integrated_schema();
-    
+
     for chunk_idx in 0..num_chunks {
         let start_idx = chunk_idx * CHUNK_SIZE;
         let end_idx = std::cmp::min((chunk_idx + 1) * CHUNK_SIZE, num_rows);
         let chunk_size = end_idx - start_idx;
-        
-        log::info!("Processing LPR3 chunk {}/{} (rows {}-{})", 
-                  chunk_idx + 1, num_chunks, start_idx, end_idx - 1);
-        
+
+        log::info!(
+            "Processing LPR3 chunk {}/{} (rows {}-{})",
+            chunk_idx + 1,
+            num_chunks,
+            start_idx,
+            end_idx - 1
+        );
+
         // Result arrays for this chunk
         let mut patient_ids = Vec::with_capacity(chunk_size);
         let mut primary_diagnoses = Vec::with_capacity(chunk_size);
@@ -581,7 +682,7 @@ pub fn integrate_lpr3_components(
         let hospital_array = StringArray::from(hospital_codes);
         let dept_array = StringArray::from(department_codes);
         let adm_type_array = StringArray::from(admission_types);
-        
+
         // Create batch for this chunk
         let chunk_batch = RecordBatch::try_new(
             Arc::new(integrated_schema.clone()),
@@ -597,27 +698,37 @@ pub fn integrate_lpr3_components(
                 Arc::new(adm_type_array),
             ],
         )
-        .map_err(|e| IdsError::Data(format!("Failed to create integrated LPR3 batch for chunk {}: {e}", chunk_idx + 1)))?;
-        
+        .map_err(|e| {
+            IdsError::Data(format!(
+                "Failed to create integrated LPR3 batch for chunk {}: {e}",
+                chunk_idx + 1
+            ))
+        })?;
+
         all_batches.push(chunk_batch);
-        
+
         // Force memory cleanup after each chunk
         std::mem::drop(secondary_diagnoses_list);
     }
-    
+
     // Combine all chunks into a single batch
     if all_batches.is_empty() {
-        return Err(IdsError::Data("No valid LPR3 chunks were created".to_string()));
+        return Err(IdsError::Data(
+            "No valid LPR3 chunks were created".to_string(),
+        ));
     } else if all_batches.len() == 1 {
         log::info!("Only one LPR3 chunk was created, returning it directly");
         return Ok(all_batches.remove(0));
     }
-    
-    log::info!("Combining {} LPR3 chunks into a single batch", all_batches.len());
+
+    log::info!(
+        "Combining {} LPR3 chunks into a single batch",
+        all_batches.len()
+    );
     let schema_arc = Arc::new(integrated_schema);
     let integrated_batch = arrow::compute::concat_batches(&schema_arc, &all_batches)
         .map_err(|e| IdsError::Data(format!("Failed to concatenate LPR3 chunks: {e}")))?;
-    
+
     Ok(integrated_batch)
 }
 
@@ -720,6 +831,7 @@ pub fn process_lpr_data(
     lpr2_bes: Option<&[RecordBatch]>,
     lpr3_kontakter: Option<&[RecordBatch]>,
     lpr3_diagnoser: Option<&[RecordBatch]>,
+    _lpr3_procedurer: Option<&[RecordBatch]>, // Not currently used, but kept for compatibility
     config: &LprConfig,
 ) -> Result<RecordBatch> {
     // Process LPR2 data if enabled and available
@@ -750,4 +862,118 @@ pub fn process_lpr_data(
     let filtered_data = apply_date_filtering(&combined_data, config)?;
 
     Ok(filtered_data)
+}
+
+/// Process LPR data from components
+/// 
+/// This function takes LprComponents (from both LPR2 and LPR3 sources)
+/// and processes them according to the config.
+pub fn process_lpr_components(
+    components: &crate::data::registry::loaders::lpr::LprComponents,
+    config: &LprConfig,
+) -> Result<RecordBatch> {
+    // Process LPR2 data if enabled and available
+    let lpr2_data = if config.include_lpr2 && 
+                       components.lpr2_adm.is_some() && 
+                       components.lpr2_diag.is_some() {
+        let lpr2_adm = components.lpr2_adm.as_ref().unwrap().as_slice();
+        let lpr2_diag = components.lpr2_diag.as_ref().unwrap().as_slice();
+        let lpr2_bes = components.lpr2_bes.as_ref().map(|v| v.as_slice());
+        
+        Some(integrate_lpr2_components(
+            lpr2_adm,
+            lpr2_diag,
+            lpr2_bes,
+        )?)
+    } else {
+        None
+    };
+
+    // Process LPR3 data if enabled and available
+    let lpr3_data = if config.include_lpr3 && 
+                       components.lpr3_kontakter.is_some() && 
+                       components.lpr3_diagnoser.is_some() {
+        let lpr3_kontakter = components.lpr3_kontakter.as_ref().unwrap().as_slice();
+        let lpr3_diagnoser = components.lpr3_diagnoser.as_ref().unwrap().as_slice();
+        
+        Some(integrate_lpr3_components(
+            lpr3_kontakter,
+            lpr3_diagnoser,
+        )?)
+    } else {
+        None
+    };
+
+    // Combine harmonized data
+    let combined_data = combine_harmonized_data(lpr2_data, lpr3_data)?;
+
+    // Apply date filtering if needed
+    let filtered_data = apply_date_filtering(&combined_data, config)?;
+
+    Ok(filtered_data)
+}
+
+/// Load and process LPR data from base path
+/// 
+/// This function loads LPR data from the specified base path
+/// and processes it according to the config.
+pub async fn load_and_process_lpr(
+    base_path: &str,
+    config: &LprConfig,
+    pnr_filter: Option<&crate::data::registry::traits::PnrFilter>,
+) -> Result<RecordBatch> {
+    // Create registry loaders
+    let lpr2_loader = crate::data::registry::loaders::lpr::Lpr2Register;
+    let lpr3_loader = crate::data::registry::loaders::lpr::Lpr3Register;
+    
+    // Load LPR2 components if enabled
+    let mut components = crate::data::registry::loaders::lpr::LprComponents::default();
+    
+    if config.include_lpr2 {
+        log::info!("Loading LPR2 components from {}", base_path);
+        if let Ok(lpr2_components) = lpr2_loader.load_components(base_path, pnr_filter).await {
+            if lpr2_components.lpr2_adm.is_some() {
+                components.lpr2_adm = lpr2_components.lpr2_adm;
+                log::info!("Loaded LPR2 admin data");
+            }
+            
+            if lpr2_components.lpr2_diag.is_some() {
+                components.lpr2_diag = lpr2_components.lpr2_diag;
+                log::info!("Loaded LPR2 diagnosis data");
+            }
+            
+            if lpr2_components.lpr2_bes.is_some() {
+                components.lpr2_bes = lpr2_components.lpr2_bes;
+                log::info!("Loaded LPR2 procedure data");
+            }
+        } else {
+            log::warn!("Failed to load LPR2 components from {}", base_path);
+        }
+    }
+    
+    // Load LPR3 components if enabled
+    if config.include_lpr3 {
+        log::info!("Loading LPR3 components from {}", base_path);
+        if let Ok(lpr3_components) = lpr3_loader.load_components(base_path, pnr_filter).await {
+            if lpr3_components.lpr3_kontakter.is_some() {
+                components.lpr3_kontakter = lpr3_components.lpr3_kontakter;
+                log::info!("Loaded LPR3 kontakter data");
+            }
+            
+            if lpr3_components.lpr3_diagnoser.is_some() {
+                components.lpr3_diagnoser = lpr3_components.lpr3_diagnoser;
+                log::info!("Loaded LPR3 diagnoser data");
+            }
+            
+            if lpr3_components.lpr3_procedurer.is_some() {
+                components.lpr3_procedurer = lpr3_components.lpr3_procedurer;
+                log::info!("Loaded LPR3 procedurer data");
+            }
+        } else {
+            log::warn!("Failed to load LPR3 components from {}", base_path);
+        }
+    }
+    
+    // Process the components
+    process_lpr_components(&components, config)
 }

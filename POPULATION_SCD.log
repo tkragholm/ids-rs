@@ -1,0 +1,50 @@
+ids-rs on  main [!?⇡] is 📦 v0.1.0 via 🦀 v1.86.0 took 9s
+❯ ./target/debug/ids-rs population-scd --population ../../TEST_OUT/population.parquet --lpr ../../generated_data/parquet/ --output ../../TEST_OUT/ -vv
+[2025-05-02 18:59:33] INFO  CORE [startup]: IDS-RS application starting
+
+Identifying Children with Severe Chronic Disease in Population
+==============================================================
+Population Data: ../../TEST_OUT/population.parquet
+LPR Data: ../../generated_data/parquet/
+Output Directory: ../../TEST_OUT/
+Include LPR2: true
+Include LPR3: true
+[2025-05-02 18:59:33] INFO  CORE : Loading population data from: ../../TEST_OUT/population.parquet
+[2025-05-02 18:59:33] INFO  CORE : Successfully discovered 1 parquet files
+[2025-05-02 18:59:35] INFO  CORE : Loaded 985793 population records
+[2025-05-02 18:59:35] INFO  CORE : Searching for LPR files in: ../../generated_data/parquet/
+[2025-05-02 18:59:35] INFO  LPR  [38dae82d][find_lpr_paths]: Operation started
+[2025-05-02 18:59:35] INFO  LPR  [38dae82d][find_lpr_paths]: LPR paths found: admin=/home/tkragholm/generated_data/parquet/lpr_adm, diag=/home/tkragholm/generated_data/parquet/lpr_diag, proc=/home/tkragholm/generated_data/parquet/lpr_bes, kontakter=None, diagnoser=None, procedurer=None
+[2025-05-02 18:59:35] INFO  LPR  [38dae82d][find_lpr_paths]: Operation completed successfully
+[2025-05-02 18:59:35] INFO  CORE : Found LPR files:
+[2025-05-02 18:59:35] INFO  CORE :   LPR_ADM: /home/tkragholm/generated_data/parquet/lpr_adm
+[2025-05-02 18:59:35] INFO  CORE :   LPR_DIAG: /home/tkragholm/generated_data/parquet/lpr_diag
+[2025-05-02 18:59:35] INFO  CORE :   LPR_BES: /home/tkragholm/generated_data/parquet/lpr_bes
+[2025-05-02 18:59:35] INFO  CORE : Loading LPR data...
+[2025-05-02 18:59:35] INFO  CORE : Loading LPR2 components from ../../generated_data/parquet/
+[2025-05-02 18:59:35] INFO  CORE : [DIAG-990f8449] Loading LPR2 components from '../../generated_data/parquet/'
+[2025-05-02 18:59:35] INFO  LPR  [e6c61b97][find_lpr_paths]: Operation started
+[2025-05-02 18:59:35] INFO  LPR  [e6c61b97][find_lpr_paths]: LPR paths found: admin=/home/tkragholm/generated_data/parquet/lpr_adm, diag=/home/tkragholm/generated_data/parquet/lpr_diag, proc=/home/tkragholm/generated_data/parquet/lpr_bes, kontakter=None, diagnoser=None, procedurer=None
+[2025-05-02 18:59:35] INFO  LPR  [e6c61b97][find_lpr_paths]: Operation completed successfully
+[2025-05-02 18:59:35] INFO  CORE : [DIAG-990f8449] Loading LPR2 admin data from '/home/tkragholm/generated_data/parquet/lpr_adm'
+[2025-05-02 18:59:35] INFO  CORE : [DIAG-990f8449] Successfully registered admin data as table 'lpr2_adm_990f8449'
+[2025-05-02 18:59:36] INFO  CORE : [DIAG-990f8449] Collected 381 admin data batches with 3009472 total records
+[2025-05-02 18:59:36] INFO  LPR  [cache]: Storing LPR2 admin data in cache for path: /home/tkragholm/generated_data/parquet/lpr_adm
+[2025-05-02 18:59:36] INFO  CORE : [DIAG-990f8449] Loading LPR2 diagnosis data from '/home/tkragholm/generated_data/parquet/lpr_diag'
+[2025-05-02 18:59:36] INFO  CORE : [DIAG-990f8449] Successfully registered diagnosis data as table 'lpr2_diag_990f8449'
+[2025-05-02 18:59:36] INFO  CORE : [DIAG-990f8449] Collected 759 diagnosis data batches with 6164145 total records
+[2025-05-02 18:59:36] INFO  LPR  [cache]: Storing LPR2 diag data in cache for path: /home/tkragholm/generated_data/parquet/lpr_diag
+[2025-05-02 18:59:36] INFO  CORE : [DIAG-990f8449] Loading LPR2 procedure data from '/home/tkragholm/generated_data/parquet/lpr_bes'
+[2025-05-02 18:59:36] INFO  CORE : [DIAG-990f8449] Successfully registered procedure data as table 'lpr2_proc_990f8449'
+[2025-05-02 18:59:37] INFO  CORE : [DIAG-990f8449] Collected 759 procedure data batches with 6164280 total records
+[2025-05-02 18:59:37] INFO  LPR  [cache]: Storing LPR2 bes data in cache for path: /home/tkragholm/generated_data/parquet/lpr_bes
+[2025-05-02 18:59:37] INFO  CORE : [DIAG-990f8449] Completed loading LPR2 components
+[2025-05-02 18:59:37] INFO  CORE : Loaded LPR2 admin data
+[2025-05-02 18:59:37] INFO  CORE : Loaded LPR2 diagnosis data
+[2025-05-02 18:59:37] INFO  CORE : Loaded LPR2 procedure data
+[2025-05-02 18:59:37] INFO  CORE : Loading LPR3 components from ../../generated_data/parquet/
+[2025-05-02 18:59:37] INFO  LPR  [47bb35da][find_lpr_paths]: Operation started
+[2025-05-02 18:59:37] INFO  LPR  [47bb35da][find_lpr_paths]: LPR paths found: admin=/home/tkragholm/generated_data/parquet/lpr_adm, diag=/home/tkragholm/generated_data/parquet/lpr_diag, proc=/home/tkragholm/generated_data/parquet/lpr_bes, kontakter=None, diagnoser=None, procedurer=None
+[2025-05-02 18:59:37] INFO  LPR  [47bb35da][find_lpr_paths]: Operation completed successfully
+[2025-05-02 18:59:37] INFO  CORE : Completed loading LPR3 components
+Error: Data error: RECNUM column is not a string array and could not be converted to one (type: Utf8View)

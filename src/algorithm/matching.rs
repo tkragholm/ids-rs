@@ -162,11 +162,13 @@ impl ControlData {
     }
 
     /// Get the length of the control data
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         self.pnrs.len()
     }
 
     /// Check if the control data is empty
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
         self.pnrs.is_empty()
     }
@@ -195,6 +197,7 @@ pub struct Matcher {
 
 impl Matcher {
     // Constants for optimization
+    #[allow(dead_code)]
     const BATCH_SIZE: usize = 1024;
     const PARALLEL_THRESHOLD: usize = 5000; // Threshold for switching to parallel processing
 
@@ -245,6 +248,7 @@ impl Matcher {
     }
 
     /// Build optimized birth date index for faster matching
+    #[allow(dead_code)]
     fn build_birth_date_index(
         &self,
         controls: &[(Pnr, NaiveDate)],
@@ -677,6 +681,7 @@ impl Matcher {
     }
 
     /// Extract PNR and birth date pairs from a `RecordBatch`
+    #[allow(dead_code)]
     fn extract_pnr_and_birth_date(&self, batch: &RecordBatch) -> Result<Vec<(Pnr, NaiveDate)>> {
         let pnr_idx = batch
             .schema()
@@ -717,6 +722,7 @@ impl Matcher {
     }
 
     /// Build a map from PNR to row index for fast lookups
+    #[allow(dead_code)]
     fn build_pnr_index(&self, batch: &RecordBatch) -> Result<FxHashMap<String, usize>> {
         let pnr_idx = batch
             .schema()

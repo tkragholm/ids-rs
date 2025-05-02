@@ -1,0 +1,737 @@
+ids-rs on  main [!?⇡] is 📦 v0.1.0 via 🦀 v1.86.0 took 13s
+❯ ./target/debug/ids-rs population --bef ../../generated_data/parquet/bef --mfr ../../generated_data/parquet/mfr --output ../../TEST_OUT -vvv
+[2025-05-02 17:26:53] INFO  CORE [startup]: IDS-RS application starting
+[2025-05-02 17:26:53] DEBUG CLI  [init]: Log level set to: DEBUG
+
+Generating Population Data
+==========================
+BEF Data: ../../generated_data/parquet/bef
+MFR Data: ../../generated_data/parquet/mfr
+Output Directory: ../../TEST_OUT
+Birth Year Range: 1995 - 2018
+[2025-05-02 17:26:53] INFO  CORE : Starting population generation
+[2025-05-02 17:26:53] INFO  CORE : Reading BEF data from: "../../generated_data/parquet/bef"
+[2025-05-02 17:26:53] DEBUG CORE : crypto functions disabled
+[2025-05-02 17:26:53] DEBUG CORE : Parsing sql 'bef'...
+[2025-05-02 17:26:53] DEBUG CORE : Parsing sql 'bef'...
+[2025-05-02 17:26:53] DEBUG CORE : resolve_grouping_function:
+TableScan: bef
+
+[2025-05-02 17:26:53] DEBUG CORE : type_coercion:
+TableScan: bef
+
+[2025-05-02 17:26:53] DEBUG CORE : Final analyzed plan:
+TableScan: bef
+
+[2025-05-02 17:26:53] DEBUG CORE : Analyzer took 0 ms
+[2025-05-02 17:26:53] DEBUG CORE : Optimizer input (pass 0):
+TableScan: bef
+
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_nested_union' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'simplify_expressions' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'replace_distinct_aggregate' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_join' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'decorrelate_predicate_subquery' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'scalar_subquery_to_join' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'extract_equijoin_predicate' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_duplicated_expr' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_filter' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_cross_join' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_limit' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'propagate_empty_relation' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_one_union' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'filter_null_join_keys' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_outer_join' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_limit' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_filter' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'single_distinct_aggregation_to_group_by' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_group_by_constant' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'common_sub_expression_eliminate' (pass 0)
+[2025-05-02 17:26:53] DEBUG CORE : optimize_projections:
+TableScan: bef projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE,FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION]
+
+[2025-05-02 17:26:53] DEBUG CORE : Optimized plan (pass 0):
+TableScan: bef projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE,FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION]
+
+[2025-05-02 17:26:53] DEBUG CORE : Optimizer input (pass 1):
+TableScan: bef projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE,FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION]
+
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_nested_union' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'simplify_expressions' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'replace_distinct_aggregate' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_join' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'decorrelate_predicate_subquery' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'scalar_subquery_to_join' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'extract_equijoin_predicate' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_duplicated_expr' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_filter' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_cross_join' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_limit' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'propagate_empty_relation' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_one_union' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'filter_null_join_keys' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_outer_join' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_limit' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_filter' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'single_distinct_aggregation_to_group_by' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_group_by_constant' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : Plan unchanged by optimizer rule 'common_sub_expression_eliminate' (pass 1)
+[2025-05-02 17:26:53] DEBUG CORE : optimize_projections:
+TableScan: bef projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE,FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION]
+
+[2025-05-02 17:26:53] DEBUG CORE : Optimized plan (pass 1):
+TableScan: bef projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE,FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION]
+
+[2025-05-02 17:26:53] DEBUG CORE : optimizer pass 1 did not make changes
+[2025-05-02 17:26:53] DEBUG CORE : Final optimized plan:
+TableScan: bef projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE,FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION]
+
+[2025-05-02 17:26:53] DEBUG CORE : Optimizer took 2 ms
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTJEK' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'CPRTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'E_FAELLE_ID' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'HUSTYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'IE_TYPE' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'OPR_LAND' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'PLADS' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'REG' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Failed to create statistics converter: Arrow: Column 'VERSION' not found in schema for statistics conversion
+[2025-05-02 17:26:53] DEBUG CORE : Input physical plan:
+DataSourceExec: file_groups={12 groups: [[home/tkragholm/generated_data/parquet/bef/200012.parquet, home/tkragholm/generated_data/parquet/bef/200112.parquet, home/tkragholm/generated_data/parquet/bef/200212.parquet], [home/tkragholm/generated_data/parquet/bef/200312.parquet, home/tkragholm/generated_data/parquet/bef/200412.parquet, home/tkragholm/generated_data/parquet/bef/200512.parquet], [home/tkragholm/generated_data/parquet/bef/200612.parquet, home/tkragholm/generated_data/parquet/bef/200712.parquet, home/tkragholm/generated_data/parquet/bef/200812.parquet], [home/tkragholm/generated_data/parquet/bef/200912.parquet, home/tkragholm/generated_data/parquet/bef/201012.parquet, home/tkragholm/generated_data/parquet/bef/201112.parquet], [home/tkragholm/generated_data/parquet/bef/201212.parquet, home/tkragholm/generated_data/parquet/bef/201312.parquet, home/tkragholm/generated_data/parquet/bef/201412.parquet], ...]}, projection=[PNR, FOED_DAG,FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE, FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION], file_type=parquet
+
+
+[2025-05-02 17:26:53] DEBUG CORE : Optimized physical plan:
+DataSourceExec: file_groups={12 groups: [[home/tkragholm/generated_data/parquet/bef/200012.parquet:0..7185654, home/tkragholm/generated_data/parquet/bef/200112.parquet:0..7320742, home/tkragholm/generated_data/parquet/bef/200212.parquet:0..7449205, home/tkragholm/generated_data/parquet/bef/200312.parquet:0..1982519], [home/tkragholm/generated_data/parquet/bef/200312.parquet:1982519..7579093, home/tkragholm/generated_data/parquet/bef/200412.parquet:0..7708425, home/tkragholm/generated_data/parquet/bef/200512.parquet:0..7841529, home/tkragholm/generated_data/parquet/bef/200612.parquet:0..2791592], [home/tkragholm/generated_data/parquet/bef/200612.parquet:2791592..7976128, home/tkragholm/generated_data/parquet/bef/200712.parquet:0..8104665, home/tkragholm/generated_data/parquet/bef/200812.parquet:0..8237015, home/tkragholm/generated_data/parquet/bef/200912.parquet:0..2411904], [home/tkragholm/generated_data/parquet/bef/200912.parquet:2411904..8379379, home/tkragholm/generated_data/parquet/bef/201012.parquet:0..8386069, home/tkragholm/generated_data/parquet/bef/201112.parquet:0..8379608, home/tkragholm/generated_data/parquet/bef/201212.parquet:0..1204968], [home/tkragholm/generated_data/parquet/bef/201212.parquet:1204968..8379386, home/tkragholm/generated_data/parquet/bef/201312.parquet:0..8388068, home/tkragholm/generated_data/parquet/bef/201412.parquet:0..8375634], ...]}, projection=[PNR, FOED_DAG, FAR_ID, MOR_ID, FAMILIE_ID, AEGTE_ID, ALDER, ANTBOERNF, ANTBOERNH, ANTPERSF, ANTPERSH, BOP_VFRA, CIVST, CPRTJEK, CPRTYPE, E_FAELLE_ID, FAMILIE_TYPE, FM_MARK, HUSTYPE, IE_TYPE, KOEN, KOM, OPR_LAND, PLADS, REG, STATSB, VERSION], file_type=parquet
+
+
+[2025-05-02 17:27:00] INFO  CORE : Found 752 BEF batches
+[2025-05-02 17:27:01] INFO  CORE : Loaded 5992565 rows from BEF data
+[2025-05-02 17:27:01] INFO  CORE : Reading MFR data from: "../../generated_data/parquet/mfr"
+[2025-05-02 17:27:01] DEBUG CORE : crypto functions disabled
+[2025-05-02 17:27:01] DEBUG CORE : Parsing sql 'mfr'...
+[2025-05-02 17:27:01] DEBUG CORE : Parsing sql 'mfr'...
+[2025-05-02 17:27:01] DEBUG CORE : resolve_grouping_function:
+TableScan: mfr
+
+[2025-05-02 17:27:01] DEBUG CORE : type_coercion:
+TableScan: mfr
+
+[2025-05-02 17:27:01] DEBUG CORE : Final analyzed plan:
+TableScan: mfr
+
+[2025-05-02 17:27:01] DEBUG CORE : Analyzer took 0 ms
+[2025-05-02 17:27:01] DEBUG CORE : Optimizer input (pass 0):
+TableScan: mfr
+
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_nested_union' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'simplify_expressions' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'replace_distinct_aggregate' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_join' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'decorrelate_predicate_subquery' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'scalar_subquery_to_join' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'extract_equijoin_predicate' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_duplicated_expr' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_filter' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_cross_join' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_limit' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'propagate_empty_relation' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_one_union' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'filter_null_join_keys' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_outer_join' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_limit' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_filter' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'single_distinct_aggregation_to_group_by' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_group_by_constant' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'common_sub_expression_eliminate' (pass 0)
+[2025-05-02 17:27:01] DEBUG CORE : optimize_projections:
+TableScan: mfr projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER]
+
+[2025-05-02 17:27:01] DEBUG CORE : Optimized plan (pass 0):
+TableScan: mfr projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER]
+
+[2025-05-02 17:27:01] DEBUG CORE : Optimizer input (pass 1):
+TableScan: mfr projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER]
+
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_nested_union' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'simplify_expressions' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'replace_distinct_aggregate' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_join' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'decorrelate_predicate_subquery' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'scalar_subquery_to_join' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'extract_equijoin_predicate' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_duplicated_expr' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_filter' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_cross_join' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_limit' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'propagate_empty_relation' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_one_union' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'filter_null_join_keys' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_outer_join' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_limit' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_filter' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'single_distinct_aggregation_to_group_by' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_group_by_constant' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : Plan unchanged by optimizer rule 'common_sub_expression_eliminate' (pass 1)
+[2025-05-02 17:27:01] DEBUG CORE : optimize_projections:
+TableScan: mfr projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER]
+
+[2025-05-02 17:27:01] DEBUG CORE : Optimized plan (pass 1):
+TableScan: mfr projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER]
+
+[2025-05-02 17:27:01] DEBUG CORE : optimizer pass 1 did not make changes
+[2025-05-02 17:27:01] DEBUG CORE : Final optimized plan:
+TableScan: mfr projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER]
+
+[2025-05-02 17:27:01] DEBUG CORE : Optimizer took 1 ms
+[2025-05-02 17:27:01] DEBUG CORE : Input physical plan:
+DataSourceExec: file_groups={12 groups: [[home/tkragholm/generated_data/parquet/mfr/2000.parquet, home/tkragholm/generated_data/parquet/mfr/2001.parquet], [home/tkragholm/generated_data/parquet/mfr/2002.parquet, home/tkragholm/generated_data/parquet/mfr/2003.parquet], [home/tkragholm/generated_data/parquet/mfr/2004.parquet, home/tkragholm/generated_data/parquet/mfr/2005.parquet], [home/tkragholm/generated_data/parquet/mfr/2006.parquet, home/tkragholm/generated_data/parquet/mfr/2007.parquet], [home/tkragholm/generated_data/parquet/mfr/2008.parquet, home/tkragholm/generated_data/parquet/mfr/2009.parquet], ...]}, projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER], file_type=parquet
+
+
+[2025-05-02 17:27:01] DEBUG CORE : Optimized physical plan:
+DataSourceExec: file_groups={12 groups: [[home/tkragholm/generated_data/parquet/mfr/2000.parquet:0..1883668, home/tkragholm/generated_data/parquet/mfr/2001.parquet:0..1732281], [home/tkragholm/generated_data/parquet/mfr/2001.parquet:1732281..1882254, home/tkragholm/generated_data/parquet/mfr/2002.parquet:0..1881511, home/tkragholm/generated_data/parquet/mfr/2003.parquet:0..1584465], [home/tkragholm/generated_data/parquet/mfr/2003.parquet:1584465..1882164, home/tkragholm/generated_data/parquet/mfr/2004.parquet:0..1884553, home/tkragholm/generated_data/parquet/mfr/2005.parquet:0..1433697], [home/tkragholm/generated_data/parquet/mfr/2005.parquet:1433697..1881454, home/tkragholm/generated_data/parquet/mfr/2006.parquet:0..1884682, home/tkragholm/generated_data/parquet/mfr/2007.parquet:0..1283510], [home/tkragholm/generated_data/parquet/mfr/2007.parquet:1283510..1882823, home/tkragholm/generated_data/parquet/mfr/2008.parquet:0..1882649, home/tkragholm/generated_data/parquet/mfr/2009.parquet:0..1133987], ...]}, projection=[CPR_BARN, FOEDSELSDATO, CPR_MODER, CPR_FADER], file_type=parquet
+
+
+[2025-05-02 17:27:01] INFO  CORE : Found 161 MFR batches
+[2025-05-02 17:27:01] INFO  CORE : Loaded 1149413 rows from MFR data
+[2025-05-02 17:27:01] INFO  CORE : Generating population data
+[2025-05-02 17:27:04] INFO  CORE : BEF birth year distribution:
+[2025-05-02 17:27:04] INFO  CORE :  - 1950: 103565 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1951: 102025 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1952: 103530 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1953: 101465 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1954: 104930 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1955: 102550 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1956: 105770 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1957: 101710 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1958: 101920 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1959: 104055 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1960: 102270 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1961: 100415 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1962: 103880 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1963: 100590 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1964: 103985 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1965: 102130 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1966: 104475 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1967: 100660 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1968: 101010 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1969: 104475 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1970: 101115 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1971: 103145 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1972: 104510 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1973: 101885 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1974: 102235 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1975: 101955 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1976: 102865 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1977: 101360 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1978: 101045 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1979: 102690 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1980: 103985 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1981: 102340 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1982: 98735 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1983: 101255 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1984: 103250 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1985: 104895 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1986: 103145 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1987: 100835 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1988: 101710 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1989: 99295 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1990: 102305 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1991: 100520 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1992: 102585 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1993: 103600 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1994: 100940 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1995: 100310 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1996: 102760 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1997: 98105 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1998: 101885 records
+[2025-05-02 17:27:04] INFO  CORE :  - 1999: 101535 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2000: 101936 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2001: 97212 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2002: 94524 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2003: 93197 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2004: 89614 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2005: 86338 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2006: 83301 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2007: 81313 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2008: 79055 records
+[2025-05-02 17:27:04] INFO  CORE :  - 2009: 73870 records
+[2025-05-02 17:27:04] INFO  CORE : BEF null date values: 0
+[2025-05-02 17:27:04] INFO  CORE : BEF invalid date values: 0
+[2025-05-02 17:27:05] INFO  CORE : BEF valid PNR count: 5992565/5992565
+[2025-05-02 17:27:05] INFO  CORE : MFR birth year distribution:
+[2025-05-02 17:27:05] INFO  CORE :  - 2000: 50000 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2001: 49969 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2002: 49965 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2003: 49965 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2004: 50000 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2005: 49967 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2006: 49954 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2007: 49964 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2008: 50000 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2009: 49959 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2010: 49958 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2011: 49969 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2012: 50000 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2013: 49968 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2014: 49963 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2015: 49968 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2016: 50000 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2017: 49970 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2018: 49973 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2019: 49971 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2020: 50000 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2021: 49966 records
+[2025-05-02 17:27:05] INFO  CORE :  - 2022: 49964 records
+[2025-05-02 17:27:05] INFO  CORE : MFR null date values: 0
+[2025-05-02 17:27:05] INFO  CORE : MFR invalid date values: 0
+[2025-05-02 17:27:05] INFO  CORE : MFR valid PNR count: 1149413/1149413
+[2025-05-02 17:27:05] INFO  CORE : BEF data before filtering: 5992565 rows, year range: 1995 to 2018
+[2025-05-02 17:27:09] INFO  CORE : BEF data after filtering: 1384955 rows
+[2025-05-02 17:27:09] INFO  CORE : MFR data before filtering: 1149413 rows, year range: 1995 to 2018
+[2025-05-02 17:27:09] INFO  CORE : MFR data after filtering: 949512 rows
+[2025-05-02 17:27:09] INFO  CORE : Combining data: 1384955 BEF records, 949512 MFR records
+[2025-05-02 17:27:12] INFO  CORE : PNR set sizes: BEF=43334, MFR=942459
+[2025-05-02 17:27:12] INFO  CORE : Records only in BEF: 43334, only in MFR: 942459
+[2025-05-02 17:27:12] INFO  CORE : Total unique PNRs after combining: 985793
+[2025-05-02 17:27:12] DEBUG CORE : Creating indexes for faster PNR lookup
+[2025-05-02 17:27:14] DEBUG CORE : Created indexes: BEF index size: 43334, MFR index size: 942459
+[2025-05-02 17:27:14] DEBUG CORE : Processing 985793 unique PNRs
+[2025-05-02 17:27:18] INFO  CORE : Processing parent data from 5992565 BEF records
+[2025-05-02 17:27:18] DEBUG CORE : Building parent map for 5992565 records
+[2025-05-02 17:27:21] DEBUG CORE : Processed parent data: 10.0% complete (60/600 chunks)
+[2025-05-02 17:27:24] DEBUG CORE : Processed parent data: 20.0% complete (120/600 chunks)
+[2025-05-02 17:27:27] DEBUG CORE : Processed parent data: 30.0% complete (180/600 chunks)
+[2025-05-02 17:27:30] DEBUG CORE : Processed parent data: 40.0% complete (240/600 chunks)
+[2025-05-02 17:27:32] DEBUG CORE : Processed parent data: 50.0% complete (300/600 chunks)
+[2025-05-02 17:27:35] DEBUG CORE : Processed parent data: 60.0% complete (360/600 chunks)
+[2025-05-02 17:27:38] DEBUG CORE : Processed parent data: 70.0% complete (420/600 chunks)
+[2025-05-02 17:27:41] DEBUG CORE : Processed parent data: 80.0% complete (480/600 chunks)
+[2025-05-02 17:27:44] DEBUG CORE : Processed parent data: 90.0% complete (540/600 chunks)
+[2025-05-02 17:27:46] DEBUG CORE : Processed parent data: 100.0% complete (600/600 chunks)
+[2025-05-02 17:27:46] INFO  CORE : Processed 5992565 parent records: 5992565 with valid dates, 0 with missing dates, 0 empty PNRs, 0 null PNRs
+[2025-05-02 17:27:46] INFO  CORE : Parent map size: 174929 unique parents
+[2025-05-02 17:27:46] INFO  CORE : Creating family data from 985793 children records and 174929 parent records
+[2025-05-02 17:27:58] INFO  CORE : Processed 985793 valid children records, 0 had errors
+[2025-05-02 17:27:59] INFO  CORE : Created family data with 985793 records
+[2025-05-02 17:28:01] INFO  CORE : Population Summary:
+[2025-05-02 17:28:01] INFO  CORE :  - Total BEF records: 1384955
+[2025-05-02 17:28:01] INFO  CORE :  - Total MFR records: 949512
+[2025-05-02 17:28:01] INFO  CORE :  - BEF missing father: 0
+[2025-05-02 17:28:01] INFO  CORE :  - BEF missing mother: 0
+[2025-05-02 17:28:01] INFO  CORE :  - MFR missing father: 0
+[2025-05-02 17:28:01] INFO  CORE :  - MFR missing mother: 0
+[2025-05-02 17:28:01] INFO  CORE :  - Records only in BEF: 43334
+[2025-05-02 17:28:01] INFO  CORE :  - Records only in MFR: 942459
+[2025-05-02 17:28:01] INFO  CORE :  - Total combined records: 985793
+[2025-05-02 17:28:01] INFO  CORE :  - Combined missing father: 0
+[2025-05-02 17:28:01] INFO  CORE :  - Combined missing mother: 0
+[2025-05-02 17:28:01] INFO  CORE : Generated population data with 985793 records
+[2025-05-02 17:28:01] INFO  CORE : Saving population data to: "../../TEST_OUT/population.parquet"
+[2025-05-02 17:28:01] DEBUG CORE : crypto functions disabled
+[2025-05-02 17:28:01] DEBUG CORE : Parsing sql 'population_data'...
+[2025-05-02 17:28:01] DEBUG CORE : resolve_grouping_function:
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data
+
+[2025-05-02 17:28:01] DEBUG CORE : type_coercion:
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data
+
+[2025-05-02 17:28:01] DEBUG CORE : Final analyzed plan:
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data
+
+[2025-05-02 17:28:01] DEBUG CORE : Analyzer took 0 ms
+[2025-05-02 17:28:01] DEBUG CORE : Optimizer input (pass 0):
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data
+
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_nested_union' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'simplify_expressions' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'replace_distinct_aggregate' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_join' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'decorrelate_predicate_subquery' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'scalar_subquery_to_join' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'extract_equijoin_predicate' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_duplicated_expr' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_filter' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_cross_join' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_limit' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'propagate_empty_relation' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_one_union' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'filter_null_join_keys' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_outer_join' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_limit' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_filter' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'single_distinct_aggregation_to_group_by' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_group_by_constant' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'common_sub_expression_eliminate' (pass 0)
+[2025-05-02 17:28:01] DEBUG CORE : optimize_projections:
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data projection=[PNR, FOED_DAG, FAR_ID, FAR_FDAG, MOR_ID, MOR_FDAG, FAMILIE_ID]
+
+[2025-05-02 17:28:01] DEBUG CORE : Optimized plan (pass 0):
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data projection=[PNR, FOED_DAG, FAR_ID, FAR_FDAG, MOR_ID, MOR_FDAG, FAMILIE_ID]
+
+[2025-05-02 17:28:01] DEBUG CORE : Optimizer input (pass 1):
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data projection=[PNR, FOED_DAG, FAR_ID, FAR_FDAG, MOR_ID, MOR_FDAG, FAMILIE_ID]
+
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_nested_union' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'simplify_expressions' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'replace_distinct_aggregate' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_join' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'decorrelate_predicate_subquery' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'scalar_subquery_to_join' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'extract_equijoin_predicate' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_duplicated_expr' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_filter' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_cross_join' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_limit' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'propagate_empty_relation' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_one_union' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'filter_null_join_keys' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_outer_join' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_limit' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'push_down_filter' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'single_distinct_aggregation_to_group_by' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'eliminate_group_by_constant' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : Plan unchanged by optimizer rule 'common_sub_expression_eliminate' (pass 1)
+[2025-05-02 17:28:01] DEBUG CORE : optimize_projections:
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data projection=[PNR, FOED_DAG, FAR_ID, FAR_FDAG, MOR_ID, MOR_FDAG, FAMILIE_ID]
+
+[2025-05-02 17:28:01] DEBUG CORE : Optimized plan (pass 1):
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data projection=[PNR, FOED_DAG, FAR_ID, FAR_FDAG, MOR_ID, MOR_FDAG, FAMILIE_ID]
+
+[2025-05-02 17:28:01] DEBUG CORE : optimizer pass 1 did not make changes
+[2025-05-02 17:28:01] DEBUG CORE : Final optimized plan:
+CopyTo: format=parquet output_url=../../TEST_OUT/population.parquet options: ()
+  TableScan: population_data projection=[PNR, FOED_DAG, FAR_ID, FAR_FDAG, MOR_ID, MOR_FDAG, FAMILIE_ID]
+
+[2025-05-02 17:28:01] DEBUG CORE : Optimizer took 1 ms
+[2025-05-02 17:28:01] DEBUG CORE : Input physical plan:
+DataSinkExec: sink=ParquetSink(file_groups=[])
+  DataSourceExec: partitions=1, partition_sizes=[1]
+
+
+[2025-05-02 17:28:01] DEBUG CORE : Optimized physical plan:
+DataSinkExec: sink=ParquetSink(file_groups=[])
+  DataSourceExec: partitions=1, partition_sizes=[1]
+
+
+[2025-05-02 17:28:02] INFO  CORE : Saving summary reports to: "../../TEST_OUT/reports"
+[2025-05-02 17:28:03] DEBUG CORE : Processing birth date distribution: 20% complete
+[2025-05-02 17:28:03] DEBUG CORE : Processing birth date distribution: 40% complete
+[2025-05-02 17:28:03] DEBUG CORE : Processing birth date distribution: 60% complete
+[2025-05-02 17:28:03] DEBUG CORE : Processing birth date distribution: 80% complete
+[2025-05-02 17:28:03] INFO  CORE : Population generation completed successfully
+✓ Population generation completed

@@ -673,11 +673,12 @@ impl Cli {
     pub fn run() -> Result<()> {
         let cli = Self::parse();
 
-        // Initialize logger with verbosity from CLI
+        // Set the log level based on CLI verbosity
+        // Note: We already initialized logging in main.rs, but we'll update the level here
         let log_level = cli.verbose.log_level_filter();
-        env_logger::Builder::new().filter_level(log_level).init();
-
-        log::debug!("Log level set to: {log_level}");
+        log::set_max_level(log_level);
+        
+        crate::debug_log!(crate::utils::logging::Component::Cli, "init", "Log level set to: {}", log_level);
 
         match cli.command {
             Commands::Sample(args) => {

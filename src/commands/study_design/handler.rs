@@ -237,6 +237,7 @@ fn extract_controls(population_data: &RecordBatch) -> Result<RecordBatch> {
 }
 
 /// Extract PNR and birth date pairs from a `RecordBatch`
+#[allow(dead_code)]
 fn extract_pnr_and_birth_date(batch: &RecordBatch) -> Result<Vec<(Pnr, NaiveDate)>> {
     let pnr_idx = batch
         .schema()
@@ -275,6 +276,7 @@ fn extract_pnr_and_birth_date(batch: &RecordBatch) -> Result<Vec<(Pnr, NaiveDate
 }
 
 /// Find eligible controls for a case
+#[allow(dead_code)]
 fn find_eligible_controls(
     case_pnr: &Pnr,
     case_birth_date: NaiveDate,
@@ -305,6 +307,7 @@ fn find_eligible_controls(
 }
 
 /// Find a record by PNR in a `RecordBatch`
+#[allow(dead_code)]
 fn find_record_by_pnr(batch: &RecordBatch, pnr: &Pnr) -> Result<RecordBatch> {
     let pnr_idx = batch
         .schema()
@@ -353,6 +356,7 @@ fn find_record_by_pnr(batch: &RecordBatch, pnr: &Pnr) -> Result<RecordBatch> {
 }
 
 /// Perform matching between cases and controls
+#[allow(dead_code)]
 fn perform_matching(
     cases: &RecordBatch,
     controls: &RecordBatch,
@@ -621,6 +625,7 @@ fn perform_matching(
 }
 
 /// Combines multiple record batches into a single batch
+#[allow(dead_code)]
 fn combine_record_batches(batches: &[RecordBatch]) -> Result<RecordBatch> {
     // If empty, return an error
     if batches.is_empty() {

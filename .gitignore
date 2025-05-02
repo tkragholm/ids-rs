@@ -8,7 +8,6 @@ Cargo.lock
 STUDY.md
 CLAUDE.md
 .DS_Store
-/docs
 /.claude
 /.venv
 /TODO

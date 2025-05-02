@@ -36,6 +36,7 @@ pub struct LprTableProvider {
     /// Schema
     schema: SchemaRef,
     /// PNR filter
+    #[allow(dead_code)]
     pnr_filter: Option<HashSet<String>>,
 }
 
@@ -102,14 +103,19 @@ impl LprTableProvider {
 fn find_parquet_files(dir: &PathBuf) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
-    if !dir.exists() || !dir.is_dir() {
+    // Resolve to absolute path
+    let abs_dir = crate::utils::path_utils::resolve_path(dir)?;
+    log::debug!("Finding parquet files in directory: {}", abs_dir.display());
+    
+    if !abs_dir.exists() || !abs_dir.is_dir() {
+        log::warn!("Directory does not exist or is not a directory: {}", abs_dir.display());
         return Ok(files);
     }
 
-    for entry_result in fs::read_dir(dir).map_err(|e| {
+    for entry_result in fs::read_dir(&abs_dir).map_err(|e| {
         IdsError::Io(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
-            format!("Failed to read directory {}: {}", dir.display(), e),
+            format!("Failed to read directory {}: {}", abs_dir.display(), e),
         ))
     })? {
         let entry = entry_result.map_err(|e| {
@@ -121,8 +127,15 @@ fn find_parquet_files(dir: &PathBuf) -> Result<Vec<PathBuf>> {
 
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
+            log::debug!("Found parquet file: {}", path.display());
             files.push(path);
         }
+    }
+
+    if files.is_empty() {
+        log::warn!("No parquet files found in directory: {}", abs_dir.display());
+    } else {
+        log::info!("Found {} parquet files in {}", files.len(), abs_dir.display());
     }
 
     Ok(files)

@@ -6,10 +6,9 @@ use log::info;
 use std::fs;
 
 use crate::algorithm::population::classification::{
-    extract_scd_children, process_lpr_and_identify_scd, PopulationScdConfig,
+    extract_scd_children, identify_scd_in_population, PopulationScdConfig,
 };
 use crate::data::registry::loaders::lpr::find_lpr_files;
-use crate::data::registry::traits::RegisterLoader;
 use crate::error::{IdsError, Result};
 use crate::utils::reports::write_csv_report;
 use crate::utils::runtime::get_runtime;
@@ -76,106 +75,34 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
         info!("  LPR3_DIAGNOSER: {}", path.display());
     }
 
-    // Step 3: Load LPR data
+    // Step 3: Load LPR data using the new optimized approach
     info!("Loading LPR data...");
 
-    // LPR2 data
-    let mut lpr2_adm = None;
-    let mut lpr2_diag = None;
-    let mut lpr2_bes = None;
-
-    if config.include_lpr2 {
-        if let Some(path) = &lpr_paths.admin_path {
-            info!("Loading LPR_ADM data...");
-            // Create a Lpr2Register from RegistryFactory
-            let adm_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
-            // Use the shared tokio runtime
-            let adm_data = runtime.block_on(async {
-                let loader = adm_loader
-                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
-                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
-                loader.load(path.to_str().unwrap(), None).await
-            })?;
-            let adm_batch_count = adm_data.len();
-            lpr2_adm = Some(adm_data);
-            info!("Loaded {adm_batch_count} LPR_ADM batches");
-        }
-
-        if let Some(path) = &lpr_paths.diag_path {
-            info!("Loading LPR_DIAG data...");
-            // Create a Lpr2Register from RegistryFactory
-            let diag_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
-            // Use the shared tokio runtime
-            let diag_data = runtime.block_on(async {
-                let loader = diag_loader
-                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
-                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
-                loader.load(path.to_str().unwrap(), None).await
-            })?;
-            let diag_batch_count = diag_data.len();
-            lpr2_diag = Some(diag_data);
-            info!("Loaded {diag_batch_count} LPR_DIAG batches");
-        }
-
-        if let Some(path) = &lpr_paths.proc_path {
-            info!("Loading LPR_BES data...");
-            // Create a Lpr2Register from RegistryFactory
-            let bes_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
-            // Use the shared tokio runtime
-            let bes_data = runtime.block_on(async {
-                let loader = bes_loader
-                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
-                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
-                loader.load(path.to_str().unwrap(), None).await
-            })?;
-            let bes_batch_count = bes_data.len();
-            lpr2_bes = Some(bes_data);
-            info!("Loaded {bes_batch_count} LPR_BES batches");
-        }
-    }
-
-    // LPR3 data
-    let mut lpr3_kontakter = None;
-    let mut lpr3_diagnoser = None;
-
-    if config.include_lpr3 {
-        if let Some(path) = &lpr_paths.kontakter_path {
-            info!("Loading LPR3_KONTAKTER data...");
-            // Create a Lpr3Register from RegistryFactory
-            let kontakter_loader =
-                crate::data::registry::factory::RegistryFactory::from_name("lpr3")?;
-            // Use the shared tokio runtime
-            let kontakter_data = runtime.block_on(async {
-                let loader = kontakter_loader
-                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
-                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
-                loader.load(path.to_str().unwrap(), None).await
-            })?;
-            let kontakter_batch_count = kontakter_data.len();
-            lpr3_kontakter = Some(kontakter_data);
-            info!("Loaded {kontakter_batch_count} LPR3_KONTAKTER batches");
-        }
-
-        if let Some(path) = &lpr_paths.diagnoser_path {
-            info!("Loading LPR3_DIAGNOSER data...");
-            // Create a Lpr3Register from RegistryFactory
-            let diagnoser_loader =
-                crate::data::registry::factory::RegistryFactory::from_name("lpr3")?;
-            // Use the shared tokio runtime
-            let diagnoser_data = runtime.block_on(async {
-                let loader = diagnoser_loader
-                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
-                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
-                loader.load(path.to_str().unwrap(), None).await
-            })?;
-            let diagnoser_batch_count = diagnoser_data.len();
-            lpr3_diagnoser = Some(diagnoser_data);
-            info!("Loaded {diagnoser_batch_count} LPR3_DIAGNOSER batches");
-        }
-    }
-
+    // Create LPR config
+    let lpr_config = crate::algorithm::health::lpr::LprConfig {
+        include_lpr2: config.include_lpr2,
+        include_lpr3: config.include_lpr3,
+        start_date: config.start_date,
+        end_date: config.end_date,
+    };
+    
+    // Load and process LPR data in a single call
+    // This avoids loading the same component (like lpr_adm) multiple times
+    let lpr_data = runtime.block_on(async {
+        crate::algorithm::health::lpr::load_and_process_lpr(
+            config.lpr_data_path.to_str().unwrap(),
+            &lpr_config,
+            None, // No PNR filter for now
+        ).await
+    })?;
+    
+    info!("Loaded and processed LPR data with {} records", lpr_data.num_rows());
+    
+    // Now we can skip the step for calling process_lpr_and_identify_scd with individual components
+    // and use the processed LPR data directly
+    
     // Step 4: Process LPR data and identify SCD in population
-    info!("Processing LPR data and identifying SCD in population...");
+    info!("Identifying SCD in population...");
     let scd_config = PopulationScdConfig {
         include_lpr2: config.include_lpr2,
         include_lpr3: config.include_lpr3,
@@ -189,14 +116,11 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
         date_column: "admission_date".to_string(),
         population_pnr_column: "PNR".to_string(),
     };
-
-    let (population_scd_data, scd_summary) = process_lpr_and_identify_scd(
+    
+    // Use the pre-processed LPR data directly
+    let (population_scd_data, scd_summary) = identify_scd_in_population(
         &population_data,
-        lpr2_adm.as_deref(),
-        lpr2_diag.as_deref(),
-        lpr2_bes.as_deref(),
-        lpr3_kontakter.as_deref(),
-        lpr3_diagnoser.as_deref(),
+        &lpr_data,
         &scd_config,
     )?;
 

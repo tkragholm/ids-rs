@@ -1,12 +1,12 @@
-use crate::error::{IdsError, Result};
 use crate::data::filter::FilterBuilder;
+use crate::error::{IdsError, Result};
 
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 
 use datafusion::execution::context::SessionContext;
-use datafusion::prelude::*;
 use datafusion::functions_aggregate::expr_fn::count;
+use datafusion::prelude::*;
 
 use std::sync::Arc;
 
@@ -55,71 +55,84 @@ impl AsyncTransformPipeline {
     }
 
     /// Add a filter operation to the pipeline
-    #[must_use] pub fn add_filter(self, expr: Expr) -> Self {
+    #[must_use]
+    pub fn add_filter(self, expr: Expr) -> Self {
         self.add_operation(FilterOperation::new(expr))
     }
-    
+
     /// Add a filter builder to the pipeline
-    #[must_use] pub fn add_filter_builder(self, builder: FilterBuilder) -> Self {
+    #[must_use]
+    pub fn add_filter_builder(self, builder: FilterBuilder) -> Self {
         self.add_filter(builder.build_and())
     }
 
     /// Add a select operation to the pipeline
-    #[must_use] pub fn add_select(self, columns: Vec<String>) -> Self {
+    #[must_use]
+    pub fn add_select(self, columns: Vec<String>) -> Self {
         self.add_operation(SelectOperation::new(columns))
     }
 
     /// Add a select with str list to the pipeline
-    #[must_use] pub fn add_select_str(self, columns: &[&str]) -> Self {
+    #[must_use]
+    pub fn add_select_str(self, columns: &[&str]) -> Self {
         let columns = columns.iter().map(|s| (*s).to_string()).collect();
         self.add_select(columns)
     }
 
     /// Add an aggregate operation to the pipeline
-    #[must_use] pub fn add_aggregate(self, group_by: Vec<Expr>, aggregates: Vec<Expr>) -> Self {
+    #[must_use]
+    pub fn add_aggregate(self, group_by: Vec<Expr>, aggregates: Vec<Expr>) -> Self {
         self.add_operation(AggregateOperation::new(group_by, aggregates))
     }
-    
+
     /// Add an aggregation with column names as strings
-    #[must_use] pub fn add_aggregate_str(self, group_by: &[&str], aggregates: Vec<Expr>) -> Self {
+    #[must_use]
+    pub fn add_aggregate_str(self, group_by: &[&str], aggregates: Vec<Expr>) -> Self {
         let group_by_exprs = group_by.iter().map(|s| col(*s)).collect();
         self.add_aggregate(group_by_exprs, aggregates)
     }
-    
+
     /// Add a count aggregation
-    #[must_use] pub fn add_count(self, group_by: &[&str]) -> Self {
+    #[must_use]
+    pub fn add_count(self, group_by: &[&str]) -> Self {
         let aggregates = vec![count(lit(1)).alias("count")];
         self.add_aggregate_str(group_by, aggregates)
     }
 
     /// Add a sort operation to the pipeline
-    #[must_use] pub fn add_sort(self, exprs: Vec<Expr>, ascending: Option<Vec<bool>>) -> Self {
+    #[must_use]
+    pub fn add_sort(self, exprs: Vec<Expr>, ascending: Option<Vec<bool>>) -> Self {
         self.add_operation(SortOperation::new(exprs, ascending))
     }
-    
+
     /// Add a sort operation using column names
-    #[must_use] pub fn add_sort_str(self, columns: &[&str], ascending: Option<Vec<bool>>) -> Self {
+    #[must_use]
+    pub fn add_sort_str(self, columns: &[&str], ascending: Option<Vec<bool>>) -> Self {
         let exprs = columns.iter().map(|s| col(*s)).collect();
         self.add_sort(exprs, ascending)
     }
-    
+
     /// Add a simple ascending sort on one column
-    #[must_use] pub fn add_sort_asc(self, column: &str) -> Self {
+    #[must_use]
+    pub fn add_sort_asc(self, column: &str) -> Self {
         self.add_sort_str(&[column], Some(vec![true]))
     }
-    
+
     /// Add a simple descending sort on one column
-    #[must_use] pub fn add_sort_desc(self, column: &str) -> Self {
+    #[must_use]
+    pub fn add_sort_desc(self, column: &str) -> Self {
         self.add_sort_str(&[column], Some(vec![false]))
     }
 
     /// Add a limit operation to the pipeline
-    #[must_use] pub fn add_limit(self, limit: usize) -> Self {
+    #[must_use]
+    pub fn add_limit(self, limit: usize) -> Self {
         self.add_operation(LimitOperation::new(limit))
     }
 
     /// Add a join operation to the pipeline
-    #[must_use] pub fn add_join(
+    #[must_use]
+    pub fn add_join(
         self,
         right_table: String,
         join_type: JoinType,
@@ -135,7 +148,8 @@ impl AsyncTransformPipeline {
     }
 
     /// Add a join operation with str lists to the pipeline
-    #[must_use] pub fn add_join_str(
+    #[must_use]
+    pub fn add_join_str(
         self,
         right_table: &str,
         join_type: JoinType,
@@ -227,7 +241,7 @@ impl TransformPipeline {
             .push(Box::new(move |df| Ok(df.filter(expr.clone())?)));
         self
     }
-    
+
     /// Add a filter builder to the pipeline
     #[must_use]
     pub fn add_filter_builder(self, builder: FilterBuilder) -> Self {
@@ -238,9 +252,8 @@ impl TransformPipeline {
     #[must_use]
     pub fn add_select(mut self, columns: Vec<&str>) -> Self {
         let columns = columns.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
-        self.operations.push(Box::new(move |df| {
-            Ok(df.select(columns.iter().map(col))?)
-        }));
+        self.operations
+            .push(Box::new(move |df| Ok(df.select(columns.iter().map(col))?)));
         self
     }
 
@@ -352,7 +365,8 @@ impl TransformPipeline {
     }
 
     /// Convert to an async transform pipeline
-    #[must_use] pub fn to_async(self) -> AsyncTransformPipeline {
+    #[must_use]
+    pub fn to_async(self) -> AsyncTransformPipeline {
         let mut pipeline = AsyncTransformPipeline::new();
 
         for (i, op) in self.operations.into_iter().enumerate() {
@@ -391,6 +405,7 @@ where
 
 /// Helper function to build a join condition from a list of column pairs
 /// Type parameter Expr is used to make the fold operation type-safe
+#[allow(dead_code)]
 fn build_join_condition(conditions: Vec<(Expr, Expr)>) -> Expr {
     conditions
         .into_iter()
@@ -406,8 +421,7 @@ fn build_join_condition(conditions: Vec<(Expr, Expr)>) -> Expr {
 #[must_use]
 pub fn date_range_transform(start_date: &str, end_date: &str) -> AsyncTransformPipeline {
     // Create a filter builder for the date range
-    let filter_builder = FilterBuilder::new()
-        .with_date_range("DATE", start_date, end_date);
+    let filter_builder = FilterBuilder::new().with_date_range("DATE", start_date, end_date);
 
     // Create year extraction operation
     let year_column =
@@ -423,7 +437,7 @@ pub fn date_range_transform(start_date: &str, end_date: &str) -> AsyncTransformP
 pub fn filter_missing_values(columns: &[&str]) -> AsyncTransformPipeline {
     // Create a filter builder for non-null columns
     let filter_builder = FilterBuilder::new().with_non_null(columns);
-    
+
     // Apply the filter builder to the pipeline
     AsyncTransformPipeline::new().add_filter_builder(filter_builder)
 }
@@ -432,13 +446,13 @@ pub fn filter_missing_values(columns: &[&str]) -> AsyncTransformPipeline {
 pub async fn empty_dataframe(ctx: &SessionContext, schema: SchemaRef) -> Result<DataFrame> {
     // Create an empty record batch
     let empty_batch = RecordBatch::new_empty(schema.clone());
-    
+
     // Create a memory table directly with the empty batch
     let provider = datafusion::datasource::MemTable::try_new(schema, vec![vec![empty_batch]])?;
-    
+
     // Create a dataframe directly without registering a table
     let df = ctx.read_table(Arc::new(provider))?;
-    
+
     Ok(df)
 }
 
@@ -470,7 +484,8 @@ pub struct FilterOperation {
 
 impl FilterOperation {
     /// Create a new filter operation
-    #[must_use] pub fn new(expr: Expr) -> Self {
+    #[must_use]
+    pub fn new(expr: Expr) -> Self {
         Self { expr }
     }
 }
@@ -493,7 +508,8 @@ pub struct SelectOperation {
 
 impl SelectOperation {
     /// Create a new select operation
-    #[must_use] pub fn new(columns: Vec<String>) -> Self {
+    #[must_use]
+    pub fn new(columns: Vec<String>) -> Self {
         Self { columns }
     }
 }
@@ -517,7 +533,8 @@ pub struct AggregateOperation {
 
 impl AggregateOperation {
     /// Create a new aggregate operation
-    #[must_use] pub fn new(group_by: Vec<Expr>, aggregates: Vec<Expr>) -> Self {
+    #[must_use]
+    pub fn new(group_by: Vec<Expr>, aggregates: Vec<Expr>) -> Self {
         Self {
             group_by,
             aggregates,
@@ -544,7 +561,8 @@ pub struct SortOperation {
 
 impl SortOperation {
     /// Create a new sort operation
-    #[must_use] pub fn new(exprs: Vec<Expr>, ascending: Option<Vec<bool>>) -> Self {
+    #[must_use]
+    pub fn new(exprs: Vec<Expr>, ascending: Option<Vec<bool>>) -> Self {
         Self { exprs, ascending }
     }
 }
@@ -591,7 +609,8 @@ pub struct LimitOperation {
 
 impl LimitOperation {
     /// Create a new limit operation
-    #[must_use] pub fn new(limit: usize) -> Self {
+    #[must_use]
+    pub fn new(limit: usize) -> Self {
         Self { limit }
     }
 }
@@ -608,6 +627,7 @@ impl AsyncDataFrameOperation for LimitOperation {
 }
 
 /// Operation that joins a `DataFrame` with another table
+#[allow(dead_code)]
 pub struct JoinOperation {
     right_table: String,
     join_type: JoinType,
@@ -617,7 +637,8 @@ pub struct JoinOperation {
 
 impl JoinOperation {
     /// Create a new join operation
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         right_table: String,
         join_type: JoinType,
         left_cols: Vec<String>,
@@ -640,7 +661,7 @@ impl AsyncDataFrameOperation for JoinOperation {
         // This is just a stub - the JoinOperation requires modification for DataFusion 47.0.0
         // We'll need to update this to accept a context reference in the constructor
         Err(IdsError::Validation("JoinOperation requires a context reference for DataFusion 47.0.0. Operation needs to be modified.".to_string()))
-        
+
         // Notes: Implementation would look like:
         // 1. Get the right dataframe: ctx.table(&self.right_table).await?
         // 2. Create join conditions for each pair of columns
@@ -681,6 +702,8 @@ impl AsyncDataFrameOperation for AddColumnOperation {
 }
 
 /// Operation that adds SQL execution to the pipeline
+
+#[allow(dead_code)]
 pub struct SqlOperation {
     sql: String,
     temp_table_name: String,
@@ -703,7 +726,7 @@ impl AsyncDataFrameOperation for SqlOperation {
         // This is just a stub - the SqlOperation requires modification for DataFusion 47.0.0
         // We'll need to update this to accept a context reference in the constructor
         Err(IdsError::Validation("SqlOperation requires a context reference for DataFusion 47.0.0. Operation needs to be modified.".to_string()))
-        
+
         // Notes: Implementation would look like:
         // 1. Register the input dataframe: ctx.register_table(&self.temp_table_name, df.into_view())?
         // 2. Execute SQL: ctx.sql(&self.sql).await?

@@ -171,3 +171,38 @@ pub fn convert_to_date32_array(array: &dyn Array) -> Result<Date32Array> {
     // Create and return a new Date32Array
     Ok(Date32Array::from(date_values))
 }
+
+/// Converts a StringArray containing date strings to a Date32Array
+///
+/// This function parses each string in the StringArray as a date and 
+/// converts it to days since epoch (January 1, 1970).
+/// 
+/// Returns a Date32Array with the converted dates
+pub fn string_array_to_date32(string_array: &StringArray) -> Result<Date32Array> {
+    let rows = string_array.len();
+    let mut date_values: Vec<Option<i32>> = Vec::with_capacity(rows);
+    
+    // Get the epoch reference date (1970-01-01)
+    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1)
+        .expect("Epoch date should be valid");
+    
+    for i in 0..rows {
+        if string_array.is_null(i) {
+            date_values.push(None);
+            continue;
+        }
+        
+        let date_str = string_array.value(i);
+        let date_opt = parse_flexible(date_str).ok();
+        
+        // Convert to days since epoch (Date32 format)
+        let epoch_day_opt = date_opt.map(|d| {
+            d.signed_duration_since(epoch).num_days() as i32
+        });
+        
+        date_values.push(epoch_day_opt);
+    }
+    
+    // Create and return a new Date32Array
+    Ok(Date32Array::from(date_values))
+}

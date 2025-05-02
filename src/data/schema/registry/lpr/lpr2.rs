@@ -146,27 +146,14 @@ impl LprSchema for Lpr2Schema {
         Field::new("C_DIAG", DataType::Utf8, true),
         Field::new("C_DIAGTYPE", DataType::Utf8, true),
         Field::new("C_TILDIAG", DataType::Utf8, true),
-        Field::new("LEVERANCEDATO", DataType::Date32, true),
         Field::new("RECNUM", DataType::Utf8, true),
-        Field::new("VERSION", DataType::Utf8, true),
     ])
 }
 
 /// Get the Arrow schema for LPR2 Procedure (`LPR_BES`) data
 #[must_use] pub fn lpr2_proc_schema() -> Schema {
     Schema::new(vec![
-        Field::new("C_KODE", DataType::Utf8, true),
-        Field::new("C_ODIAG", DataType::Utf8, true),
-        Field::new("C_PSGH", DataType::Utf8, true),
-        Field::new("C_TILKODE", DataType::Utf8, true),
-        Field::new("CPRTJEK", DataType::Utf8, true),
-        Field::new("CPRTYPE", DataType::Utf8, true),
-        Field::new("D_ODTO", DataType::Date32, true),
-        Field::new("LEVERANCEDATO", DataType::Date32, true),
-        Field::new("PNR", DataType::Utf8, false),
+        Field::new("D_AMBDTO", DataType::Utf8, true),
         Field::new("RECNUM", DataType::Utf8, true),
-        Field::new("V_OMINUT", DataType::Int32, true),
-        Field::new("V_OTIME", DataType::Int32, true),
-        Field::new("VERSION", DataType::Utf8, true),
     ])
 }

@@ -545,6 +545,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
+name = "cmake"
+version = "0.1.54"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1709,13 +1718,16 @@ dependencies = [
  "indicatif",
  "itertools",
  "log",
+ "once_cell",
  "rand 0.9.1",
  "rayon",
  "regex",
  "rustc-hash",
  "smallvec",
+ "snmalloc-rs",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -2564,6 +2576,24 @@ name = "snap"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
+
+[[package]]
+name = "snmalloc-rs"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb317153089fdfa4d8a2eec059d40a5a23c3bde43995ea23b19121c3f621e74a"
+dependencies = [
+ "snmalloc-sys",
+]
+
+[[package]]
+name = "snmalloc-sys"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "065fea53d32bb77bc36cca466cb191f2e5216ebfd0ed360b1d64889ee6e559ea"
+dependencies = [
+ "cmake",
+]
 
 [[package]]
 name = "sqlparser"

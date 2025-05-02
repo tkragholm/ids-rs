@@ -25,6 +25,9 @@ pub enum IdsError {
         source: Box<dyn StdError + Send + Sync>,
         context: String,
     },
+
+    /// DataFusion-specific errors
+    DataFusion(datafusion::error::DataFusionError),
 }
 
 impl fmt::Display for IdsError {
@@ -37,7 +40,8 @@ impl fmt::Display for IdsError {
             Self::External(err) => write!(f, "External error: {err}"),
             Self::ArrowWithContext { source, context } => {
                 write!(f, "Arrow error: {source} (context: {context})")
-            }
+            },
+            Self::DataFusion(err) => write!(f, "DataFusion error: {err}"),
         }
     }
 }
@@ -48,6 +52,7 @@ impl StdError for IdsError {
             Self::Io(err) => Some(err),
             Self::External(err) => Some(err.as_ref()),
             Self::ArrowWithContext { source, .. } => Some(source.as_ref()),
+            Self::DataFusion(err) => Some(err),
             _ => None,
         }
     }
@@ -67,7 +72,7 @@ impl From<arrow::error::ArrowError> for IdsError {
 
 impl From<datafusion::error::DataFusionError> for IdsError {
     fn from(err: datafusion::error::DataFusionError) -> Self {
-        Self::External(Box::new(err))
+        Self::DataFusion(err)
     }
 }
 
@@ -78,10 +83,12 @@ pub fn validation_error(message: impl ToString) -> IdsError {
     IdsError::Validation(message.to_string())
 }
 
+#[allow(dead_code)]
 pub fn data_error(message: impl ToString) -> IdsError {
     IdsError::Data(message.to_string())
 }
 
+#[allow(dead_code)]
 pub fn computation_error(message: impl ToString) -> IdsError {
     IdsError::Computation(message.to_string())
 }
@@ -90,6 +97,7 @@ pub fn computation_error(message: impl ToString) -> IdsError {
 pub type Result<T> = std::result::Result<T, IdsError>;
 
 /// Extension trait for adding context to error results
+#[allow(dead_code)]
 pub trait ErrorContext<T, E> {
     /// Add context to an error result
     fn with_context<C, F>(self, context_fn: F) -> Result<T>
