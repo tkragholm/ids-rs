@@ -5,14 +5,21 @@ use std::fs;
 
 use crate::algorithm::population::core::{generate_population, PopulationConfig};
 use crate::commands::population::config::PopulationCommandConfig;
-use crate::utils::date_utils;
 use crate::error::{IdsError, Result};
-use crate::registry::{BefRegister, MfrRegister, RegisterLoader};
+use crate::utils::date_utils;
 use crate::utils::reports::save_population_summary;
 use arrow::array::{Array, StringArray};
 use arrow::record_batch::RecordBatch;
 use chrono::Datelike;
+use datafusion::common::config::TableParquetOptions;
+use datafusion::dataframe::DataFrameWriteOptions;
+use datafusion::prelude::*;
 use std::collections::HashMap;
+use tokio::runtime::Runtime;
+
+// Import the new DataFusion-based registry registry factory
+use crate::data::registry::factory::RegistryFactory;
+use crate::data::registry::traits::RegisterLoader;
 
 /// Handle the population generation command
 pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()> {
@@ -27,14 +34,28 @@ pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()>
         include_migration_data: true,
     };
 
-    // Read BEF data using BEF registry
+    // Create a tokio runtime for async operations
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+
+    // Load BEF data using the new DataFusion-based registry loader
     info!("Reading BEF data from: {:?}", config.bef_path);
-    let bef_registry = BefRegister;
-    let bef_data_vec = bef_registry.load(config.bef_path.to_str().unwrap_or(""), None)?;
+    let bef_data_vec = runtime.block_on(async {
+        // Create a BEF registry loader from the factory
+        let bef_registry = RegistryFactory::from_name("bef")?;
+
+        // Downcast to the correct type and use async load method
+        let loader = bef_registry
+            .downcast_ref::<crate::data::registry::loaders::bef::BefRegister>()
+            .ok_or_else(|| IdsError::Data("Failed to downcast BEF register".to_string()))?;
+            
+        // Use async load method from the RegisterLoader trait
+        let base_path = config.bef_path.to_str().unwrap_or("");
+        loader.load(base_path, None).await
+    })?;
+
     if bef_data_vec.is_empty() {
-        return Err(crate::error::IdsError::Data(
-            "No BEF data found".to_string(),
-        ));
+        return Err(IdsError::Data("No BEF data found".to_string()));
     }
 
     // Combine all batches into a single RecordBatch
@@ -42,14 +63,24 @@ pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()>
     let bef_data = combine_record_batches(&bef_data_vec)?;
     info!("Loaded {} rows from BEF data", bef_data.num_rows());
 
-    // Read MFR data using MFR registry
+    // Load MFR data using the new DataFusion-based registry loader
     info!("Reading MFR data from: {:?}", config.mfr_path);
-    let mfr_registry = MfrRegister;
-    let mfr_data_vec = mfr_registry.load(config.mfr_path.to_str().unwrap_or(""), None)?;
+    let mfr_data_vec = runtime.block_on(async {
+        // Create an MFR registry loader from the factory
+        let mfr_registry = RegistryFactory::from_name("mfr")?;
+
+        // Downcast to the correct type and use async load method
+        let loader = mfr_registry
+            .downcast_ref::<crate::data::registry::loaders::mfr::MfrRegister>()
+            .ok_or_else(|| IdsError::Data("Failed to downcast MFR register".to_string()))?;
+            
+        // Use async load method
+        let base_path = config.mfr_path.to_str().unwrap_or("");
+        loader.load(base_path, None).await
+    })?;
+
     if mfr_data_vec.is_empty() {
-        return Err(crate::error::IdsError::Data(
-            "No MFR data found".to_string(),
-        ));
+        return Err(IdsError::Data("No MFR data found".to_string()));
     }
 
     // Combine all batches into a single RecordBatch
@@ -97,24 +128,29 @@ pub fn handle_population_command(config: &PopulationCommandConfig) -> Result<()>
     // Create output directory if it doesn't exist
     fs::create_dir_all(&config.output_dir)?;
 
-    // Save population data
+    // Save population data using DataFusion's write_parquet functionality
     let population_file = config.output_dir.join("population.parquet");
     info!("Saving population data to: {population_file:?}");
 
-    // Use a File object and ParquetWriter to write the file
-    let file = std::fs::File::create(&population_file)?;
-    let schema = family_data.schema();
-    let writer = parquet::arrow::ArrowWriter::try_new(file, schema, None).map_err(|e| {
-        crate::error::IdsError::Data(format!("Failed to create parquet writer: {e}"))
-    })?;
+    // Use DataFusion to write the parquet file
+    runtime.block_on(async {
+        // Create a session context
+        let ctx = SessionContext::new();
 
-    let mut writer = writer;
-    writer
-        .write(&family_data)
-        .map_err(|e| crate::error::IdsError::Data(format!("Failed to write parquet data: {e}")))?;
+        // Create a memory table from the record batch
+        let table_name = "population_data";
+        ctx.register_batch(table_name, family_data.clone())?;
 
-    writer.close().map_err(|e| {
-        crate::error::IdsError::Data(format!("Failed to close parquet writer: {e}"))
+        // Create a DataFrame and write to Parquet
+        let df = ctx.table(table_name).await?;
+
+        // Write to Parquet using DataFusion (with optimal settings)
+        df.write_parquet(
+            population_file.to_str().unwrap(),
+            DataFrameWriteOptions::default(),
+            Some(TableParquetOptions::new()),
+        )
+        .await
     })?;
 
     // Save summary reports
@@ -177,11 +213,9 @@ fn debug_birth_years(batch: &RecordBatch, dataset_name: &str) -> Result<()> {
     };
 
     // Get the date column
-    let date_col = batch.column_by_name(date_column).ok_or_else(|| {
-        IdsError::Data(format!(
-            "Missing {date_column} column in {dataset_name}"
-        ))
-    })?;
+    let date_col = batch
+        .column_by_name(date_column)
+        .ok_or_else(|| IdsError::Data(format!("Missing {date_column} column in {dataset_name}")))?;
 
     // Count occurrences by year
     let mut year_counts: HashMap<i32, usize> = HashMap::new();

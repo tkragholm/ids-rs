@@ -528,7 +528,7 @@ pub fn register_batches(
     Ok(())
 }
 
-/// Save record batches to parquet file
+/// Save record batches to parquet file with optimized settings
 pub async fn save_batches_to_parquet(
     batches: &[RecordBatch],
     output_path: impl AsRef<Path>,
@@ -551,11 +551,39 @@ pub async fn save_batches_to_parquet(
     // Get the table as a DataFrame
     let df = ctx.table(&table_name).await?;
 
-    // Write to parquet
+    // Write to parquet with optimized settings
     df.write_parquet(
         output_path.as_ref().to_str().unwrap(),
         datafusion::dataframe::DataFrameWriteOptions::default(),
-        None,
+        Some(datafusion::common::config::TableParquetOptions::new()),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Save a single record batch to parquet file with optimized settings
+pub async fn save_batch_to_parquet(
+    batch: &RecordBatch,
+    output_path: impl AsRef<Path>,
+) -> Result<()> {
+    // Create a session context
+    let ctx = create_optimized_context();
+
+    // Create a random table name
+    let table_name = format!("temp_table_{}", random::<u64>());
+
+    // Register the batch
+    ctx.register_batch(&table_name, batch.clone())?;
+
+    // Get the table as a DataFrame
+    let df = ctx.table(&table_name).await?;
+
+    // Write to parquet with optimized settings
+    df.write_parquet(
+        output_path.as_ref().to_str().unwrap(),
+        datafusion::dataframe::DataFrameWriteOptions::default(),
+        Some(datafusion::common::config::TableParquetOptions::new()),
     )
     .await?;
 

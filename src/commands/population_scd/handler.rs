@@ -2,22 +2,18 @@
 //!
 //! This module provides the implementation for handling the Population SCD command.
 
-use crate::schema::parquet_utils;
-use parquet::arrow::ArrowWriter;
 use arrow::record_batch::RecordBatch;
 use log::info;
 use std::fs;
 use std::path::Path;
+use tokio::runtime::Runtime;
 
 use crate::algorithm::population::classification::{
     extract_scd_children, process_lpr_and_identify_scd, PopulationScdConfig,
 };
+use crate::data::registry::loaders::lpr::find_lpr_files;
+use crate::data::registry::traits::RegisterLoader;
 use crate::error::{IdsError, Result};
-use crate::registry::lpr::find_lpr_files;
-use crate::registry::lpr::{
-    Lpr3DiagnoserRegister, Lpr3KontakterRegister, LprAdmRegister, LprBesRegister, LprDiagRegister,
-};
-use crate::registry::RegisterLoader;
 use crate::utils::reports::write_csv_report;
 
 use super::config::PopulationScdCommandConfig;
@@ -28,6 +24,10 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
     if !config.output_dir.exists() {
         fs::create_dir_all(&config.output_dir).map_err(IdsError::Io)?;
     }
+
+    // Create a tokio runtime for async operations
+    let _runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
 
     // Step 1: Load population data
     info!(
@@ -45,19 +45,19 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
     let lpr_paths = find_lpr_files(config.lpr_data_path.to_str().unwrap())?;
 
     info!("Found LPR files:");
-    if let Some(path) = &lpr_paths.lpr_adm {
+    if let Some(path) = &lpr_paths.admin_path {
         info!("  LPR_ADM: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr_diag {
+    if let Some(path) = &lpr_paths.diag_path {
         info!("  LPR_DIAG: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr_bes {
+    if let Some(path) = &lpr_paths.proc_path {
         info!("  LPR_BES: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr3_kontakter {
+    if let Some(path) = &lpr_paths.kontakter_path {
         info!("  LPR3_KONTAKTER: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr3_diagnoser {
+    if let Some(path) = &lpr_paths.diagnoser_path {
         info!("  LPR3_DIAGNOSER: {}", path.display());
     }
 
@@ -70,28 +70,55 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
     let mut lpr2_bes = None;
 
     if config.include_lpr2 {
-        if let Some(path) = &lpr_paths.lpr_adm {
+        if let Some(path) = &lpr_paths.admin_path {
             info!("Loading LPR_ADM data...");
-            let adm_loader = LprAdmRegister;
-            let adm_data = adm_loader.load(path.to_str().unwrap(), None)?;
+            // Create a Lpr2Register from RegistryFactory
+            let adm_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
+            // Use tokio runtime to run async load
+            let runtime = Runtime::new()
+                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            let adm_data = runtime.block_on(async {
+                let loader = adm_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let adm_batch_count = adm_data.len();
             lpr2_adm = Some(adm_data);
             info!("Loaded {adm_batch_count} LPR_ADM batches");
         }
 
-        if let Some(path) = &lpr_paths.lpr_diag {
+        if let Some(path) = &lpr_paths.diag_path {
             info!("Loading LPR_DIAG data...");
-            let diag_loader = LprDiagRegister;
-            let diag_data = diag_loader.load(path.to_str().unwrap(), None)?;
+            // Create a Lpr2Register from RegistryFactory
+            let diag_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
+            // Use tokio runtime to run async load
+            let runtime = Runtime::new()
+                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            let diag_data = runtime.block_on(async {
+                let loader = diag_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let diag_batch_count = diag_data.len();
             lpr2_diag = Some(diag_data);
             info!("Loaded {diag_batch_count} LPR_DIAG batches");
         }
 
-        if let Some(path) = &lpr_paths.lpr_bes {
+        if let Some(path) = &lpr_paths.proc_path {
             info!("Loading LPR_BES data...");
-            let bes_loader = LprBesRegister;
-            let bes_data = bes_loader.load(path.to_str().unwrap(), None)?;
+            // Create a Lpr2Register from RegistryFactory
+            let bes_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
+            // Use tokio runtime to run async load
+            let runtime = Runtime::new()
+                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            let bes_data = runtime.block_on(async {
+                let loader = bes_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let bes_batch_count = bes_data.len();
             lpr2_bes = Some(bes_data);
             info!("Loaded {bes_batch_count} LPR_BES batches");
@@ -103,19 +130,39 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
     let mut lpr3_diagnoser = None;
 
     if config.include_lpr3 {
-        if let Some(path) = &lpr_paths.lpr3_kontakter {
+        if let Some(path) = &lpr_paths.kontakter_path {
             info!("Loading LPR3_KONTAKTER data...");
-            let kontakter_loader = Lpr3KontakterRegister;
-            let kontakter_data = kontakter_loader.load(path.to_str().unwrap(), None)?;
+            // Create a Lpr3Register from RegistryFactory
+            let kontakter_loader =
+                crate::data::registry::factory::RegistryFactory::from_name("lpr3")?;
+            // Use tokio runtime to run async load
+            let runtime = Runtime::new()
+                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            let kontakter_data = runtime.block_on(async {
+                let loader = kontakter_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let kontakter_batch_count = kontakter_data.len();
             lpr3_kontakter = Some(kontakter_data);
             info!("Loaded {kontakter_batch_count} LPR3_KONTAKTER batches");
         }
 
-        if let Some(path) = &lpr_paths.lpr3_diagnoser {
+        if let Some(path) = &lpr_paths.diagnoser_path {
             info!("Loading LPR3_DIAGNOSER data...");
-            let diagnoser_loader = Lpr3DiagnoserRegister;
-            let diagnoser_data = diagnoser_loader.load(path.to_str().unwrap(), None)?;
+            // Create a Lpr3Register from RegistryFactory
+            let diagnoser_loader =
+                crate::data::registry::factory::RegistryFactory::from_name("lpr3")?;
+            // Use tokio runtime to run async load
+            let runtime = Runtime::new()
+                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            let diagnoser_data = runtime.block_on(async {
+                let loader = diagnoser_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast register".to_string()))?;
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let diagnoser_batch_count = diagnoser_data.len();
             lpr3_diagnoser = Some(diagnoser_data);
             info!("Loaded {diagnoser_batch_count} LPR3_DIAGNOSER batches");
@@ -235,8 +282,13 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
 
 /// Load a Parquet file as a `RecordBatch`
 fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
-    // Use the existing read_parquet function
-    let batches = parquet_utils::read_parquet(path, None, None)?;
+    // Use the parquet reader from data::io::parquet
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+
+    let batches = runtime.block_on(async {
+        crate::data::io::parquet::load_parquet_directory(path, None, None).await
+    })?;
 
     if batches.is_empty() {
         return Err(IdsError::Data("No data found in Parquet file".to_string()));
@@ -254,20 +306,9 @@ fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
 
 /// Save `RecordBatch` as a Parquet file
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    // Use existing helpers if possible, otherwise create a simple implementation
-    let file = std::fs::File::create(path).map_err(IdsError::Io)?;
+    // Use the optimized Parquet writer from data::io::parquet
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
 
-    let writer_props = ArrowWriter::try_new(file, batch.schema(), None)
-        .map_err(|e| IdsError::Data(format!("Failed to create writer: {e}")))?;
-
-    let mut writer = writer_props;
-    writer
-        .write(batch)
-        .map_err(|e| IdsError::Data(format!("Failed to write batch: {e}")))?;
-
-    writer
-        .close()
-        .map_err(|e| IdsError::Data(format!("Failed to close writer: {e}")))?;
-
-    Ok(())
+    runtime.block_on(async { crate::data::io::parquet::save_batch_to_parquet(batch, path).await })
 }

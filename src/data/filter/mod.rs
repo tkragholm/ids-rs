@@ -3,10 +3,10 @@
 //! This module provides unified filtering for `DataFrames` and registry data.
 //! It includes specialized filters for PNR/CPR, dates, and categorical values.
 
-mod predicates;
-mod pnr;
-mod builder;
+pub mod builder;
+pub mod pnr;
+pub mod predicates;
 
-pub use predicates::*;
-pub use pnr::*;
 pub use builder::*;
+pub use pnr::*;
+pub use predicates::*;

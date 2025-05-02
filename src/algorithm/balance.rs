@@ -63,17 +63,28 @@ pub struct BalanceSummary {
 /// Load records from a parquet file
 pub fn load_records(path: &str) -> Result<Vec<RecordBatch>> {
     use std::path::Path;
+    use tokio::runtime::Runtime;
     
     let path = Path::new(path);
     if !path.exists() {
         return Err(IdsError::Validation(format!("File does not exist: {}", path.display())));
     }
     
+    // Create a tokio runtime for async operations
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+    
     // Check if path is directory or file
     if path.is_dir() {
-        crate::schema::parquet_utils::load_parquet_files_parallel(path, None, None)
+        runtime.block_on(async {
+            crate::data::io::parquet::load_parquet_directory(path, None, None).await
+        })
     } else {
-        crate::schema::parquet_utils::read_parquet(path, None, None)
+        // Use the ParquetReader to read a single file
+        let mut reader = crate::data::io::parquet::ParquetReader::new(path);
+        runtime.block_on(async {
+            reader.read_async().await
+        })
     }
 }
 

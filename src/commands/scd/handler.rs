@@ -2,21 +2,21 @@
 //!
 //! This module provides the implementation for handling the SCD command.
 
-use arrow::record_batch::RecordBatch;
-use parquet::arrow::ArrowWriter;
-use parquet::file::properties::WriterProperties;
+use datafusion::common::config::TableParquetOptions;
+use datafusion::dataframe::DataFrameWriteOptions;
+use datafusion::prelude::*;
 use std::fs;
-use std::path::Path;
+use tokio::runtime::Runtime;
 
 use crate::algorithm::lpr::{process_lpr_data, LprConfig};
 use crate::algorithm::scd::{apply_scd_algorithm, scd_results_to_record_batch, ScdConfig};
+use crate::data::registry::traits::RegisterLoader;
 use crate::error::{IdsError, Result};
-use crate::registry::lpr::find_lpr_files;
-use crate::registry::lpr::{
-    Lpr3DiagnoserRegister, Lpr3KontakterRegister, LprAdmRegister, LprBesRegister, LprDiagRegister,
-};
-use crate::registry::RegisterLoader;
 use crate::utils::reports::write_csv_report;
+
+// Import the new DataFusion-based registry loaders
+use crate::data::registry::factory::RegistryFactory;
+use crate::data::registry::loaders::lpr::find_lpr_files;
 
 use super::config::ScdCommandConfig;
 
@@ -27,6 +27,10 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
         fs::create_dir_all(&config.output_path).map_err(IdsError::Io)?;
     }
 
+    // Create a tokio runtime for async operations
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+
     // Step 1: Find LPR files
     log::info!(
         "Searching for LPR files in: {}",
@@ -35,23 +39,23 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     let lpr_paths = find_lpr_files(config.lpr_data_path.to_str().unwrap())?;
 
     log::info!("Found LPR files:");
-    if let Some(path) = &lpr_paths.lpr_adm {
+    if let Some(path) = &lpr_paths.admin_path {
         log::info!("  LPR_ADM: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr_diag {
+    if let Some(path) = &lpr_paths.diag_path {
         log::info!("  LPR_DIAG: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr_bes {
+    if let Some(path) = &lpr_paths.proc_path {
         log::info!("  LPR_BES: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr3_kontakter {
+    if let Some(path) = &lpr_paths.kontakter_path {
         log::info!("  LPR3_KONTAKTER: {}", path.display());
     }
-    if let Some(path) = &lpr_paths.lpr3_diagnoser {
+    if let Some(path) = &lpr_paths.diagnoser_path {
         log::info!("  LPR3_DIAGNOSER: {}", path.display());
     }
 
-    // Step 2: Load LPR data
+    // Step 2: Load LPR data using the new DataFusion-based registry loaders
     log::info!("Loading LPR data...");
 
     // LPR2 data
@@ -60,28 +64,52 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     let mut lpr2_bes = None;
 
     if config.include_lpr2 {
-        if let Some(path) = &lpr_paths.lpr_adm {
+        if let Some(path) = &lpr_paths.admin_path {
             log::info!("Loading LPR_ADM data...");
-            let adm_loader = LprAdmRegister;
-            let adm_data = adm_loader.load(path.to_str().unwrap(), None)?;
+            let adm_data = runtime.block_on(async {
+                let adm_loader = RegistryFactory::from_name("lpr_adm")?;
+                
+                // Downcast to the actual type
+                let loader = adm_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::lpr2_loader::Lpr2Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast LPR ADM register".to_string()))?;
+                    
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let adm_batch_count = adm_data.len();
             lpr2_adm = Some(adm_data);
             log::info!("Loaded {adm_batch_count} LPR_ADM batches");
         }
 
-        if let Some(path) = &lpr_paths.lpr_diag {
+        if let Some(path) = &lpr_paths.diag_path {
             log::info!("Loading LPR_DIAG data...");
-            let diag_loader = LprDiagRegister;
-            let diag_data = diag_loader.load(path.to_str().unwrap(), None)?;
+            let diag_data = runtime.block_on(async {
+                let diag_loader = RegistryFactory::from_name("lpr_diag")?;
+                
+                // Downcast to the actual type
+                let loader = diag_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::lpr2_loader::Lpr2Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast LPR DIAG register".to_string()))?;
+                    
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let diag_batch_count = diag_data.len();
             lpr2_diag = Some(diag_data);
             log::info!("Loaded {diag_batch_count} LPR_DIAG batches");
         }
 
-        if let Some(path) = &lpr_paths.lpr_bes {
+        if let Some(path) = &lpr_paths.proc_path {
             log::info!("Loading LPR_BES data...");
-            let bes_loader = LprBesRegister;
-            let bes_data = bes_loader.load(path.to_str().unwrap(), None)?;
+            let bes_data = runtime.block_on(async {
+                let bes_loader = RegistryFactory::from_name("lpr_bes")?;
+                
+                // Downcast to the actual type
+                let loader = bes_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::lpr2_loader::Lpr2Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast LPR BES register".to_string()))?;
+                    
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let bes_batch_count = bes_data.len();
             lpr2_bes = Some(bes_data);
             log::info!("Loaded {bes_batch_count} LPR_BES batches");
@@ -93,19 +121,35 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     let mut lpr3_diagnoser = None;
 
     if config.include_lpr3 {
-        if let Some(path) = &lpr_paths.lpr3_kontakter {
+        if let Some(path) = &lpr_paths.kontakter_path {
             log::info!("Loading LPR3_KONTAKTER data...");
-            let kontakter_loader = Lpr3KontakterRegister;
-            let kontakter_data = kontakter_loader.load(path.to_str().unwrap(), None)?;
+            let kontakter_data = runtime.block_on(async {
+                let kontakter_loader = RegistryFactory::from_name("lpr3_kontakter")?;
+                
+                // Downcast to the actual type
+                let loader = kontakter_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::lpr3_loader::Lpr3Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast LPR3 KONTAKTER register".to_string()))?;
+                    
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let kontakter_batch_count = kontakter_data.len();
             lpr3_kontakter = Some(kontakter_data);
             log::info!("Loaded {kontakter_batch_count} LPR3_KONTAKTER batches");
         }
 
-        if let Some(path) = &lpr_paths.lpr3_diagnoser {
+        if let Some(path) = &lpr_paths.diagnoser_path {
             log::info!("Loading LPR3_DIAGNOSER data...");
-            let diagnoser_loader = Lpr3DiagnoserRegister;
-            let diagnoser_data = diagnoser_loader.load(path.to_str().unwrap(), None)?;
+            let diagnoser_data = runtime.block_on(async {
+                let diagnoser_loader = RegistryFactory::from_name("lpr3_diagnoser")?;
+                
+                // Downcast to the actual type
+                let loader = diagnoser_loader
+                    .downcast_ref::<crate::data::registry::loaders::lpr::lpr3_loader::Lpr3Register>()
+                    .ok_or_else(|| IdsError::Data("Failed to downcast LPR3 DIAGNOSER register".to_string()))?;
+                    
+                loader.load(path.to_str().unwrap(), None).await
+            })?;
             let diagnoser_batch_count = diagnoser_data.len();
             lpr3_diagnoser = Some(diagnoser_data);
             log::info!("Loaded {diagnoser_batch_count} LPR3_DIAGNOSER batches");
@@ -132,9 +176,12 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
 
     log::info!("Processed data: {} rows", processed_data.num_rows());
 
-    // Save the processed data
+    // Save the processed data using our utility function
     let processed_path = config.output_path.join("processed_lpr_data.parquet");
-    save_batch_as_parquet(&processed_data, &processed_path)?;
+    runtime.block_on(crate::data::io::parquet::save_batch_to_parquet(
+        &processed_data,
+        &processed_path,
+    ))?;
     log::info!("Saved processed data to: {}", processed_path.display());
 
     // Step 4: Apply SCD algorithm
@@ -162,9 +209,7 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
 
     log::info!("SCD Summary:");
     log::info!("  Total patients: {total_patients}");
-    log::info!(
-        "  Patients with SCD: {scd_patients} ({scd_percentage:.2}%)"
-    );
+    log::info!("  Patients with SCD: {scd_patients} ({scd_percentage:.2}%)");
 
     // Count by disease category
     let mut category_counts = std::collections::HashMap::new();
@@ -190,10 +235,30 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     log::info!("Converting SCD results to RecordBatch...");
     let scd_batch = scd_results_to_record_batch(&scd_results)?;
 
-    // Save as Parquet
+    // Save as Parquet using DataFusion
     let scd_parquet_path = config.output_path.join("scd_results.parquet");
-    save_batch_as_parquet(&scd_batch, &scd_parquet_path)?;
-    log::info!("Saved SCD results to: {}", scd_parquet_path.display());
+    log::info!("Saving SCD results to: {}", scd_parquet_path.display());
+
+    // Use DataFusion to write the Parquet file
+    runtime.block_on(async {
+        // Create a session context
+        let ctx = SessionContext::new();
+
+        // Create a memory table from the record batch
+        let table_name = "scd_results";
+        ctx.register_batch(table_name, scd_batch.clone())?;
+
+        // Create a DataFrame and write to Parquet
+        let df = ctx.table(table_name).await?;
+
+        // Write to Parquet using DataFusion (with optimal settings)
+        df.write_parquet(
+            scd_parquet_path.to_str().unwrap(),
+            DataFrameWriteOptions::default(),
+            Some(TableParquetOptions::new()),
+        )
+        .await
+    })?;
 
     // Save summary as CSV
     let summary_path = config.output_path.join("scd_summary.csv");
@@ -224,22 +289,5 @@ pub fn handle_scd_command(config: &ScdCommandConfig) -> Result<()> {
     log::info!("Saved SCD summary to: {}", summary_path.display());
 
     log::info!("SCD command completed successfully");
-    Ok(())
-}
-
-/// Save `RecordBatch` as a Parquet file
-fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    let file = fs::File::create(path).map_err(IdsError::Io)?;
-
-    let props = WriterProperties::builder().build();
-    let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))
-        .map_err(|e| IdsError::Data(e.to_string()))?;
-
-    writer
-        .write(batch)
-        .map_err(|e| IdsError::Data(e.to_string()))?;
-
-    writer.close().map_err(|e| IdsError::Data(e.to_string()))?;
-
     Ok(())
 }

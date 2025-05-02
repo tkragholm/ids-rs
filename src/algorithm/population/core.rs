@@ -10,7 +10,7 @@ use crate::utils::date_utils;
 use crate::error::{IdsError, Result};
 use crate::model::pnr::Pnr;
 use crate::model::population::{FamilyData, Population};
-use crate::schema::filter_expr::Expr;
+use datafusion::logical_expr::Expr;
 
 /// Configuration for population generation
 pub struct PopulationConfig {
@@ -67,13 +67,13 @@ pub struct PopulationSummary {
 
 /// Creates a filter expression for birth year range
 #[must_use] pub fn create_birth_year_filter(column_name: &str, start_year: i32, end_year: i32) -> Expr {
-    use crate::schema::filter_expr::col;
+    use datafusion::prelude::{col, lit};
 
     // Create filter for birth year >= start_year
-    let start_filter = col(column_name).gt(i64::from(start_year) - 1);
+    let start_filter = col(column_name).gt(lit(start_year));
 
     // Create filter for birth year <= end_year
-    let end_filter = col(column_name).lt(i64::from(end_year) + 1);
+    let end_filter = col(column_name).lt(lit(end_year + 1));
 
     // Combine with AND
     start_filter.and(end_filter)

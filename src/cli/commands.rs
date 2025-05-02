@@ -1,7 +1,11 @@
 use crate::cli::console::Console;
+use crate::data::registry::traits::RegisterLoader;
 use crate::error::Result;
 use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
+use datafusion::common::DataFusionError;
+use datafusion::common::config::TableParquetOptions;
+use datafusion::dataframe::DataFrameWriteOptions;
 use std::path::PathBuf;
 
 /// Command handler trait
@@ -29,10 +33,39 @@ impl CommandHandler for SampleCommand {
         Console::print_key_value("Output", &self.output_path);
         Console::print_key_value("Samples", &self.sample_count.to_string());
 
-        // Load data from the specified registry
+        // Create a Tokio runtime for async operations
+        let runtime = tokio::runtime::Runtime::new().map_err(|e| {
+            crate::error::IdsError::Data(format!("Failed to create async runtime: {e}"))
+        })?;
+
+        // Load data using the DataFusion-based registry factory
         Console::print_info("Loading registry data...");
-        let registry = crate::registry::registry_from_path(&self.input_path)?;
-        let records = registry.load(&self.input_path, None)?;
+        let records = runtime.block_on(async {
+            let registry = crate::data::registry::factory::RegistryFactory::from_path(
+                std::path::Path::new(&self.input_path),
+            )?;
+
+            // Downcast to correct type and then load
+            // We try a few common register types
+            if let Some(loader) =
+                registry.downcast_ref::<crate::data::registry::loaders::bef::BefRegister>()
+            {
+                loader.load(&self.input_path, None).await
+            } else if let Some(loader) =
+                registry.downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
+            {
+                loader.load(&self.input_path, None).await
+            } else if let Some(loader) =
+                registry.downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
+            {
+                loader.load(&self.input_path, None).await
+            } else {
+                // If we can't determine the type, try to use a generic DataFusion approach
+                // This would work for basic Parquet files without specialized handling
+                let mut reader = crate::data::io::parquet::ParquetReader::new(&self.input_path);
+                reader.read_async().await
+            }
+        })?;
 
         Console::print_info(&format!("Loaded {} record batches", records.len()));
 
@@ -40,9 +73,42 @@ impl CommandHandler for SampleCommand {
         Console::print_info(&format!("Sampling {} records...", self.sample_count));
         let sampled = crate::algorithm::sampler::sample_records(&records, self.sample_count, None)?;
 
-        // Save to the output path
+        // Save to the output path using DataFusion
         Console::print_info(&format!("Writing sampled data to {}", self.output_path));
-        crate::algorithm::sampler::write_parquet(&self.output_path, &sampled)?;
+
+        // We can use DataFusion to write Parquet files efficiently
+        runtime.block_on(async {
+            use datafusion::prelude::*;
+
+            // Create a session context
+            let ctx = SessionContext::new();
+
+            // Create a memory table from the record batch
+            let table_name = "sampled_data";
+            
+            // If sampled is a Vec<RecordBatch>, we need to combine them into a single batch
+            // or register them via a different method
+            if sampled.len() == 1 {
+                // If there's only one batch, use register_batch
+                ctx.register_batch(table_name, sampled[0].clone())?;
+            } else {
+                // If there are multiple batches, use register_batches
+                let provider = crate::data::io::parquet::batches_to_table(&sampled)
+                    .map_err(|e| DataFusionError::External(Box::new(e)))?;
+                ctx.register_table(table_name, provider)?;
+            }
+
+            // Create a DataFrame and write to Parquet
+            let df = ctx.table(table_name).await?;
+
+            // Write to Parquet using DataFusion with optimal settings
+            df.write_parquet(
+                &self.output_path,
+                DataFrameWriteOptions::default(),
+                Some(TableParquetOptions::new()),
+            )
+            .await
+        })?;
 
         Console::print_success("Sampling completed");
         Ok(())

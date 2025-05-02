@@ -163,8 +163,13 @@ pub fn handle_study_design_command(config: &StudyDesignCommandConfig) -> Result<
 ///
 /// This is the synchronous version of the function.
 fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
-    // Use the existing read_parquet function
-    let batches = crate::schema::parquet_utils::read_parquet(path, None, None)?;
+    // Use the parquet reader from data::io::parquet
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+    
+    let batches = runtime.block_on(async {
+        crate::data::io::parquet::load_parquet_directory(path, None, None).await
+    })?;
 
     if batches.is_empty() {
         return Err(IdsError::Data("No data found in Parquet file".to_string()));
@@ -185,8 +190,8 @@ fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
 /// This version uses the optimized async Parquet reader for better performance
 /// with slow storage devices.
 async fn load_parquet_file_async(path: &Path) -> Result<RecordBatch> {
-    // Use the async read_parquet function
-    let batches = crate::schema::parquet_async::read_parquet_async(path, None, None).await?;
+    // Use the optimized parquet reader with async support
+    let batches = crate::data::io::parquet::load_parquet_directory(path, None, None).await?;
 
     if batches.is_empty() {
         return Err(IdsError::Data("No data found in Parquet file".to_string()));
@@ -647,21 +652,13 @@ fn combine_record_batches(batches: &[RecordBatch]) -> Result<RecordBatch> {
 
 /// Save `RecordBatch` as a Parquet file (synchronous version)
 fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    let file = std::fs::File::create(path).map_err(IdsError::Io)?;
-
-    let writer_props = parquet::arrow::ArrowWriter::try_new(file, batch.schema(), None)
-        .map_err(|e| IdsError::Data(format!("Failed to create writer: {e}")))?;
-
-    let mut writer = writer_props;
-    writer
-        .write(batch)
-        .map_err(|e| IdsError::Data(format!("Failed to write batch: {e}")))?;
-
-    writer
-        .close()
-        .map_err(|e| IdsError::Data(format!("Failed to close writer: {e}")))?;
-
-    Ok(())
+    // Use the optimized Parquet writer from data::io::parquet
+    let runtime = Runtime::new()
+        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+    
+    runtime.block_on(async {
+        crate::data::io::parquet::save_batch_to_parquet(batch, path).await
+    })
 }
 
 /// Save `RecordBatch` as a Parquet file asynchronously
@@ -669,32 +666,8 @@ fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
 /// This uses Tokio's async file operations for better performance with slow
 /// storage devices.
 async fn save_batch_as_parquet_async(batch: &RecordBatch, path: &Path) -> Result<()> {
-    // Create the file asynchronously
-    let file = tokio::fs::File::create(path).await.map_err(|e| {
-        IdsError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to create file asynchronously: {e}"),
-        ))
-    })?;
-
-    // We need to convert the tokio file to a std file since parquet-arrow
-    // doesn't have async writer support yet
-    let std_file = file.into_std().await;
-
-    // Now proceed with the normal parquet writing
-    let writer_props = parquet::arrow::ArrowWriter::try_new(std_file, batch.schema(), None)
-        .map_err(|e| IdsError::Data(format!("Failed to create writer: {e}")))?;
-
-    let mut writer = writer_props;
-    writer
-        .write(batch)
-        .map_err(|e| IdsError::Data(format!("Failed to write batch: {e}")))?;
-
-    writer
-        .close()
-        .map_err(|e| IdsError::Data(format!("Failed to close writer: {e}")))?;
-
-    Ok(())
+    // Use the optimized Parquet writer with async support
+    crate::data::io::parquet::save_batch_to_parquet(batch, path).await
 }
 
 /// Handle the study design command using async I/O
