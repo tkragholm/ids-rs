@@ -11,7 +11,6 @@ use chrono::{Datelike, NaiveDate};
 use log::info;
 use rand::seq::IteratorRandom;
 use std::path::Path;
-use tokio::runtime::Runtime;
 
 use crate::algorithm::balance::{calculate_balance, generate_balance_report};
 use crate::algorithm::matching::{Matcher, MatchingCriteria};
@@ -30,9 +29,8 @@ pub fn handle_study_design_command(config: &StudyDesignCommandConfig) -> Result<
     // For improved performance with slow storage, consider using the async version
     // You can call it from this synchronous handler using a runtime:
     if config.use_async_io {
-        let rt = Runtime::new()
-            .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
-        return rt.block_on(handle_study_design_command_async(config));
+        let runtime = crate::utils::runtime::get_runtime()?;
+        return runtime.block_on(handle_study_design_command_async(config));
     }
 
     // Regular synchronous implementation follows...
@@ -81,14 +79,47 @@ pub fn handle_study_design_command(config: &StudyDesignCommandConfig) -> Result<
     // Step 3: Sample Controls and Match with Cases
     info!("Step 3: Matching Cases with Controls");
 
-    // Load SCD children (cases)
-    let scd_children = load_parquet_file(&scd_children_path)?;
+    // Load SCD children (cases) using the DataFusion-based loader
+    let runtime = crate::utils::runtime::get_runtime()?;
+    let scd_children_batches = runtime.block_on(async {
+        crate::data::io::parquet::load_parquet_directory(&scd_children_path, None, None).await
+    })?;
+    
+    if scd_children_batches.is_empty() {
+        return Err(IdsError::Data("No SCD children data found".to_string()));
+    }
+    
+    // Combine batches if necessary
+    let scd_children = if scd_children_batches.len() == 1 {
+        scd_children_batches[0].clone()
+    } else {
+        let schema = scd_children_batches[0].schema();
+        arrow::compute::concat_batches(&schema, &scd_children_batches)
+            .map_err(|e| IdsError::Data(format!("Failed to concatenate SCD children batches: {e}")))?
+    };
 
     // Load full population data
     let population_scd_data_path = population_scd_config
         .output_dir
         .join("population_scd.parquet");
-    let population_scd_data = load_parquet_file(&population_scd_data_path)?;
+    
+    // Load population SCD data using the DataFusion-based loader
+    let population_scd_batches = runtime.block_on(async {
+        crate::data::io::parquet::load_parquet_directory(&population_scd_data_path, None, None).await
+    })?;
+    
+    if population_scd_batches.is_empty() {
+        return Err(IdsError::Data("No population SCD data found".to_string()));
+    }
+    
+    // Combine batches if necessary
+    let population_scd_data = if population_scd_batches.len() == 1 {
+        population_scd_batches[0].clone()
+    } else {
+        let schema = population_scd_batches[0].schema();
+        arrow::compute::concat_batches(&schema, &population_scd_batches)
+            .map_err(|e| IdsError::Data(format!("Failed to concatenate population SCD batches: {e}")))?
+    };
 
     // Extract controls (non-SCD children) from population
     let controls = extract_controls(&population_scd_data)?;
@@ -115,15 +146,18 @@ pub fn handle_study_design_command(config: &StudyDesignCommandConfig) -> Result<
         config.matching_ratio,
     )?;
     
-    // Save matched cases and controls
-    save_batch_as_parquet(
-        &case_data,
-        &matching_output_dir.join("matched_cases.parquet"),
-    )?;
-    save_batch_as_parquet(
-        &control_data,
-        &matching_output_dir.join("matched_controls.parquet"),
-    )?;
+    // Save matched cases and controls using DataFusion-based writer
+    let cases_path = matching_output_dir.join("matched_cases.parquet");
+    let controls_path = matching_output_dir.join("matched_controls.parquet");
+    
+    // Use async to save the data
+    runtime.block_on(async {
+        // Save cases
+        crate::data::io::parquet::save_batch_to_parquet(&case_data, &cases_path).await?;
+        
+        // Save controls
+        crate::data::io::parquet::save_batch_to_parquet(&control_data, &controls_path).await
+    })?;
 
     // Step 4: Check Covariate Balance
     info!("Step 4: Checking Covariate Balance");
@@ -159,53 +193,6 @@ pub fn handle_study_design_command(config: &StudyDesignCommandConfig) -> Result<
     Ok(())
 }
 
-/// Load a Parquet file as a `RecordBatch`
-///
-/// This is the synchronous version of the function.
-fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
-    // Use the parquet reader from data::io::parquet
-    let runtime = Runtime::new()
-        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
-    
-    let batches = runtime.block_on(async {
-        crate::data::io::parquet::load_parquet_directory(path, None, None).await
-    })?;
-
-    if batches.is_empty() {
-        return Err(IdsError::Data("No data found in Parquet file".to_string()));
-    }
-
-    // Combine all batches into a single RecordBatch
-    if batches.len() == 1 {
-        Ok(batches[0].clone())
-    } else {
-        let schema = batches[0].schema();
-        arrow::compute::concat_batches(&schema, &batches)
-            .map_err(|e| IdsError::Data(format!("Failed to concatenate batches: {e}")))
-    }
-}
-
-/// Load a Parquet file asynchronously as a `RecordBatch`
-///
-/// This version uses the optimized async Parquet reader for better performance
-/// with slow storage devices.
-async fn load_parquet_file_async(path: &Path) -> Result<RecordBatch> {
-    // Use the optimized parquet reader with async support
-    let batches = crate::data::io::parquet::load_parquet_directory(path, None, None).await?;
-
-    if batches.is_empty() {
-        return Err(IdsError::Data("No data found in Parquet file".to_string()));
-    }
-
-    // Combine all batches into a single RecordBatch
-    if batches.len() == 1 {
-        Ok(batches[0].clone())
-    } else {
-        let schema = batches[0].schema();
-        arrow::compute::concat_batches(&schema, &batches)
-            .map_err(|e| IdsError::Data(format!("Failed to concatenate batches: {e}")))
-    }
-}
 
 /// Extract controls (non-SCD children) from the population data
 fn extract_controls(population_data: &RecordBatch) -> Result<RecordBatch> {
@@ -617,14 +604,17 @@ fn perform_matching(
     );
 
     // Save matched cases and controls
-    save_batch_as_parquet(
-        &matched_cases_batch,
-        &output_dir.join("matched_cases.parquet"),
-    )?;
-    save_batch_as_parquet(
-        &matched_controls_batch,
-        &output_dir.join("matched_controls.parquet"),
-    )?;
+    let runtime = crate::utils::runtime::get_runtime()?;
+    let cases_path = output_dir.join("matched_cases.parquet");
+    let controls_path = output_dir.join("matched_controls.parquet");
+    
+    runtime.block_on(async {
+        // Save cases
+        crate::data::io::parquet::save_batch_to_parquet(&matched_cases_batch, &cases_path).await?;
+        
+        // Save controls
+        crate::data::io::parquet::save_batch_to_parquet(&matched_controls_batch, &controls_path).await
+    })?;
 
     // Return the matched data
     Ok((matched_cases_batch, matched_controls_batch))
@@ -650,25 +640,6 @@ fn combine_record_batches(batches: &[RecordBatch]) -> Result<RecordBatch> {
         .map_err(|e| IdsError::Data(format!("Failed to concatenate batches: {e}")))
 }
 
-/// Save `RecordBatch` as a Parquet file (synchronous version)
-fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    // Use the optimized Parquet writer from data::io::parquet
-    let runtime = Runtime::new()
-        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
-    
-    runtime.block_on(async {
-        crate::data::io::parquet::save_batch_to_parquet(batch, path).await
-    })
-}
-
-/// Save `RecordBatch` as a Parquet file asynchronously
-///
-/// This uses Tokio's async file operations for better performance with slow
-/// storage devices.
-async fn save_batch_as_parquet_async(batch: &RecordBatch, path: &Path) -> Result<()> {
-    // Use the optimized Parquet writer with async support
-    crate::data::io::parquet::save_batch_to_parquet(batch, path).await
-}
 
 /// Handle the study design command using async I/O
 ///
@@ -726,13 +697,40 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
     info!("Step 3: Matching Cases with Controls (async)");
 
     // Load SCD children (cases) with async reader
-    let scd_children = load_parquet_file_async(&scd_children_path).await?;
+    let scd_children_batches = crate::data::io::parquet::load_parquet_directory(&scd_children_path, None, None).await?;
+    
+    if scd_children_batches.is_empty() {
+        return Err(IdsError::Data("No SCD children data found".to_string()));
+    }
+    
+    // Combine batches if necessary
+    let scd_children = if scd_children_batches.len() == 1 {
+        scd_children_batches[0].clone()
+    } else {
+        let schema = scd_children_batches[0].schema();
+        arrow::compute::concat_batches(&schema, &scd_children_batches)
+            .map_err(|e| IdsError::Data(format!("Failed to concatenate SCD children batches: {e}")))?
+    };
 
     // Load full population data with async reader
     let population_scd_data_path = population_scd_config
         .output_dir
         .join("population_scd.parquet");
-    let population_scd_data = load_parquet_file_async(&population_scd_data_path).await?;
+    
+    let population_scd_batches = crate::data::io::parquet::load_parquet_directory(&population_scd_data_path, None, None).await?;
+    
+    if population_scd_batches.is_empty() {
+        return Err(IdsError::Data("No population SCD data found".to_string()));
+    }
+    
+    // Combine batches if necessary
+    let population_scd_data = if population_scd_batches.len() == 1 {
+        population_scd_batches[0].clone()
+    } else {
+        let schema = population_scd_batches[0].schema();
+        arrow::compute::concat_batches(&schema, &population_scd_batches)
+            .map_err(|e| IdsError::Data(format!("Failed to concatenate population SCD batches: {e}")))?
+    };
 
     // Extract controls (non-SCD children) from population
     let controls = extract_controls(&population_scd_data)?;
@@ -776,17 +774,21 @@ pub async fn handle_study_design_command_async(config: &StudyDesignCommandConfig
         matched_controls_batch.num_rows()
     );
     
-    // Save matched cases and controls asynchronously
-    save_batch_as_parquet_async(
+    // Save matched cases and controls asynchronously using DataFusion-based writer
+    let cases_path = matching_output_dir.join("matched_cases.parquet");
+    let controls_path = matching_output_dir.join("matched_controls.parquet");
+    
+    // Save cases
+    crate::data::io::parquet::save_batch_to_parquet(
         &matched_cases_batch,
-        &matching_output_dir.join("matched_cases.parquet"),
-    )
-    .await?;
-    save_batch_as_parquet_async(
+        &cases_path
+    ).await?;
+    
+    // Save controls  
+    crate::data::io::parquet::save_batch_to_parquet(
         &matched_controls_batch,
-        &matching_output_dir.join("matched_controls.parquet"),
-    )
-    .await?;
+        &controls_path
+    ).await?;
 
     // Step 4: Check Covariate Balance
     info!("Step 4: Checking Covariate Balance");

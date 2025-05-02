@@ -2,12 +2,16 @@
 //!
 //! This module contains registry loaders for various Danish registry data sources.
 
-pub mod traits;
-pub mod loaders;
 pub mod factory;
+pub mod helper;
+pub mod loaders;
+pub mod traits;
 
 // Re-export registry traits
-pub use traits::{RegisterLoader, PnrFilter};
+pub use traits::{PnrFilter, RegisterLoader};
 
 // Re-export registry loaders
 pub use loaders::*;
+
+// Re-export helper functions
+pub use helper::{load_registry_data, load_registry_data_sync};

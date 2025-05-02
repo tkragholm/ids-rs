@@ -1,6 +1,6 @@
 use crate::cli::console::Console;
-use crate::data::registry::traits::RegisterLoader;
 use crate::error::Result;
+use crate::utils::runtime::get_runtime;
 use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use datafusion::common::DataFusionError;
@@ -33,38 +33,13 @@ impl CommandHandler for SampleCommand {
         Console::print_key_value("Output", &self.output_path);
         Console::print_key_value("Samples", &self.sample_count.to_string());
 
-        // Create a Tokio runtime for async operations
-        let runtime = tokio::runtime::Runtime::new().map_err(|e| {
-            crate::error::IdsError::Data(format!("Failed to create async runtime: {e}"))
-        })?;
+        // Get the shared Tokio runtime
+        let runtime = get_runtime()?;
 
-        // Load data using the DataFusion-based registry factory
+        // Load data using the DataFusion-based registry helper
         Console::print_info("Loading registry data...");
         let records = runtime.block_on(async {
-            let registry = crate::data::registry::factory::RegistryFactory::from_path(
-                std::path::Path::new(&self.input_path),
-            )?;
-
-            // Downcast to correct type and then load
-            // We try a few common register types
-            if let Some(loader) =
-                registry.downcast_ref::<crate::data::registry::loaders::bef::BefRegister>()
-            {
-                loader.load(&self.input_path, None).await
-            } else if let Some(loader) =
-                registry.downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
-            {
-                loader.load(&self.input_path, None).await
-            } else if let Some(loader) =
-                registry.downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
-            {
-                loader.load(&self.input_path, None).await
-            } else {
-                // If we can't determine the type, try to use a generic DataFusion approach
-                // This would work for basic Parquet files without specialized handling
-                let mut reader = crate::data::io::parquet::ParquetReader::new(&self.input_path);
-                reader.read_async().await
-            }
+            crate::data::registry::load_registry_data(&self.input_path, None, None).await
         })?;
 
         Console::print_info(&format!("Loaded {} record batches", records.len()));

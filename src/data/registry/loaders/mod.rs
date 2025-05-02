@@ -20,7 +20,7 @@ pub use dod::DodRegister;
 pub use dodsaarsag::DodsaarsagRegister;
 pub use idan::IdanRegister;
 pub use ind::IndRegister;
-pub use lpr::{Lpr2Register, Lpr3Register, LprRegistry, LprVersion, LprPaths};
+pub use lpr::{Lpr2Register, Lpr3Register, LprPaths, LprRegistry, LprVersion};
 pub use mfr::MfrRegister;
 pub use uddf::UddfRegister;
 pub use vnds::VndsRegister;

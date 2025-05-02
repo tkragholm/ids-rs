@@ -2,11 +2,8 @@
 //!
 //! This module provides the implementation for handling the Population SCD command.
 
-use arrow::record_batch::RecordBatch;
 use log::info;
 use std::fs;
-use std::path::Path;
-use tokio::runtime::Runtime;
 
 use crate::algorithm::population::classification::{
     extract_scd_children, process_lpr_and_identify_scd, PopulationScdConfig,
@@ -15,6 +12,7 @@ use crate::data::registry::loaders::lpr::find_lpr_files;
 use crate::data::registry::traits::RegisterLoader;
 use crate::error::{IdsError, Result};
 use crate::utils::reports::write_csv_report;
+use crate::utils::runtime::get_runtime;
 
 use super::config::PopulationScdCommandConfig;
 
@@ -25,16 +23,33 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
         fs::create_dir_all(&config.output_dir).map_err(IdsError::Io)?;
     }
 
-    // Create a tokio runtime for async operations
-    let _runtime = Runtime::new()
-        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+    // Get the shared Tokio runtime
+    let runtime = get_runtime()?;
 
     // Step 1: Load population data
     info!(
         "Loading population data from: {}",
         config.population_path.display()
     );
-    let population_data = load_parquet_file(&config.population_path)?;
+    
+    // Use the DataFusion-based parquet loader
+    let population_batches = runtime.block_on(async {
+        crate::data::io::parquet::load_parquet_directory(&config.population_path, None, None).await
+    })?;
+    
+    if population_batches.is_empty() {
+        return Err(IdsError::Data("No population data found".to_string()));
+    }
+    
+    // Combine batches if necessary
+    let population_data = if population_batches.len() == 1 {
+        population_batches[0].clone()
+    } else {
+        let schema = population_batches[0].schema();
+        arrow::compute::concat_batches(&schema, &population_batches)
+            .map_err(|e| IdsError::Data(format!("Failed to concatenate population batches: {e}")))?
+    };
+    
     info!("Loaded {} population records", population_data.num_rows());
 
     // Step 2: Find LPR files
@@ -74,9 +89,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             info!("Loading LPR_ADM data...");
             // Create a Lpr2Register from RegistryFactory
             let adm_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
-            // Use tokio runtime to run async load
-            let runtime = Runtime::new()
-                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            // Use the shared tokio runtime
             let adm_data = runtime.block_on(async {
                 let loader = adm_loader
                     .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
@@ -92,9 +105,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             info!("Loading LPR_DIAG data...");
             // Create a Lpr2Register from RegistryFactory
             let diag_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
-            // Use tokio runtime to run async load
-            let runtime = Runtime::new()
-                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            // Use the shared tokio runtime
             let diag_data = runtime.block_on(async {
                 let loader = diag_loader
                     .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
@@ -110,9 +121,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             info!("Loading LPR_BES data...");
             // Create a Lpr2Register from RegistryFactory
             let bes_loader = crate::data::registry::factory::RegistryFactory::from_name("lpr2")?;
-            // Use tokio runtime to run async load
-            let runtime = Runtime::new()
-                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            // Use the shared tokio runtime
             let bes_data = runtime.block_on(async {
                 let loader = bes_loader
                     .downcast_ref::<crate::data::registry::loaders::lpr::Lpr2Register>()
@@ -135,9 +144,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             // Create a Lpr3Register from RegistryFactory
             let kontakter_loader =
                 crate::data::registry::factory::RegistryFactory::from_name("lpr3")?;
-            // Use tokio runtime to run async load
-            let runtime = Runtime::new()
-                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            // Use the shared tokio runtime
             let kontakter_data = runtime.block_on(async {
                 let loader = kontakter_loader
                     .downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
@@ -154,9 +161,7 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
             // Create a Lpr3Register from RegistryFactory
             let diagnoser_loader =
                 crate::data::registry::factory::RegistryFactory::from_name("lpr3")?;
-            // Use tokio runtime to run async load
-            let runtime = Runtime::new()
-                .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
+            // Use the shared tokio runtime
             let diagnoser_data = runtime.block_on(async {
                 let loader = diagnoser_loader
                     .downcast_ref::<crate::data::registry::loaders::lpr::Lpr3Register>()
@@ -228,7 +233,9 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
 
     // Save full population with SCD indicators
     let population_scd_path = config.output_dir.join("population_scd.parquet");
-    save_batch_as_parquet(&population_scd_data, &population_scd_path)?;
+    runtime.block_on(async {
+        crate::data::io::parquet::save_batch_to_parquet(&population_scd_data, &population_scd_path).await
+    })?;
     info!(
         "Saved population with SCD indicators to: {}",
         population_scd_path.display()
@@ -236,7 +243,9 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
 
     // Save only SCD children
     let scd_children_path = config.output_dir.join("scd_children.parquet");
-    save_batch_as_parquet(&scd_children_data, &scd_children_path)?;
+    runtime.block_on(async {
+        crate::data::io::parquet::save_batch_to_parquet(&scd_children_data, &scd_children_path).await
+    })?;
     info!("Saved SCD children to: {}", scd_children_path.display());
 
     // Save summary as CSV
@@ -280,35 +289,3 @@ pub fn handle_population_scd_command(config: &PopulationScdCommandConfig) -> Res
     Ok(())
 }
 
-/// Load a Parquet file as a `RecordBatch`
-fn load_parquet_file(path: &Path) -> Result<RecordBatch> {
-    // Use the parquet reader from data::io::parquet
-    let runtime = Runtime::new()
-        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
-
-    let batches = runtime.block_on(async {
-        crate::data::io::parquet::load_parquet_directory(path, None, None).await
-    })?;
-
-    if batches.is_empty() {
-        return Err(IdsError::Data("No data found in Parquet file".to_string()));
-    }
-
-    // Combine all batches into a single RecordBatch
-    if batches.len() == 1 {
-        Ok(batches[0].clone())
-    } else {
-        let schema = batches[0].schema();
-        arrow::compute::concat_batches(&schema, &batches)
-            .map_err(|e| IdsError::Data(format!("Failed to concatenate batches: {e}")))
-    }
-}
-
-/// Save `RecordBatch` as a Parquet file
-fn save_batch_as_parquet(batch: &RecordBatch, path: &Path) -> Result<()> {
-    // Use the optimized Parquet writer from data::io::parquet
-    let runtime = Runtime::new()
-        .map_err(|e| IdsError::Data(format!("Failed to create async runtime: {e}")))?;
-
-    runtime.block_on(async { crate::data::io::parquet::save_batch_to_parquet(batch, path).await })
-}
