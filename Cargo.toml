@@ -57,4 +57,4 @@ path = "src/main.rs"
 
 [profile.release]
 lto = true
-codegen-units = 1
+codegen-units = 16 # Reduce to 1 to increase performance

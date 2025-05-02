@@ -1,7 +1,7 @@
 /target
 *.csv
 *.png
-/log
+
 /data
 Cargo.lock
 /output

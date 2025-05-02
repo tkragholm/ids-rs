@@ -84,12 +84,20 @@ pub fn identify_scd_in_population(
     log::info!("SCD analysis complete: {} patient records", scd_results.len());
 
     // Step 2: Create map of patient ID to SCD result with preallocated capacity
+    // Use a more efficient hash map implementation for string keys
     log::debug!("Creating index for fast SCD lookup");
     let estimated_capacity = scd_results.len();
-    let mut scd_map: HashMap<String, &ScdResult> = HashMap::with_capacity(estimated_capacity);
     
+    // Use rustc_hash::FxHashMap which is faster for string keys than the standard HashMap
+    use rustc_hash::FxHashMap;
+    let mut scd_map: FxHashMap<&str, &ScdResult> = FxHashMap::with_capacity_and_hasher(
+        estimated_capacity, 
+        Default::default()
+    );
+    
+    // Store references to avoid cloning strings
     for result in &scd_results {
-        scd_map.insert(result.patient_id.clone(), result);
+        scd_map.insert(&result.patient_id, result);
     }
     
     // Step 3: Extract PNR from population data
@@ -103,12 +111,37 @@ pub fn identify_scd_in_population(
         })?;
 
     let pnr_col = population_data.column(pnr_col_idx);
-    let pnr_array = pnr_col
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .ok_or_else(|| {
-            IdsError::Data("PNR column in population data is not a string array".to_string())
-        })?;
+    
+    // Handle the StringArray conversion
+    let mut converted_array_holder = None;
+    
+    // First, try direct downcast
+    let pnr_array = if let Some(array) = pnr_col.as_any().downcast_ref::<StringArray>() {
+        array
+    } else {
+        // If direct downcast fails, try to convert using Arrow cast
+        log::warn!("Attempting generic conversion to StringArray for column {} with type {:?}", 
+                  config.population_pnr_column, pnr_col.data_type());
+        
+        // Create a cast result that will be owned
+        let cast_result = arrow::compute::cast(pnr_col, &arrow::datatypes::DataType::Utf8)
+            .map_err(|e| IdsError::Data(format!(
+                "Failed to convert PNR column to StringArray: {e}"
+            )))?;
+        
+        log::info!("Successfully converted column {} to StringArray using Arrow cast", 
+                  config.population_pnr_column);
+        
+        // Keep the converted array alive for the duration of this function
+        converted_array_holder = Some(cast_result);
+        
+        // Get a StringArray reference from the cast result
+        converted_array_holder.as_ref().unwrap().as_any().downcast_ref::<StringArray>()
+            .ok_or_else(|| IdsError::Data(format!(
+                "Failed to convert {} to StringArray after casting", 
+                config.population_pnr_column
+            )))?
+    };
 
     // Step 4: Match population records with SCD results
     log::debug!("Matching population records with SCD results");
@@ -135,81 +168,136 @@ pub fn identify_scd_in_population(
         category_counts.insert(category.clone(), 0);
     }
 
-    // Process in chunks for better cache efficiency
-    const CHUNK_SIZE: usize = 10000;
-    let total_chunks = num_rows.div_ceil(CHUNK_SIZE);
+    // Process data in parallel using Rayon
+    use rayon::prelude::*;
     
-    for chunk_index in 0..total_chunks {
-        let start_idx = chunk_index * CHUNK_SIZE;
-        let end_idx = (start_idx + CHUNK_SIZE).min(num_rows);
-        
-        // Process each child in this chunk
-        for i in start_idx..end_idx {
-            if pnr_array.is_null(i) {
-                // Add nulls for missing PNR
-                is_scd.push(None);
-                first_scd_date.push(None);
-                for category_vec in disease_categories.values_mut() {
-                    category_vec.push(None);
-                }
-                continue;
-            }
-
-            let pnr = pnr_array.value(i);
+    // Create intermediate vectors that will be processed in parallel
+    let chunk_size = 10000;
+    let num_chunks = num_rows.div_ceil(chunk_size);
+    
+    // Define the chunk structure to be processed in parallel
+    struct ChunkResult {
+        is_scd: Vec<Option<bool>>,
+        first_scd_date: Vec<Option<i32>>,
+        category_values: HashMap<String, Vec<Option<bool>>>,
+        scd_children_count: usize,
+        category_counts: HashMap<String, usize>,
+    }
+    
+    // Process chunks in parallel
+    let chunk_results: Vec<ChunkResult> = (0..num_chunks)
+        .into_par_iter()
+        .map(|chunk_index| {
+            let start_idx = chunk_index * chunk_size;
+            let end_idx = (start_idx + chunk_size).min(num_rows);
+            let chunk_size = end_idx - start_idx;
             
-            // Look up SCD result for this PNR (O(1) lookup with HashMap)
-            if let Some(scd_result) = scd_map.get(pnr) {
-                is_scd.push(Some(scd_result.is_scd));
-                
-                if scd_result.is_scd {
-                    scd_children_count += 1;
-                    
-                    // Update first SCD date
-                    if let Some(date) = scd_result.first_scd_date {
-                        let days = (date.signed_duration_since(
-                            NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
-                        ).num_days()) as i32;
-                        first_scd_date.push(Some(days));
-                    } else {
-                        first_scd_date.push(None);
+            // Initialize chunk result data
+            let mut chunk_is_scd = Vec::with_capacity(chunk_size);
+            let mut chunk_first_scd_date = Vec::with_capacity(chunk_size);
+            let mut chunk_category_values: HashMap<String, Vec<Option<bool>>> = HashMap::new();
+            let mut chunk_scd_children_count = 0;
+            let mut chunk_category_counts: HashMap<String, usize> = HashMap::new();
+            
+            // Initialize category vectors and counts
+            for category in &all_categories {
+                chunk_category_values.insert(category.clone(), Vec::with_capacity(chunk_size));
+                chunk_category_counts.insert(category.clone(), 0);
+            }
+            
+            // Process each child in this chunk
+            for i in start_idx..end_idx {
+                if pnr_array.is_null(i) {
+                    // Add nulls for missing PNR
+                    chunk_is_scd.push(None);
+                    chunk_first_scd_date.push(None);
+                    for category_vec in chunk_category_values.values_mut() {
+                        category_vec.push(None);
                     }
+                    continue;
+                }
+
+                let pnr = pnr_array.value(i);
+                
+                // Look up SCD result for this PNR (O(1) lookup with HashMap)
+                if let Some(scd_result) = scd_map.get(pnr) {
+                    chunk_is_scd.push(Some(scd_result.is_scd));
                     
-                    // Update disease categories
-                    for (category, has_disease) in &scd_result.disease_categories {
-                        let category_vec = disease_categories.get_mut(category).unwrap();
-                        category_vec.push(Some(*has_disease));
+                    if scd_result.is_scd {
+                        chunk_scd_children_count += 1;
                         
-                        if *has_disease {
-                            *category_counts.get_mut(category).unwrap() += 1;
+                        // Update first SCD date
+                        if let Some(date) = scd_result.first_scd_date {
+                            let days = (date.signed_duration_since(
+                                NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
+                            ).num_days()) as i32;
+                            chunk_first_scd_date.push(Some(days));
+                        } else {
+                            chunk_first_scd_date.push(None);
+                        }
+                        
+                        // Update disease categories
+                        for (category, has_disease) in &scd_result.disease_categories {
+                            let category_vec = chunk_category_values.get_mut(category).unwrap();
+                            category_vec.push(Some(*has_disease));
+                            
+                            if *has_disease {
+                                *chunk_category_counts.get_mut(category).unwrap() += 1;
+                            }
+                        }
+                    } else {
+                        // Not SCD
+                        chunk_first_scd_date.push(None);
+                        
+                        // Set all categories to false
+                        for category_vec in chunk_category_values.values_mut() {
+                            category_vec.push(Some(false));
                         }
                     }
                 } else {
-                    // Not SCD
-                    first_scd_date.push(None);
+                    // No SCD result for this PNR
+                    chunk_is_scd.push(Some(false));
+                    chunk_first_scd_date.push(None);
                     
                     // Set all categories to false
-                    for category_vec in disease_categories.values_mut() {
+                    for category_vec in chunk_category_values.values_mut() {
                         category_vec.push(Some(false));
                     }
                 }
-            } else {
-                // No SCD result for this PNR
-                is_scd.push(Some(false));
-                first_scd_date.push(None);
-                
-                // Set all categories to false
-                for category_vec in disease_categories.values_mut() {
-                    category_vec.push(Some(false));
-                }
             }
+            
+            // Log progress
+            log::debug!("Processed chunk {}/{}, found {} SCD children", 
+                       chunk_index + 1, num_chunks, chunk_scd_children_count);
+            
+            // Return this chunk's results
+            ChunkResult {
+                is_scd: chunk_is_scd,
+                first_scd_date: chunk_first_scd_date,
+                category_values: chunk_category_values,
+                scd_children_count: chunk_scd_children_count,
+                category_counts: chunk_category_counts,
+            }
+        })
+        .collect();
+    
+    // Combine results from all chunks
+    for chunk_result in chunk_results {
+        // Extend vectors
+        is_scd.extend(chunk_result.is_scd);
+        first_scd_date.extend(chunk_result.first_scd_date);
+        
+        // Extend category vectors
+        for (category, values) in chunk_result.category_values {
+            disease_categories.get_mut(&category).unwrap().extend(values);
         }
         
-        // Log progress periodically
-        if chunk_index % 10 == 0 || chunk_index == total_chunks - 1 {
-            log::debug!("Matched population chunk {}/{} ({:.1}%), found {} SCD children so far", 
-                       chunk_index + 1, total_chunks, 
-                       (chunk_index + 1) as f64 * 100.0 / total_chunks as f64,
-                       scd_children_count);
+        // Update counts
+        scd_children_count += chunk_result.scd_children_count;
+        
+        // Update category counts
+        for (category, count) in chunk_result.category_counts {
+            *category_counts.get_mut(&category).unwrap() += count;
         }
     }
 

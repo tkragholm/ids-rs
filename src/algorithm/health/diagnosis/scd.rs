@@ -192,43 +192,104 @@ impl ScdDiseaseCodes {
         &self.all_codes_cache
     }
     
-    /// Check if a diagnosis code is a SCD code
+    /// Check if a diagnosis code is a SCD code with caching for better performance
     #[must_use] 
     pub fn is_scd_code(&self, diagnosis: &str) -> bool {
-        // First normalize the code
+        use std::sync::Mutex;
+        use once_cell::sync::Lazy;
+        
+        // Cache of previously seen diagnosis codes and their SCD status
+        // This avoids repeated normalization and pattern matching for common codes
+        static DIAGNOSIS_CACHE: Lazy<Mutex<HashMap<String, bool>>> = 
+            Lazy::new(|| Mutex::new(HashMap::with_capacity(10000)));
+        
+        // Check cache first for this exact diagnosis string
+        {
+            let cache = DIAGNOSIS_CACHE.lock().unwrap();
+            if let Some(&result) = cache.get(diagnosis) {
+                return result;
+            }
+        }
+        
+        // If not in cache, normalize the code
         let normalized = match normalize_diagnosis_code(diagnosis) {
             Some(norm) => norm,
-            None => return false,
+            None => {
+                // Cache negative result
+                let mut cache = DIAGNOSIS_CACHE.lock().unwrap();
+                if cache.len() < 100000 { // Limit cache size
+                    cache.insert(diagnosis.to_string(), false);
+                }
+                return false;
+            },
         };
         
         // First check if it's a simple prefix match (faster)
         for prefix in &self.all_codes_cache {
             if normalized.full_code.starts_with(prefix) {
+                // Cache positive result
+                let mut cache = DIAGNOSIS_CACHE.lock().unwrap();
+                if cache.len() < 100000 { // Limit cache size
+                    cache.insert(diagnosis.to_string(), true);
+                }
                 return true;
             }
         }
         
         // If not found in prefix cache, check regex patterns
+        let mut result = false;
         for patterns in self.patterns.values() {
             for pattern in patterns {
                 if pattern.matches(&normalized) {
-                    return true;
+                    result = true;
+                    break;
                 }
+            }
+            if result {
+                break;
             }
         }
         
-        false
+        // Cache the result before returning
+        let mut cache = DIAGNOSIS_CACHE.lock().unwrap();
+        if cache.len() < 100000 { // Limit cache size
+            cache.insert(diagnosis.to_string(), result);
+        }
+        
+        result
     }
     
-    /// Get the disease categories for a diagnosis code
+    /// Get the disease categories for a diagnosis code with caching for better performance
     #[must_use] 
     pub fn get_disease_categories(&self, diagnosis: &str) -> HashSet<String> {
+        use std::sync::Mutex;
+        use once_cell::sync::Lazy;
+        
+        // Cache of previously seen diagnosis codes and their disease categories
+        static CATEGORY_CACHE: Lazy<Mutex<HashMap<String, HashSet<String>>>> = 
+            Lazy::new(|| Mutex::new(HashMap::with_capacity(10000)));
+        
+        // Check cache first for this exact diagnosis string
+        {
+            let cache = CATEGORY_CACHE.lock().unwrap();
+            if let Some(cached_categories) = cache.get(diagnosis) {
+                return cached_categories.clone();
+            }
+        }
+        
         let mut categories = HashSet::new();
         
         // First normalize the code
         let normalized = match normalize_diagnosis_code(diagnosis) {
             Some(norm) => norm,
-            None => return categories,
+            None => {
+                // Cache empty result
+                let mut cache = CATEGORY_CACHE.lock().unwrap();
+                if cache.len() < 100000 { // Limit cache size
+                    cache.insert(diagnosis.to_string(), categories.clone());
+                }
+                return categories;
+            },
         };
         
         // Check each category's patterns
@@ -239,6 +300,12 @@ impl ScdDiseaseCodes {
                     break; // No need to check other patterns in this category
                 }
             }
+        }
+        
+        // Cache the result before returning
+        let mut cache = CATEGORY_CACHE.lock().unwrap();
+        if cache.len() < 100000 { // Limit cache size
+            cache.insert(diagnosis.to_string(), categories.clone());
         }
         
         categories
@@ -290,13 +357,16 @@ pub struct ScdResult {
     pub disease_categories: HashMap<String, bool>,
 }
 
-/// Apply the SCD algorithm to health data
+/// Apply the SCD algorithm to health data with parallel processing
 pub fn apply_scd_algorithm(
     health_data: &RecordBatch,
     config: &ScdConfig,
 ) -> Result<Vec<ScdResult>> {
-    // Initialize SCD disease codes
-    let scd_codes = ScdDiseaseCodes::new();
+    use rayon::prelude::*;
+    use std::sync::{Arc, Mutex};
+    
+    // Initialize SCD disease codes (shared across threads)
+    let scd_codes = Arc::new(ScdDiseaseCodes::new());
     let all_categories = scd_codes.get_all_categories();
     
     // Get required columns for the algorithm
@@ -329,112 +399,191 @@ pub fn apply_scd_algorithm(
         categories: HashMap<String, bool>,
     }
     
-    let mut patient_data: HashMap<String, PatientData> = HashMap::with_capacity(estimated_patients);
+    // Create a thread-safe map for patient data
+    let patient_data: Arc<Mutex<HashMap<String, PatientData>>> = 
+        Arc::new(Mutex::new(HashMap::with_capacity(estimated_patients)));
     
-    // Process each record in the health data
-    for row_idx in 0..num_rows {
-        // Skip records with null patient ID
-        if patient_id_array.is_null(row_idx) {
-            continue;
-        }
-        
-        let patient_id = patient_id_array.value(row_idx).to_string();
-        
-        // Initialize patient data if not seen before
-        let patient = patient_data
-            .entry(patient_id.clone())
-            .or_insert_with(|| {
-                let mut categories = HashMap::with_capacity(all_categories.len());
-                for category in &all_categories {
-                    categories.insert(category.clone(), false);
-                }
-                PatientData {
-                    is_scd: false,
-                    first_scd_date: None,
-                    categories,
-                }
-            });
-        
-        // Get the diagnosis date (may be null)
-        let diagnosis_date = if let Some(date_col) = health_data.column_by_name(&config.date_column) {
-            if date_col.is_null(row_idx) {
-                None
-            } else if let Some(date_array) = date_col.as_any().downcast_ref::<Date32Array>() {
-                // Convert from days since epoch to NaiveDate
-                let days_since_epoch = date_array.value(row_idx);
-                Some(
-                    NaiveDate::from_ymd_opt(1970, 1, 1)
-                        .unwrap()
-                        .checked_add_days(chrono::Days::new(days_since_epoch as u64))
-                        .unwrap(),
-                )
-            } else {
-                // Date column is not a Date32Array
-                None
-            }
-        } else {
-            // Date column not found
-            None
-        };
-        
-        // Check each diagnosis column
-        let mut found_scd = false;
-        let mut scd_categories = HashSet::new();
-        
-        for diag_col_name in &config.diagnosis_columns {
-            if let Some(diag_col) = health_data.column_by_name(diag_col_name) {
-                if diag_col.is_null(row_idx) {
-                    continue;
-                }
-                
-                // Extract diagnosis code
-                if let Some(diag_array) = diag_col.as_any().downcast_ref::<StringArray>() {
-                    let diagnosis = diag_array.value(row_idx);
-                    
-                    // Check if it's a SCD code
-                    if scd_codes.is_scd_code(diagnosis) {
-                        found_scd = true;
-                        
-                        // Get categories for this diagnosis
-                        let categories = scd_codes.get_disease_categories(diagnosis);
-                        scd_categories.extend(categories);
-                    }
-                }
-            }
-        }
-        
-        // Update patient data if SCD was found
-        if found_scd {
-            patient.is_scd = true;
-            
-            // Update first diagnosis date
-            if let Some(date) = diagnosis_date {
-                if let Some(current_date) = patient.first_scd_date {
-                    if date < current_date {
-                        patient.first_scd_date = Some(date);
-                    }
-                } else {
-                    patient.first_scd_date = Some(date);
-                }
-            }
-            
-            // Update disease categories
-            for category in scd_categories {
-                if let Some(has_category) = patient.categories.get_mut(&category) {
-                    *has_category = true;
-                }
+    // Extract and validate date column
+    let date_col_opt = health_data.column_by_name(&config.date_column);
+    let date_array_opt = if let Some(date_col) = date_col_opt {
+        date_col.as_any().downcast_ref::<Date32Array>().map(Arc::new)
+    } else {
+        None
+    };
+    
+    // Extract diagnosis columns for parallel processing
+    let mut diag_arrays = Vec::with_capacity(config.diagnosis_columns.len());
+    for diag_col_name in &config.diagnosis_columns {
+        if let Some(diag_col) = health_data.column_by_name(diag_col_name) {
+            if let Some(diag_array) = diag_col.as_any().downcast_ref::<StringArray>() {
+                diag_arrays.push(Arc::new(diag_array));
             }
         }
     }
     
+    // Process records in configurable chunk sizes for better cache efficiency
+    const CHUNK_SIZE: usize = 10000;
+    let chunks = (0..num_rows).collect::<Vec<usize>>()
+        .chunks(CHUNK_SIZE)
+        .map(|chunk| chunk.to_vec())
+        .collect::<Vec<Vec<usize>>>();
+    
+    // Process chunks in parallel
+    chunks.into_par_iter().for_each(|chunk| {
+        // Create thread-local maps to reduce lock contention
+        let mut thread_patient_data: HashMap<String, PatientData> = HashMap::new();
+        
+        // Process each record in this chunk
+        for &row_idx in &chunk {
+            // Skip records with null patient ID
+            if patient_id_array.is_null(row_idx) {
+                continue;
+            }
+            
+            // Get patient ID (we'll clone only when needed)
+            let patient_id = patient_id_array.value(row_idx);
+            
+            // Check if we've already seen this patient in current thread
+            if !thread_patient_data.contains_key(patient_id) {
+                // Check if this patient is already in the shared map
+                let mut global_map = patient_data.lock().unwrap();
+                if !global_map.contains_key(patient_id) {
+                    // Initialize categories map
+                    let mut categories = HashMap::with_capacity(all_categories.len());
+                    for category in &all_categories {
+                        categories.insert(category.clone(), false);
+                    }
+                    
+                    // Insert into global map
+                    global_map.insert(patient_id.to_string(), PatientData {
+                        is_scd: false,
+                        first_scd_date: None,
+                        categories,
+                    });
+                }
+                
+                // Copy to thread-local map
+                if let Some(patient) = global_map.get(patient_id) {
+                    thread_patient_data.insert(
+                        patient_id.to_string(), 
+                        PatientData {
+                            is_scd: patient.is_scd,
+                            first_scd_date: patient.first_scd_date,
+                            categories: patient.categories.clone(),
+                        }
+                    );
+                }
+            }
+            
+            // Get patient data from thread-local map
+            let patient = thread_patient_data.get_mut(patient_id).unwrap();
+            
+            // Get the diagnosis date (may be null)
+            let diagnosis_date = if let Some(date_array) = &date_array_opt {
+                if date_array.is_null(row_idx) {
+                    None
+                } else {
+                    // Convert from days since epoch to NaiveDate
+                    let days_since_epoch = date_array.value(row_idx);
+                    Some(
+                        NaiveDate::from_ymd_opt(1970, 1, 1)
+                            .unwrap()
+                            .checked_add_days(chrono::Days::new(days_since_epoch as u64))
+                            .unwrap(),
+                    )
+                }
+            } else {
+                None
+            };
+            
+            // Check each diagnosis column
+            let mut found_scd = false;
+            let mut scd_categories = HashSet::new();
+            
+            for diag_array in &diag_arrays {
+                if diag_array.is_null(row_idx) {
+                    continue;
+                }
+                
+                // Extract diagnosis code (without cloning)
+                let diagnosis = diag_array.value(row_idx);
+                
+                // Check if it's a SCD code
+                if scd_codes.is_scd_code(diagnosis) {
+                    found_scd = true;
+                    
+                    // Get categories for this diagnosis
+                    let categories = scd_codes.get_disease_categories(diagnosis);
+                    scd_categories.extend(categories);
+                }
+            }
+            
+            // Update patient data if SCD was found
+            if found_scd {
+                patient.is_scd = true;
+                
+                // Update first diagnosis date
+                if let Some(date) = diagnosis_date {
+                    if let Some(current_date) = patient.first_scd_date {
+                        if date < current_date {
+                            patient.first_scd_date = Some(date);
+                        }
+                    } else {
+                        patient.first_scd_date = Some(date);
+                    }
+                }
+                
+                // Update disease categories
+                for category in scd_categories {
+                    if let Some(has_category) = patient.categories.get_mut(&category) {
+                        *has_category = true;
+                    }
+                }
+            }
+        }
+        
+        // Merge thread-local data back into shared map
+        let mut global_map = patient_data.lock().unwrap();
+        for (id, thread_patient) in thread_patient_data {
+            if let Some(global_patient) = global_map.get_mut(&id) {
+                // Only update if thread data has SCD
+                if thread_patient.is_scd {
+                    global_patient.is_scd = true;
+                    
+                    // Update first diagnosis date if needed
+                    if let Some(thread_date) = thread_patient.first_scd_date {
+                        if let Some(global_date) = global_patient.first_scd_date {
+                            if thread_date < global_date {
+                                global_patient.first_scd_date = Some(thread_date);
+                            }
+                        } else {
+                            global_patient.first_scd_date = Some(thread_date);
+                        }
+                    }
+                    
+                    // Merge categories
+                    for (category, &has_category) in &thread_patient.categories {
+                        if has_category {
+                            if let Some(global_has_category) = global_patient.categories.get_mut(category) {
+                                *global_has_category = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
     // Convert the patient data map to a vector of ScdResult objects
     let results = patient_data
-        .into_iter()
+        .lock()
+        .unwrap()
+        .iter()
         .map(|(patient_id, data)| ScdResult {
-            patient_id,
+            patient_id: patient_id.clone(),
             is_scd: data.is_scd,
             first_scd_date: data.first_scd_date,
-            disease_categories: data.categories,
+            disease_categories: data.categories.clone(),
         })
         .collect();
     
