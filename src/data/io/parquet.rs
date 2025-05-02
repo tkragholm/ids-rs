@@ -207,7 +207,7 @@ impl ParquetReader {
         Ok(self.file_list.as_ref().unwrap())
     }
 
-    /// Create physical execution plan for parquet reading with DataFusion 47.0.0
+    /// Create physical execution plan for parquet reading with `DataFusion` 47.0.0
     async fn create_execution_plan(&mut self) -> Result<Arc<dyn ExecutionPlan>> {
         // Ensure session context is initialized
         self.init_session_context()?;
@@ -222,7 +222,7 @@ impl ParquetReader {
         let format_arc = Arc::new(format);
 
         // Create the object store URL - we need to use file:// URI
-        let url = ObjectStoreUrl::parse("file://".to_string())?;
+        let url = ObjectStoreUrl::parse("file://")?;
 
         // Start building the config with schema
         let schema = if let Some(schema) = &self.config.schema {
@@ -353,12 +353,12 @@ impl ParquetReader {
         self.read_async().await
     }
 
-    /// Create an execution plan that can be used in custom DataFusion operations
+    /// Create an execution plan that can be used in custom `DataFusion` operations
     pub async fn create_plan(&mut self) -> Result<Arc<dyn ExecutionPlan>> {
         self.create_execution_plan().await
     }
 
-    /// Create a DataFrame from this reader
+    /// Create a `DataFrame` from this reader
     pub async fn to_dataframe(&mut self) -> Result<DataFrame> {
         let ctx = self.init_session_context()?.clone();
         let physical_plan = self.create_execution_plan().await?;
@@ -499,7 +499,7 @@ pub async fn register_parquet_as_table(
     Ok(df)
 }
 
-/// Convert record batches to a DataFusion table
+/// Convert record batches to a `DataFusion` table
 pub fn batches_to_table(batches: &[RecordBatch]) -> Result<Arc<dyn TableProvider>> {
     if batches.is_empty() {
         return Err(IdsError::Validation(

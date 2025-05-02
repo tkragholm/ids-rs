@@ -25,8 +25,14 @@ pub mod parquet;
 
 pub use async_utils::*;
 pub use base_provider::*;
-pub use datafusion::*;
-pub use datafusion_utils::*;
+// Use explicit imports to avoid ambiguous re-exports
+pub use datafusion_utils::create_listing_table;
+pub use datafusion_utils::create_mem_table;
+pub use datafusion_utils::create_optimized_context;
+pub use datafusion_utils::find_parquet_files;
+pub use datafusion_utils::filter_by_pnrs;
+pub use datafusion_utils::register_listing_table;
+pub use datafusion_utils::register_tables_from_directories;
 pub use parquet::*;
 
 // Re-export from the new modules to maintain backward compatibility

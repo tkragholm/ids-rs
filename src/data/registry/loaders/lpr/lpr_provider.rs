@@ -15,7 +15,7 @@ use datafusion::error::Result as DFResult;
 use datafusion::logical_expr::TableProviderFilterPushDown;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 
-use datafusion::physical_plan::ExecutionPlan;
+// ExecutionPlan is used through type annotations so we don't need to import it directly
 use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -154,8 +154,8 @@ impl TableProvider for LprTableProvider {
         // We can push down PNR filter but not complex filters
         let mut pushdowns = Vec::new();
 
-        for filter in filters {
-            if let Expr::BinaryExpr(expr) = *filter {
+        for &filter in filters {
+            if let Expr::BinaryExpr(expr) = filter {
                 if let Expr::Column(col) = expr.left.as_ref() {
                     // LPR v2 uses PNR, LPR v3 uses CPR
                     let pnr_col = match self.version {
@@ -177,14 +177,13 @@ impl TableProvider for LprTableProvider {
         }
     }
 
-    fn scan(
+    async fn scan(
         &self,
         _state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        _filters: &[&Expr],
+        _filters: &[Expr],
         limit: Option<usize>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = DFResult<Arc<dyn datafusion::physical_plan::ExecutionPlan>>> + Send>> {
-        Box::pin(async move {
+    ) -> DFResult<Arc<dyn datafusion::physical_plan::ExecutionPlan>> {
         // Find all the parquet files
         let parquet_files = self.find_lpr_files().map_err(|e| {
             datafusion::error::DataFusionError::Execution(format!("Error finding LPR files: {e}"))
@@ -248,6 +247,5 @@ impl TableProvider for LprTableProvider {
         // Create DataSourceExec with the config and return it
         // DataSourceExec implements ExecutionPlan trait
         Ok(DataSourceExec::from_data_source(config) as Arc<dyn datafusion::physical_plan::ExecutionPlan>)
-        })
     }
 }

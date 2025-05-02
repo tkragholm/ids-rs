@@ -87,8 +87,8 @@ impl PnrFilter {
         }
     }
 
-    /// Create a predicate for DataFusion execution
-    pub fn to_predicate(&self) -> Option<Expr> {
+    /// Create a predicate for `DataFusion` execution
+    #[must_use] pub fn to_predicate(&self) -> Option<Expr> {
         self.to_expr()
     }
     

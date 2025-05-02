@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// Create a new DataFusion session context with optimized settings
+/// Create a new `DataFusion` session context with optimized settings
 #[must_use] pub fn create_optimized_context() -> SessionContext {
     let config = SessionConfig::new()
         .with_target_partitions(4)
@@ -20,7 +20,7 @@ use std::sync::Arc;
     SessionContext::new_with_config(config)
 }
 
-/// Create a ListingTable from a directory of parquet files
+/// Create a `ListingTable` from a directory of parquet files
 pub fn create_listing_table(
     dir_path: impl AsRef<Path>,
     schema: SchemaRef,
@@ -36,16 +36,26 @@ pub fn create_listing_table(
     let parquet_format = ParquetFormat::default()
         .with_enable_pruning(true);
     
-    // Create listing options
-    let options = ListingOptions::new(Arc::new(parquet_format))
+    // Create listing options with partition columns
+    let mut options = ListingOptions::new(Arc::new(parquet_format))
         .with_file_extension(file_extension)
         .with_target_partitions(4);
         
-    // Create config
+    // Add partition columns to listing options directly
+    if !table_partition_cols.is_empty() {
+        // Convert String vec to (String, DataType::Utf8) tuples for table partition columns
+        let partition_cols_with_types: Vec<(String, arrow::datatypes::DataType)> = 
+            table_partition_cols.into_iter()
+            .map(|col| (col, arrow::datatypes::DataType::Utf8))
+            .collect();
+            
+        options = options.with_table_partition_cols(partition_cols_with_types);
+    }
+        
+    // Create config with the options that include partition columns
     let config = ListingTableConfig::new(url)
         .with_schema(schema)
-        .with_listing_options(options)
-        .with_table_partition_cols(table_partition_cols);
+        .with_listing_options(options);
         
     // Create the listing table
     let table = ListingTable::try_new(config)?;
@@ -53,7 +63,7 @@ pub fn create_listing_table(
     Ok(Arc::new(table))
 }
 
-/// Create a MemTable from record batches
+/// Create a `MemTable` from record batches
 pub fn create_mem_table(batches: &[RecordBatch]) -> Result<Arc<dyn TableProvider>> {
     if batches.is_empty() {
         return Err(DataFusionError::Execution("Cannot create table from empty batches".to_string()).into());

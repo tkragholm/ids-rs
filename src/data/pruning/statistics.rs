@@ -43,25 +43,25 @@ impl FileStatistics {
     }
 
     /// Add a minimum value for a column
-    pub fn with_min_value(mut self, column: &str, value: ScalarValue) -> Self {
+    #[must_use] pub fn with_min_value(mut self, column: &str, value: ScalarValue) -> Self {
         self.min_values.insert(column.to_string(), value);
         self
     }
 
     /// Add a maximum value for a column
-    pub fn with_max_value(mut self, column: &str, value: ScalarValue) -> Self {
+    #[must_use] pub fn with_max_value(mut self, column: &str, value: ScalarValue) -> Self {
         self.max_values.insert(column.to_string(), value);
         self
     }
 
     /// Add unique values for a column
-    pub fn with_unique_values(mut self, column: &str, values: HashSet<String>) -> Self {
+    #[must_use] pub fn with_unique_values(mut self, column: &str, values: HashSet<String>) -> Self {
         self.unique_values.insert(column.to_string(), values);
         self
     }
 
     /// Check if a file should be processed based on a filter
-    pub fn should_process(&self, expr: &Expr) -> bool {
+    #[must_use] pub fn should_process(&self, expr: &Expr) -> bool {
         match expr {
             // Handle binary expressions (like =, >, <, etc.)
             Expr::BinaryExpr(binary) => {
@@ -200,7 +200,7 @@ impl RegistryPruningStatistics {
     }
 
     /// Add files statistics
-    pub fn with_files(mut self, files: Vec<FileStatistics>) -> Self {
+    #[must_use] pub fn with_files(mut self, files: Vec<FileStatistics>) -> Self {
         self.files = files;
 
         // Extract min/max values from files for columns
@@ -224,7 +224,7 @@ impl RegistryPruningStatistics {
                         })
                         .collect();
 
-                    if !min_strings.is_empty() && min_strings.iter().any(|s| s.is_some()) {
+                    if !min_strings.is_empty() && min_strings.iter().any(std::option::Option::is_some) {
                         let array = StringArray::from(min_strings);
                         self.min_values.insert(column_name.clone(), Arc::new(array));
                     }
@@ -244,7 +244,7 @@ impl RegistryPruningStatistics {
                         })
                         .collect();
 
-                    if !max_strings.is_empty() && max_strings.iter().any(|s| s.is_some()) {
+                    if !max_strings.is_empty() && max_strings.iter().any(std::option::Option::is_some) {
                         let array = StringArray::from(max_strings);
                         self.max_values.insert(column_name.clone(), Arc::new(array));
                     }
@@ -265,7 +265,7 @@ impl RegistryPruningStatistics {
                         })
                         .collect();
 
-                    if !min_ints.is_empty() && min_ints.iter().any(|i| i.is_some()) {
+                    if !min_ints.is_empty() && min_ints.iter().any(std::option::Option::is_some) {
                         let array = UInt32Array::from(min_ints);
                         self.min_values.insert(column_name.clone(), Arc::new(array));
                     }
@@ -285,7 +285,7 @@ impl RegistryPruningStatistics {
                         })
                         .collect();
 
-                    if !max_ints.is_empty() && max_ints.iter().any(|i| i.is_some()) {
+                    if !max_ints.is_empty() && max_ints.iter().any(std::option::Option::is_some) {
                         let array = UInt32Array::from(max_ints);
                         self.max_values.insert(column_name.clone(), Arc::new(array));
                     }
@@ -306,7 +306,7 @@ impl RegistryPruningStatistics {
     }
 
     /// Filter files based on an expression
-    pub fn filter_files(&self, expr: &Expr) -> Vec<FileStatistics> {
+    #[must_use] pub fn filter_files(&self, expr: &Expr) -> Vec<FileStatistics> {
         self.files
             .iter()
             .filter(|file| file.should_process(expr))

@@ -1,6 +1,6 @@
-//! Filtering functionality for DataFrames
+//! Filtering functionality for `DataFrames`
 //!
-//! This module provides unified filtering for DataFrames and registry data.
+//! This module provides unified filtering for `DataFrames` and registry data.
 //! It includes specialized filters for PNR/CPR, dates, and categorical values.
 
 mod predicates;

@@ -74,7 +74,7 @@ pub fn create_pruning_predicate(
     Ok(Some(PruningPredicate::try_new(physical_expr, schema)?))
 }
 
-/// Create a SessionContext with a registered table using pruning
+/// Create a `SessionContext` with a registered table using pruning
 pub async fn create_context_with_pruning(
     path: &str,
     schema: SchemaRef,

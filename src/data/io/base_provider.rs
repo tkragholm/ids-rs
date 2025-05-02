@@ -1,6 +1,6 @@
-//! Base table provider for consistent DataFusion integration
+//! Base table provider for consistent `DataFusion` integration
 //!
-//! This module provides a common base for TableProvider implementations
+//! This module provides a common base for `TableProvider` implementations
 //! to ensure consistency across different table providers.
 
 use arrow::datatypes::SchemaRef;
@@ -103,7 +103,7 @@ pub struct GenericTableProvider {
 
 impl GenericTableProvider {
     /// Create a new generic table provider
-    pub fn new(
+    #[must_use] pub fn new(
         schema: SchemaRef,
         file_list: Vec<PathBuf>,
         filter_columns: HashSet<String>,
@@ -216,20 +216,21 @@ impl TableProvider for GenericTableProvider {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn scan(
+    async fn scan(
         &self,
         state: &dyn datafusion::catalog::Session,
         projection: Option<&Vec<usize>>,
-        filters: &[&Expr],
+        filters: &[Expr],
         limit: Option<usize>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = datafusion::error::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>>> + Send>> {        
-        Box::pin(async move {
+    ) -> datafusion::error::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>> {
+        // Convert filters to references for backward compatibility
+        let filter_refs: Vec<&Expr> = filters.iter().collect();
+        
         // Filter files based on predicates
-        let filtered_files = self.filter_files(filters);
+        let filtered_files = self.filter_files(&filter_refs);
 
         // Create execution plan
         self.create_execution_plan(state, projection, &filtered_files, limit)
             .await
-        })
     }
 }

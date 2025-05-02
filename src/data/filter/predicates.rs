@@ -3,14 +3,14 @@ use datafusion::functions::expr_fn::strpos;
 use std::collections::HashSet;
 
 /// Create a date range filter
-pub fn date_range_filter(column: &str, start_date: &str, end_date: &str) -> Expr {
+#[must_use] pub fn date_range_filter(column: &str, start_date: &str, end_date: &str) -> Expr {
     col(column)
         .gt_eq(lit(start_date))
         .and(col(column).lt_eq(lit(end_date)))
 }
 
 /// Create a categorical value filter
-pub fn categorical_filter(column: &str, values: &[&str]) -> Expr {
+#[must_use] pub fn categorical_filter(column: &str, values: &[&str]) -> Expr {
     let values = values
         .iter()
         .map(|v| lit((*v).to_string()))
@@ -19,12 +19,12 @@ pub fn categorical_filter(column: &str, values: &[&str]) -> Expr {
 }
 
 /// Create a numeric range filter
-pub fn numeric_range_filter(column: &str, min: f64, max: f64) -> Expr {
+#[must_use] pub fn numeric_range_filter(column: &str, min: f64, max: f64) -> Expr {
     col(column).gt_eq(lit(min)).and(col(column).lt_eq(lit(max)))
 }
 
 /// Create a non-null filter for multiple columns
-pub fn non_null_filter(columns: &[&str]) -> Expr {
+#[must_use] pub fn non_null_filter(columns: &[&str]) -> Expr {
     let filters = columns
         .iter()
         .map(|column| col(*column).is_not_null())
@@ -34,25 +34,25 @@ pub fn non_null_filter(columns: &[&str]) -> Expr {
 }
 
 /// Create a prefix filter (LIKE 'prefix%')
-pub fn prefix_filter(column: &str, prefix: &str) -> Expr {
+#[must_use] pub fn prefix_filter(column: &str, prefix: &str) -> Expr {
     let pattern = format!("{prefix}%");
     col(column).like(lit(pattern))
 }
 
 /// Create a contains filter (LIKE '%pattern%')
-pub fn contains_filter(column: &str, pattern: &str) -> Expr {
+#[must_use] pub fn contains_filter(column: &str, pattern: &str) -> Expr {
     let pattern = format!("%{pattern}%");
     col(column).like(lit(pattern))
 }
 
 /// Create a substring filter (checking if the column contains a substring)
-pub fn substring_filter(column: &str, substring: &str) -> Expr {
+#[must_use] pub fn substring_filter(column: &str, substring: &str) -> Expr {
     // In DataFusion we can use strpos(column, substring) > 0
     strpos(col(column), lit(substring.to_string())).gt(lit(0))
 }
 
 /// Create a filter for values in a `HashSet`
-pub fn hash_set_filter(column: &str, values: HashSet<String>) -> Expr {
+#[must_use] pub fn hash_set_filter(column: &str, values: HashSet<String>) -> Expr {
     if values.is_empty() {
         return lit(true); // Always true if no values
     }

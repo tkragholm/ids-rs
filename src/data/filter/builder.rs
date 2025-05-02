@@ -1,10 +1,16 @@
 use datafusion::prelude::*;
 use std::collections::HashSet;
-use super::predicates::*;
+use super::predicates::{and_filters, categorical_filter, contains_filter, date_range_filter, hash_set_filter, numeric_range_filter, or_filters, prefix_filter};
 
 /// Builder for creating complex filter expressions
 pub struct FilterBuilder {
     filters: Vec<Expr>,
+}
+
+impl Default for FilterBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FilterBuilder {
@@ -88,7 +94,7 @@ impl FilterBuilder {
         or_filters(self.filters)
     }
 
-    /// Apply to a DataFrame (combines all filters with AND)
+    /// Apply to a `DataFrame` (combines all filters with AND)
     pub fn apply_to_dataframe(self, df: DataFrame) -> Result<DataFrame, datafusion::error::DataFusionError> {
         if self.filters.is_empty() {
             return Ok(df);

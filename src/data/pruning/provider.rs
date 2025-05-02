@@ -21,7 +21,7 @@ pub struct PrunableTableProvider {
 
 impl PrunableTableProvider {
     /// Create a new prunable table provider
-    pub fn new(
+    #[must_use] pub fn new(
         schema: SchemaRef,
         statistics: RegistryPruningStatistics,
         file_list: Vec<PathBuf>,
@@ -55,7 +55,7 @@ impl TableProvider for PrunableTableProvider {
         // We can push down filters for columns we have statistics for
         let mut result = Vec::with_capacity(filters.len());
 
-        for filter in filters {
+        for &filter in filters {
             // Check if this is a filter we can push down
             match filter {
                 Expr::BinaryExpr(binary) => {
@@ -93,18 +93,22 @@ impl TableProvider for PrunableTableProvider {
     }
 
     // Implement a TableProvider that can scan files with pruning
-    fn scan(
+    async fn scan(
         &self,
         _state: &dyn datafusion::catalog::Session,
         projection: Option<&Vec<usize>>,
-        filters: &[&Expr],
+        filters: &[Expr],
         limit: Option<usize>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = datafusion::error::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>>> + Send>> {
-        Box::pin(async move {
+    ) -> datafusion::error::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>> {
         use std::fs;
 
+        // Convert filters to references for compatibility with existing code
+        let filter_refs: Vec<&Expr> = filters.iter().collect();
+
         // Filter the file list based on filters
-        let files = if !filters.is_empty() {
+        let files = if filters.is_empty() {
+            self.file_list.clone()
+        } else {
             // For each filter, get files that pass it
             let mut filtered_files = self.file_list.clone();
             filtered_files.retain(|file| {
@@ -116,7 +120,7 @@ impl TableProvider for PrunableTableProvider {
                     .find(|stats| stats.path == *file);
 
                 if let Some(stats) = file_stats {
-                    for filter in filters {
+                    for filter in &filter_refs {
                         if !stats.should_process(filter) {
                             return false;
                         }
@@ -128,8 +132,6 @@ impl TableProvider for PrunableTableProvider {
                 }
             });
             filtered_files
-        } else {
-            self.file_list.clone()
         };
 
         if files.is_empty() {
@@ -138,7 +140,10 @@ impl TableProvider for PrunableTableProvider {
             let empty_batch = RecordBatch::new_empty(empty_schema.clone());
             let provider =
                 datafusion::datasource::MemTable::try_new(empty_schema, vec![vec![empty_batch]])?;
-            let plan = provider.scan(_state, projection, &[], limit).await?;
+            
+            // Create a new empty array of &Expr for compatibility with the updated API
+            let empty_filters: Vec<Expr> = Vec::new();
+            let plan = provider.scan(_state, projection, &empty_filters, limit).await?;
 
             return Ok(plan);
         }
@@ -179,6 +184,5 @@ impl TableProvider for PrunableTableProvider {
 
         // Create DataSourceExec with the config and return it
         Ok(DataSourceExec::from_data_source(config))
-        })
     }
 }
