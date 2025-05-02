@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use super::datafusion::create_optimized_context;
 use crate::data::PnrFilter;
+use crate::utils::path_utils::resolve_path;
 
 /// Options for controlling parquet reading behavior
 #[derive(Debug, Clone)]
@@ -175,29 +176,33 @@ impl ParquetReader {
     /// Discover parquet files in the path
     fn discover_files(&mut self) -> Result<&Vec<PathBuf>> {
         if self.file_list.is_none() {
-            let path = &self.config.path;
-            if !path.exists() {
+            // Convert to absolute path if needed
+            let abs_path = resolve_path(&self.config.path)?;
+            
+            log::debug!("Discovering files using absolute path: {}", abs_path.display());
+            
+            if !abs_path.exists() {
                 return Err(IdsError::Io(std::io::Error::new(
                     std::io::ErrorKind::NotFound,
-                    format!("Path not found: {}", path.display()),
+                    format!("Path not found: {}", abs_path.display()),
                 )));
             }
 
-            let files = if path.is_dir() {
-                Self::list_parquet_files(path)?
-            } else if path.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
-                vec![path.clone()]
+            let files = if abs_path.is_dir() {
+                Self::list_parquet_files(&abs_path)?
+            } else if abs_path.is_file() && abs_path.extension().is_some_and(|ext| ext == "parquet") {
+                vec![abs_path.clone()]
             } else {
                 return Err(IdsError::Validation(format!(
                     "Path is not a parquet file or directory: {}",
-                    path.display()
+                    abs_path.display()
                 )));
             };
 
             if files.is_empty() {
                 return Err(IdsError::Validation(format!(
                     "No parquet files found in: {}",
-                    path.display()
+                    abs_path.display()
                 )));
             }
 
@@ -230,10 +235,13 @@ impl ParquetReader {
         } else {
             // If no schema provided, try to infer from first file
             if let Some(first_file) = files.first() {
+                // Convert to absolute path if needed
+                let abs_file_path = resolve_path(first_file)?;
+                
                 let read_options = ParquetReadOptions::default();
                 let ctx = self.session_context.as_ref().unwrap();
                 let df = ctx
-                    .read_parquet(first_file.to_string_lossy().to_string(), read_options)
+                    .read_parquet(abs_file_path.to_string_lossy().to_string(), read_options)
                     .await?;
                 // Convert DFSchema to Schema using Arc::new
                 Arc::new(df.schema().clone().into())
@@ -247,9 +255,12 @@ impl ParquetReader {
 
         // Add each file individually with size info for better statistics
         for file_path in &files {
-            let file_size = fs::metadata(file_path).map(|m| m.len()).unwrap_or(0);
+            // Convert to absolute path if needed
+            let abs_file_path = resolve_path(file_path)?;
+            
+            let file_size = fs::metadata(&abs_file_path).map(|m| m.len()).unwrap_or(0);
 
-            let file_path_str = file_path.to_string_lossy().to_string();
+            let file_path_str = abs_file_path.to_string_lossy().to_string();
             config_builder =
                 config_builder.with_file(PartitionedFile::new(file_path_str, file_size));
         }
@@ -274,11 +285,12 @@ impl ParquetReader {
 
     /// Read parquet data synchronously
     pub fn read(&mut self) -> Result<Vec<RecordBatch>> {
-        // Check if path exists
-        if !self.config.path.exists() {
+        // Check if path exists using the resolved path
+        let abs_path = resolve_path(&self.config.path)?;
+        if !abs_path.exists() {
             return Err(IdsError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("Path not found: {}", self.config.path.display()),
+                format!("Path not found: {}", abs_path.display()),
             )));
         }
 
@@ -294,6 +306,11 @@ impl ParquetReader {
     /// Read parquet data asynchronously
     pub async fn read_async(&mut self) -> Result<Vec<RecordBatch>> {
         let ctx = self.init_session_context()?.clone();
+        
+        // Ensure path is absolute
+        let abs_path = resolve_path(&self.config.path)?;
+        
+        log::debug!("Reading parquet from absolute path: {}", abs_path.display());
 
         // If filter is set, we'll use the execution plan approach
         if self.config.filter.is_some()
@@ -329,9 +346,9 @@ impl ParquetReader {
                 read_options = read_options.schema(schema.as_ref());
             }
 
-            // Read the files
+            // Read the files using absolute path
             let df = ctx
-                .read_parquet(self.config.path.to_string_lossy().to_string(), read_options)
+                .read_parquet(abs_path.to_string_lossy().to_string(), read_options)
                 .await?;
 
             // Collect and return the results
@@ -439,10 +456,13 @@ pub async fn load_parquet_directory(
     schema: Option<SchemaRef>,
     pnr_filter: Option<&PnrFilter>,
 ) -> Result<Vec<RecordBatch>> {
-    let dir_path = dir_path.as_ref();
+    // Convert to absolute path for DataFusion - this handles relative paths like ../../
+    let abs_path = resolve_path(dir_path)?;
+    
+    log::debug!("Loading parquet from absolute path: {}", abs_path.display());
 
     // Create a ParquetReader with appropriate configuration
-    let mut reader = ParquetReader::new(dir_path);
+    let mut reader = ParquetReader::new(abs_path);
 
     // Set schema if provided
     if let Some(s) = schema {
@@ -471,7 +491,10 @@ pub async fn register_parquet_as_table(
     schema: Option<SchemaRef>,
     pnr_filter: Option<&PnrFilter>,
 ) -> Result<DataFrame> {
-    let path = path.as_ref();
+    // Convert to absolute path for DataFusion - this handles relative paths like ../../
+    let abs_path = resolve_path(path)?;
+    
+    log::debug!("Registering parquet from absolute path: {}", abs_path.display());
 
     // Create read options
     let mut read_options = ParquetReadOptions::default();
@@ -479,8 +502,8 @@ pub async fn register_parquet_as_table(
         read_options = read_options.schema(s.as_ref());
     }
 
-    // Register the parquet file/directory
-    ctx.register_parquet(table_name, path.to_string_lossy().to_string(), read_options)
+    // Register the parquet file/directory using absolute path
+    ctx.register_parquet(table_name, abs_path.to_string_lossy().to_string(), read_options)
         .await?;
 
     // Get the table
